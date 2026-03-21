@@ -3,7 +3,9 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useCartStore } from '@/store/useCartStore';
 import { toast } from '@/components/ui/use-toast';
+import { motion } from 'framer-motion';
 
 export interface ProductProps {
   id: number;
@@ -17,22 +19,31 @@ export interface ProductProps {
   slug: string;
 }
 
-const ProductCard = ({ id, name, price, rating, image, category, featured = false, eco = true, slug }: ProductProps) => {
-  // In a real app, this would use context or state management to add to cart
+const ProductCard = (props: ProductProps) => {
+  const { id, name, price, rating, image, category, featured = false, eco = true, slug } = props;
+  const addItem = useCartStore((state) => state.addItem);
+
   const addToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    addItem(props, 1);
     toast({
       title: "Added to cart",
       description: `${name} added to your cart`,
     });
   };
 
-  // Generate a random number for reviews count (for display purposes)
-  const reviewCount = Math.floor(Math.random() * 45) + 5;
+  // Use a stable deterministic formula based on ID instead of Math.random
+  const reviewCount = (id * 17) % 45 + 5;
 
   return (
-    <div className="product-card group relative bg-white rounded-lg shadow-md overflow-hidden">
+    <motion.div
+      className="product-card group relative bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      whileHover={{ y: -5, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
+    >
       {featured && (
         <span className="absolute top-2 left-2 z-10 bg-amber-600 text-white px-2 py-1 text-xs rounded-full">
           Featured
@@ -46,7 +57,7 @@ const ProductCard = ({ id, name, price, rating, image, category, featured = fals
           Eco
         </span>
       )}
-      
+
       <Link to={`/products/${category}/${slug}`} className="block">
         <div className="relative overflow-hidden h-64 bg-gray-100">
           <img
@@ -56,7 +67,7 @@ const ProductCard = ({ id, name, price, rating, image, category, featured = fals
           />
         </div>
       </Link>
-      
+
       <div className="p-4">
         <Link to={`/products/${category}/${slug}`} className="block">
           <h3 className="font-medium text-lg text-brown-800 mb-1 hover:text-green-700 transition-colors">{name}</h3>
@@ -76,11 +87,12 @@ const ProductCard = ({ id, name, price, rating, image, category, featured = fals
           </div>
           <p className="text-green-700 font-semibold">₹{price.toFixed(2)}</p>
         </Link>
-        
+
         <div className="mt-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          {/* @ts-ignore */}
+          <Button
+            variant="outline"
+            size="sm"
             className="w-full flex items-center justify-center hover:bg-green-50 hover:text-green-700 hover:border-green-700"
             onClick={addToCart}
           >
@@ -89,7 +101,7 @@ const ProductCard = ({ id, name, price, rating, image, category, featured = fals
           </Button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

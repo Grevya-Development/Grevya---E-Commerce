@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Search, ShoppingCart, Menu, X, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useCartStore } from '@/store/useCartStore';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +13,14 @@ import {
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [cartCount] = useState(0); // This would connect to your cart state in a full implementation
+  const getTotalItems = useCartStore((state) => state.getTotalItems);
+  const [cartCount, setCartCount] = useState(0);
+
+  // Hydration fix for client-only state vs SSR output mismatch if any
+  useEffect(() => {
+    setCartCount(getTotalItems());
+  }, [getTotalItems]);
+
   const location = useLocation();
 
   const toggleMenu = () => {
