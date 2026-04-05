@@ -1,5 +1,4 @@
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:wght@300;400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,35 +6,35 @@
 
 @layer base {
   :root {
-    --background: 145 70% 14%;           /* Darker green background */
-    --foreground: 145 44% 96%;           /* Light text on dark */
-    --card: 145 50% 16%;                 /* Slightly lighter green for cards */
-    --card-foreground: 145 44% 96%;
-    --popover: 145 60% 18%;
-    --popover-foreground: 145 44% 96%;
-    --primary: 145 75% 35%;              /* Vibrant green */
-    --primary-foreground: 145 44% 96%;
-    --secondary: 138 44% 35%;            /* Another dark green */
-    --secondary-foreground: 145 44% 96%;
-    --muted: 145 28% 25%;                /* Muted green for backgrounds */
-    --muted-foreground: 145 44% 96%;
-    --accent: 142 60% 34%;               /* Slight accent green */
-    --accent-foreground: 145 44% 96%;
-    --destructive: 0 90% 40%;
-    --destructive-foreground: 145 44% 96%;
-    --border: 145 37% 24%;
-    --input: 145 37% 24%;
-    --ring: 145 75% 35%;
-    --radius: 0.75rem;
+    --background: 40 33% 98%;           /* Cream / neutral-50 */
+    --foreground: 0 0% 15%;             /* Neutral 800 */
+    --card: 0 0% 100%;                  /* White for premium cards */
+    --card-foreground: 0 0% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 15%;
+    --primary: 142 76% 23%;             /* green-800 / dark emerald */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 43 96% 56%;            /* amber-400 */
+    --secondary-foreground: 0 0% 10%;
+    --muted: 40 20% 94%;                /* subtle warm mute */
+    --muted-foreground: 0 0% 40%;
+    --accent: 142 40% 90%;              /* light green accent */
+    --accent-foreground: 142 76% 23%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 142 76% 23%;
+    --radius: 1.5rem;                   /* rounded-2xl for Apple-like feel */
 
-    --sidebar-background: 145 60% 15%;
-    --sidebar-foreground: 145 44% 96%;
-    --sidebar-primary: 145 75% 35%;
-    --sidebar-primary-foreground: 145 44% 96%;
-    --sidebar-accent: 142 50% 24%;
-    --sidebar-accent-foreground: 145 44% 96%;
-    --sidebar-border: 145 37% 24%;
-    --sidebar-ring: 145 75% 35%;
+    --sidebar-background: 40 33% 98%;
+    --sidebar-foreground: 0 0% 15%;
+    --sidebar-primary: 142 76% 23%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 40 20% 94%;
+    --sidebar-accent-foreground: 0 0% 15%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 142 76% 23%;
   }
 }
 
@@ -45,40 +44,37 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-serif;
+    @apply font-sans tracking-tight;
   }
 }
 
 @layer components {
   .eco-badge {
-    @apply bg-green-700 text-green-100 px-2 py-1 text-xs rounded-full font-medium flex items-center;
+    @apply bg-green-50 text-green-800 px-3 py-1 text-xs rounded-full font-semibold flex items-center shadow-sm border border-green-100;
   }
 
   .nav-link {
-    @apply relative text-foreground hover:text-primary after:content-[''] after:absolute after:w-full after:scale-x-0 after:h-0.5 after:bottom-0 after:left-0 after:bg-primary after:origin-bottom-right after:transition-transform after:duration-300 hover:after:scale-x-100 hover:after:origin-bottom-left;
+    @apply relative text-gray-500 font-medium hover:text-green-800 transition-colors after:content-[''] after:absolute after:w-full after:scale-x-0 after:h-0.5 after:bottom-0 after:left-0 after:bg-green-800 after:origin-bottom-right after:transition-transform after:duration-300 hover:after:scale-x-100 hover:after:origin-bottom-left;
   }
 
   .btn-primary {
-    @apply bg-primary hover:bg-green-900 text-white px-6 py-2 rounded-md transition-colors;
+    @apply bg-green-800 hover:bg-green-900 text-white px-8 py-3 rounded-xl transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .btn-secondary {
-    @apply bg-secondary hover:bg-green-800 text-white px-6 py-2 rounded-md transition-colors;
+    @apply bg-amber-400 hover:bg-amber-500 text-neutral-900 px-8 py-3 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0;
   }
 
   .btn-outline {
-    @apply border border-primary text-primary hover:bg-green-100 px-6 py-2 rounded-md transition-colors;
+    @apply border-2 border-green-800 text-green-800 hover:bg-green-50 px-8 py-3 rounded-xl font-medium transition-all duration-300;
   }
 
   .section-heading {
-    @apply text-3xl md:text-4xl font-serif font-bold text-primary mb-6;
-  }
-
-  .product-card {
-    @apply bg-card rounded-lg shadow-md transition-all duration-300 hover:shadow-lg overflow-hidden border border-green-700;
+    @apply text-4xl md:text-5xl font-extrabold text-neutral-900 mb-8 tracking-tight;
   }
 }

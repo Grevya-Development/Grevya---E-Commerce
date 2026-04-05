@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -6,6 +5,8 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Check, CreditCard, IndianRupee } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { useCartStore } from '@/store/useCartStore';
+import { supabase } from '@/lib/supabaseClient';
 
 interface PaymentMethod {
   id: string;
@@ -19,6 +20,11 @@ const Checkout = () => {
   const [processing, setProcessing] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<string>('upi');
   
+  // Real cart values
+  const cartItems = useCartStore((state) => state.items);
+  const getSubtotal = useCartStore((state) => state.getSubtotal);
+  const clearCart = useCartStore((state) => state.clearCart);
+
   const paymentMethods: PaymentMethod[] = [
     {
       id: 'upi',
@@ -31,25 +37,86 @@ const Checkout = () => {
       name: 'Credit/Debit Card',
       description: 'Pay securely with your card',
       icon: <CreditCard className="h-8 w-8" />
+    },
+    {
+      id: 'cod',
+      name: 'Cash on Delivery',
+      description: 'Pay with cash when your order arrives',
+      icon: <IndianRupee className="h-8 w-8" />
     }
   ];
   
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (cartItems.length === 0) {
+      toast({
+        title: "Cart empty",
+        description: "Add some items before checking out.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setProcessing(true);
-    
-    // In a real implementation, this would be connected to a payment gateway
     toast({
-      title: "Processing payment",
-      description: "Your order is being processed..."
+      title: "Processing order",
+      description: "Please wait..."
     });
     
-    // Simulate payment processing delay
-    setTimeout(() => {
-      setProcessing(false);
-      // Redirect to success page
+    try {
+      const subtotal = getSubtotal();
+
+      // 1. Create Order
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          total_amount: subtotal,
+          status: 'pending',
+          payment_method: selectedPayment || 'cod',
+        })
+        .select()
+        .single();
+        
+      if (orderError) throw orderError;
+
+      const orderId = orderData.id;
+
+      // 2. Insert Order Items (map current cart to db format)
+      const orderItems = cartItems.map(item => ({
+        order_id: orderId,
+        product_id: item.id,
+        quantity: item.quantity,
+        price: item.price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // 3. Create Notification
+      await supabase
+        .from('notifications')
+        .insert({
+          message: 'Your order has been placed successfully!',
+          type: 'order'
+        });
+
+      // 4. Cleanup and Redirect
+      clearCart();
       navigate('/payment-success');
-    }, 2000);
+
+    } catch (error: any) {
+      console.error("Order processing failed:", error);
+      toast({
+        title: "Order Failed",
+        description: error.message || "Failed to process your order.",
+        variant: "destructive"
+      });
+    } finally {
+      setProcessing(false);
+    }
   };
   
   return (
@@ -198,7 +265,7 @@ const Checkout = () => {
               <div className="space-y-2 mb-4">
                 <div className="flex justify-between">
                   <span className="text-brown-600">Subtotal</span>
-                  <span>₹799.00</span>
+                  <span>₹{getSubtotal().toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-brown-600">Shipping</span>
@@ -207,7 +274,7 @@ const Checkout = () => {
                 <div className="border-t border-gray-100 pt-2 mt-2">
                   <div className="flex justify-between font-semibold">
                     <span>Total</span>
-                    <span className="text-green-700">₹799.00</span>
+                    <span className="text-green-700">₹{getSubtotal().toFixed(2)}</span>
                   </div>
                 </div>
               </div>

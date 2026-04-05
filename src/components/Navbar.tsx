@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import NotificationBell from './NotificationBell';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -72,6 +73,7 @@ const Navbar = () => {
             <Button variant="ghost" size="icon">
               <User className="h-5 w-5 text-gray-600" />
             </Button>
+            <NotificationBell />
             <Link to="/cart" className="relative">
               <Button variant="ghost" size="icon">
                 <ShoppingCart className="h-5 w-5 text-gray-600" />
@@ -86,6 +88,7 @@ const Navbar = () => {
 
           {/* Mobile menu button */}
           <div className="flex md:hidden items-center space-x-4">
+            <NotificationBell />
             <Link to="/cart" className="relative">
               <Button variant="ghost" size="icon">
                 <ShoppingCart className="h-5 w-5 text-gray-600" />
