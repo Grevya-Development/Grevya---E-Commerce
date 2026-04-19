@@ -1,0 +1,189 @@
+import React, { useEffect, useState } from 'react';
+import { Bell, Check, Info, Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/lib/supabaseClient';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+interface Notification {
+  id: string;
+  message: string;
+  type: string;
+  created_at: string;
+  read: boolean;
+}
+
+const NotificationBell = () => {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [hasError, setHasError] = useState(false);
+
+  const fetchNotifications = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error && (error.message || '').includes('relation')) {
+        setHasError(true);
+        return;
+      }
+      if (error) {
+        throw error;
+      }
+      
+      const notifs = data ? (data as Notification[]) : [];
+      setNotifications(notifs);
+      setUnreadCount(notifs.filter((n) => !n.read).length);
+    } catch (err) {
+      console.error("Failed to load notifications:", err);
+      // Failsafe: don't crash, just show empty list
+      setNotifications([]);
+      setUnreadCount(0);
+      setHasError(true);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+
+    let channel: any = null;
+
+    try {
+      channel = supabase
+        .channel('notifications_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+          },
+          (payload) => {
+            console.log('Change received!', payload);
+            fetchNotifications();
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('Realtime subscribed');
+          }
+        });
+    } catch (e) {
+      console.warn("Realtime disabled", e);
+    }
+
+    return () => {
+      try {
+        if (channel) {
+          supabase.removeChannel(channel);
+        }
+      } catch (e) {
+        console.error("Failed to remove channel:", e);
+      }
+    };
+  }, []);
+
+  const markAsRead = async (id: string, currentlyRead: boolean) => {
+    if (currentlyRead) return;
+    try {
+      const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
+      if (error) throw error;
+      
+      setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error("Failed to mark as read:", err);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const { error } = await supabase.from('notifications').update({ read: true }).eq('read', false);
+      if (error) throw error;
+      
+      setNotifications(notifications.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error("Failed to mark all as read:", err);
+    }
+  };
+
+  if (hasError) {
+    return (
+      <Button variant="ghost" size="icon" className="relative cursor-not-allowed opacity-50" title="Notifications unavailable">
+        <Bell className="h-5 w-5 text-gray-500" />
+      </Button>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative">
+          <Bell className="h-5 w-5 text-gray-600" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
+              {unreadCount}
+            </span>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <h3 className="font-semibold text-brown-800">Notifications</h3>
+          {unreadCount > 0 && (
+            <button 
+              className="text-xs text-green-700 hover:text-green-800 font-medium flex items-center"
+              onClick={markAllAsRead}
+            >
+              <Check className="h-3 w-3 mr-1" />
+              Mark all read
+            </button>
+          )}
+        </div>
+        <div className="max-h-80 overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="p-4 text-center text-sm text-gray-500">
+              No notifications yet
+            </div>
+          ) : (
+            notifications.map((notification) => (
+              <DropdownMenuItem 
+                key={notification.id} 
+                className={`p-4 cursor-pointer border-b border-gray-50 last:border-0 flex items-start space-x-3 ${!notification.read ? 'bg-green-50/50' : 'bg-transparent'}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  markAsRead(notification.id, notification.read);
+                }}
+              >
+                <div className={`mt-0.5 p-1.5 rounded-full ${notification.type === 'order' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                  {notification.type === 'order' ? <Package className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <p className={`text-sm ${!notification.read ? 'font-medium text-brown-800' : 'text-gray-600'}`}>
+                    {notification.message}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {new Date(notification.created_at).toLocaleDateString()} at {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                {!notification.read && (
+                  <div className="w-2 h-2 rounded-full bg-green-600 mt-2"></div>
+                )}
+              </DropdownMenuItem>
+            ))
+          )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+export default NotificationBell;

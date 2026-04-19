@@ -1,18 +1,27 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Search, ShoppingCart, Menu, X, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useCartStore } from '@/store/useCartStore';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import NotificationBell from './NotificationBell';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [cartCount] = useState(0); // This would connect to your cart state in a full implementation
+  const getTotalItems = useCartStore((state) => state.getTotalItems);
+  const [cartCount, setCartCount] = useState(0);
+
+  // Hydration fix for client-only state vs SSR output mismatch if any
+  useEffect(() => {
+    setCartCount(getTotalItems());
+  }, [getTotalItems]);
+
   const location = useLocation();
 
   const toggleMenu = () => {
@@ -64,6 +73,7 @@ const Navbar = () => {
             <Button variant="ghost" size="icon">
               <User className="h-5 w-5 text-gray-600" />
             </Button>
+            <NotificationBell />
             <Link to="/cart" className="relative">
               <Button variant="ghost" size="icon">
                 <ShoppingCart className="h-5 w-5 text-gray-600" />
@@ -78,6 +88,7 @@ const Navbar = () => {
 
           {/* Mobile menu button */}
           <div className="flex md:hidden items-center space-x-4">
+            <NotificationBell />
             <Link to="/cart" className="relative">
               <Button variant="ghost" size="icon">
                 <ShoppingCart className="h-5 w-5 text-gray-600" />

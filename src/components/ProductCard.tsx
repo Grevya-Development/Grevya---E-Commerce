@@ -1,9 +1,10 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useCartStore } from '@/store/useCartStore';
 import { toast } from '@/components/ui/use-toast';
+import { motion } from 'framer-motion';
 
 export interface ProductProps {
   id: number;
@@ -15,81 +16,96 @@ export interface ProductProps {
   featured?: boolean;
   eco?: boolean;
   slug: string;
+  reviewCount?: number;
 }
 
-const ProductCard = ({ id, name, price, rating, image, category, featured = false, eco = true, slug }: ProductProps) => {
-  // In a real app, this would use context or state management to add to cart
+const ProductCard = (props: ProductProps) => {
+  const { id, name, price, rating, image, category, featured = false, eco = true, slug, reviewCount } = props;
+  const addItem = useCartStore((state) => state.addItem);
+
   const addToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    addItem(props, 1);
     toast({
       title: "Added to cart",
       description: `${name} added to your cart`,
     });
   };
 
-  // Generate a random number for reviews count (for display purposes)
-  const reviewCount = Math.floor(Math.random() * 45) + 5;
+  const displayReviewCount = reviewCount !== undefined ? reviewCount : ((id * 17) % 45 + 5);
 
   return (
-    <div className="product-card group relative bg-white rounded-lg shadow-md overflow-hidden">
+    <motion.div
+      className="group relative bg-white rounded-2xl shadow-sm border border-neutral-100 overflow-hidden flex flex-col h-full transition-all duration-300"
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      whileHover={{ y: -8, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)" }}
+    >
       {featured && (
-        <span className="absolute top-2 left-2 z-10 bg-amber-600 text-white px-2 py-1 text-xs rounded-full">
+        <span className="absolute top-3 left-3 z-10 bg-amber-400 text-neutral-900 px-3 py-1 text-xs font-bold rounded-full shadow-md">
           Featured
         </span>
       )}
       {eco && (
-        <span className="absolute top-2 right-2 z-10 bg-green-50 text-green-700 px-2 py-1 text-xs rounded-full flex items-center">
+        <span className="absolute top-3 right-3 z-10 eco-badge shadow-md shadow-black/5 bg-white backdrop-blur-sm bg-opacity-90">
           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
           </svg>
           Eco
         </span>
       )}
-      
-      <Link to={`/products/${category}/${slug}`} className="block">
-        <div className="relative overflow-hidden h-64 bg-gray-100">
-          <img
-            src={image}
-            alt={name}
-            className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
-          />
-        </div>
+
+      <Link to={`/products/${category}/${slug}`} className="block relative overflow-hidden h-72 bg-neutral-50/50">
+        <img
+          src={image}
+          alt={name}
+          className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       </Link>
-      
-      <div className="p-4">
-        <Link to={`/products/${category}/${slug}`} className="block">
-          <h3 className="font-medium text-lg text-brown-800 mb-1 hover:text-green-700 transition-colors">{name}</h3>
-          <div className="flex items-center mb-2">
-            <div className="flex">
-              {[...Array(5)].map((_, i) => (
-                <Star
-                  key={i}
-                  size={14}
-                  fill={i < Math.floor(rating) ? "#FFA500" : "none"}
-                  stroke={i < Math.floor(rating) ? "#FFA500" : "#C0C0C0"}
-                  className={i < rating && i >= Math.floor(rating) ? "fill-[50%] text-amber-500" : "mr-0.5"}
-                />
-              ))}
-            </div>
-            <span className="text-xs text-gray-500 ml-1">({reviewCount})</span>
+
+      <div className="p-5 flex flex-col flex-grow">
+        <Link to={`/products/${category}/${slug}`} className="block mb-auto">
+          <h3 className="font-semibold text-lg text-neutral-900 mb-1.5 group-hover:text-green-800 transition-colors line-clamp-1">{name}</h3>
+          <div className="flex items-center mb-3">
+            {displayReviewCount > 0 ? (
+              <>
+                <div className="flex">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      size={14}
+                      fill={i < Math.floor(rating) ? "currentColor" : "none"}
+                      stroke="currentColor"
+                      className={i < rating && i >= Math.floor(rating) ? "fill-[50%] text-amber-400" : (i < Math.floor(rating) ? "text-amber-400" : "text-neutral-300")}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs font-medium text-neutral-500 ml-1.5">({displayReviewCount})</span>
+              </>
+            ) : (
+               <span className="text-xs text-neutral-400 italic font-medium">No ratings yet</span>
+            )}
           </div>
-          <p className="text-green-700 font-semibold">₹{price.toFixed(2)}</p>
+          <p className="text-xl font-extrabold text-green-800 tracking-tight">₹{price.toFixed(2)}</p>
         </Link>
-        
-        <div className="mt-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full flex items-center justify-center hover:bg-green-50 hover:text-green-700 hover:border-green-700"
+
+        <div className="mt-5 pt-1">
+          {/* @ts-ignore */}
+          <Button
+            variant="outline"
+            className="w-full flex items-center justify-center rounded-xl border-green-200 bg-green-50/50 text-green-800 hover:bg-green-800 hover:text-white hover:border-green-800 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 h-11 font-semibold"
             onClick={addToCart}
           >
-            <ShoppingCart className="h-4 w-4 mr-1" />
+            <ShoppingCart className="h-4 w-4 mr-2" />
             Add to Cart
           </Button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

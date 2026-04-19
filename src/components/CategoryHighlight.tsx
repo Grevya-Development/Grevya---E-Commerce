@@ -13,14 +13,14 @@ const CategoryHighlight = () => {
           Discover our range of eco-friendly products crafted with care for both you and the environment.
           All our products are sustainably sourced and support rural employment.
         </p>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Areca Products */}
           <div className="rounded-lg overflow-hidden shadow-md bg-white relative group">
             <div className="relative h-64 overflow-hidden">
-              <img 
-                src={productImages.areca.dinnerware} 
-                alt="Areca Products" 
+              <img
+                src={productImages.areca.dinnerware}
+                alt="Areca Products"
                 className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
@@ -28,7 +28,7 @@ const CategoryHighlight = () => {
             </div>
             <div className="p-6">
               <p className="text-brown-600 mb-4">
-                Biodegradable dinnerware made from fallen areca palm leaves. No trees cut, no chemicals used. 
+                Biodegradable dinnerware made from fallen areca palm leaves. No trees cut, no chemicals used.
                 Perfect for eco-conscious dining and events.
               </p>
               <div className="flex flex-wrap gap-2 mb-4">
@@ -38,17 +38,17 @@ const CategoryHighlight = () => {
                 <span className="text-sm bg-cream text-brown-700 px-3 py-1 rounded-full">Dinnerware</span>
               </div>
               <Button asChild variant="outline">
-                <Link to="/products/areca">Explore Areca Products</Link>
+                <Link to="/products?category=areca">Explore Areca Products</Link>
               </Button>
             </div>
           </div>
-          
+
           {/* Natural Products */}
           <div className="rounded-lg overflow-hidden shadow-md bg-white relative group">
             <div className="relative h-64 overflow-hidden">
-              <img 
-                src={productImages.natural.coconutOil} 
-                alt="Natural Products" 
+              <img
+                src={productImages.natural.coconutOil}
+                alt="Natural Products"
                 className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
@@ -56,7 +56,7 @@ const CategoryHighlight = () => {
             </div>
             <div className="p-6">
               <p className="text-brown-600 mb-4">
-                Pure, organic food and cosmetic products sourced directly from farmers and processed without additives. 
+                Pure, organic food and cosmetic products sourced directly from farmers and processed without additives.
                 Experience nature's goodness in its purest form.
               </p>
               <div className="flex flex-wrap gap-2 mb-4">
@@ -66,7 +66,7 @@ const CategoryHighlight = () => {
                 <span className="text-sm bg-cream text-brown-700 px-3 py-1 rounded-full">Indigo Powder</span>
               </div>
               <Button asChild variant="outline">
-                <Link to="/products/natural">Explore Natural Products</Link>
+                <Link to="/products?category=natural">Explore Natural Products</Link>
               </Button>
             </div>
           </div>
