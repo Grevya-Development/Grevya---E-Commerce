@@ -24,6 +24,9 @@ const Checkout = () => {
   const cartItems = useCartStore((state) => state.items);
   const getSubtotal = useCartStore((state) => state.getSubtotal);
   const clearCart = useCartStore((state) => state.clearCart);
+  const subtotal = getSubtotal();
+  const shipping = subtotal >= 500 ? 0 : 50;
+  const total = subtotal + shipping;
 
   const paymentMethods: PaymentMethod[] = [
     {
@@ -265,16 +268,16 @@ const Checkout = () => {
               <div className="space-y-2 mb-4">
                 <div className="flex justify-between">
                   <span className="text-brown-600">Subtotal</span>
-                  <span>₹{getSubtotal().toFixed(2)}</span>
+                  <span>₹{subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-brown-600">Shipping</span>
-                  <span>Free</span>
+                  <span>{shipping === 0 ? 'Free' : `₹${shipping.toFixed(2)}`}</span>
                 </div>
                 <div className="border-t border-gray-100 pt-2 mt-2">
                   <div className="flex justify-between font-semibold">
                     <span>Total</span>
-                    <span className="text-green-700">₹{getSubtotal().toFixed(2)}</span>
+                    <span className="text-green-700">₹{total.toFixed(2)}</span>
                   </div>
                 </div>
               </div>

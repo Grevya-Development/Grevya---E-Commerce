@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
+
 import { supabase } from '@/lib/supabaseClient';
 
 const Products = () => {
   const [searchParams] = useSearchParams();
+
   const categoryFilter = searchParams.get('category');
+  const searchFilter = searchParams.get('search');
 
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,15 +27,26 @@ const Products = () => {
           .select('*')
           .order('id', { ascending: true });
 
+        // Category filter
         if (categoryFilter) {
           query = query.ilike('category', `%${categoryFilter}%`);
+        }
+
+        // Search filter
+        if (searchFilter) {
+          query = query.ilike('name', `%${searchFilter}%`);
         }
 
         const { data, error: fetchError } = await query;
 
         if (fetchError) throw fetchError;
 
-        // ✅ Normalize data
+        console.log("PRODUCT DATA:", data);
+
+        if (data && data.length > 0) {
+        console.log("FIRST PRODUCT:", data[0]);
+      }
+
         const formatted = (data || []).map((item) => ({
           ...item,
           image: item.image_url,
@@ -49,8 +64,51 @@ const Products = () => {
     };
 
     fetchProducts();
-  }, [categoryFilter]);
+  }, [categoryFilter, searchFilter]);
 
+//   useEffect(() => {
+//   const fetchProducts = async () => {
+//     try {
+//       setLoading(true);
+
+//       let url = "http://localhost:5000/api/products";
+
+//       // CATEGORY FILTER
+//       if (categoryFilter) {
+//         url += `?category=${categoryFilter}`;
+//       }
+
+//       const response = await fetch(url);
+
+//       if (!response.ok) {
+//         throw new Error("Failed to fetch products");
+//       }
+
+//       const data = await response.json();
+
+//       let filteredProducts = data;
+
+//       // SEARCH FILTER
+//       if (searchFilter) {
+//         filteredProducts = data.filter((product: any) =>
+//           product.name
+//             .toLowerCase()
+//             .includes(searchFilter.toLowerCase())
+//         );
+//       }
+
+//       setProducts(filteredProducts);
+
+//     } catch (err: any) {
+//       console.error("FETCH ERROR:", err);
+//       setError(err.message || "Something went wrong");
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   fetchProducts();
+// }, [categoryFilter, searchFilter]);
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
@@ -61,7 +119,9 @@ const Products = () => {
           <h1 className="text-4xl font-bold text-green-800 mb-2">
             {categoryFilter
               ? `${categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1)} Products`
-              : 'Our Products'}
+              : searchFilter
+              ? `Search Results for "${searchFilter}"`
+              : 'All Products'}
           </h1>
 
           <p className="text-green-600 mb-8">
@@ -83,6 +143,7 @@ const Products = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {products.map((product) => {
+
                 const slug = (product.name || '')
                   .toLowerCase()
                   .replace(/\s+/g, '-');
@@ -90,20 +151,16 @@ const Products = () => {
                 const category = encodeURIComponent(product.category || 'general');
 
                 return (
-                  <Link
-                    key={product.id}
-                    to={`/products/${category}/${slug}`}
-                  >
-                    <ProductCard
-                      id={product.id}
-                      name={product.name}
-                      price={product.price}
-                      image={product.image} // ✅ FIXED
-                      category={product.category}
-                      rating={product.rating}
-                      slug={slug}
-                    />
-                  </Link>
+                <ProductCard
+                  key={product.id}
+                  id={product.id}
+                  name={product.name}
+                  price={product.price}
+                  image={product.image}
+                  category={product.category}
+                  rating={product.rating}
+                  slug={slug}
+                />
                 );
               })}
             </div>

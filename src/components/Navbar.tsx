@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, Menu, X, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/store/useCartStore';
@@ -16,6 +16,8 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const getTotalItems = useCartStore((state) => state.getTotalItems);
   const [cartCount, setCartCount] = useState(0);
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Hydration fix for client-only state vs SSR output mismatch if any
   useEffect(() => {
@@ -27,6 +29,14 @@ const Navbar = () => {
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
+  
+  const handleSearch = () => {
+      console.log("SEARCH CLICKED", searchTerm);
+
+  if (searchTerm.trim()) {
+    navigate(`/products?search=${encodeURIComponent(searchTerm)}`);
+  }
+};
 
   const isActive = (path: string) => {
     return location.pathname === path ? "text-green-700 font-medium" : "text-foreground hover:text-green-700";
@@ -67,9 +77,30 @@ const Navbar = () => {
 
           {/* Right side icons */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="ghost" size="icon">
-              <Search className="h-5 w-5 text-gray-600" />
-            </Button>
+          {/* Search Box */}
+             <div className="flex items-center border border-gray-300 rounded-md overflow-hidden bg-white">
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch();
+                  }
+                }}
+                className="px-3 py-1 text-sm outline-none w-48"
+              />
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleSearch}
+              >
+                <Search className="h-5 w-5 text-gray-600" />
+              </Button>
+            </div>
+
             <Button variant="ghost" size="icon">
               <User className="h-5 w-5 text-gray-600" />
             </Button>
