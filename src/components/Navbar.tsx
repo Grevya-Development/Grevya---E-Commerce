@@ -66,22 +66,15 @@ const Navbar = () => {
     }
   };
   
-  const handleSearch = () => {
-      console.log("SEARCH CLICKED", searchTerm);
 
-  if (searchTerm.trim()) {
-    navigate(`/products?search=${encodeURIComponent(searchTerm)}`);
-  }
-};
-
-  // const handleSearch = (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   if (searchQuery.trim()) {
-  //     navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
-  //     setSearchOpen(false);
-  //     setSearchQuery('');
-  //   }
-  // };
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchOpen(false);
+      setSearchQuery('');
+    }
+  };
 
   return (
     <>
