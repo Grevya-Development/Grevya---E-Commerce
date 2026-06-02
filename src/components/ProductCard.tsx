@@ -33,8 +33,7 @@ const ProductCard = (props: ProductProps) => {
     });
   };
 
-  const displayReviewCount = reviewCount !== undefined ? reviewCount : ((id * 17) % 45 + 5);
-
+    const displayReviewCount = reviewCount ?? 0;
   return (
     <motion.div
       className="group relative bg-white rounded-2xl shadow-sm border border-neutral-100 overflow-hidden flex flex-col h-full transition-all duration-300"
@@ -70,26 +69,34 @@ const ProductCard = (props: ProductProps) => {
       <div className="p-5 flex flex-col flex-grow">
         <Link to={`/products/${category}/${slug}`} className="block mb-auto">
           <h3 className="font-semibold text-lg text-neutral-900 mb-1.5 group-hover:text-green-800 transition-colors line-clamp-1">{name}</h3>
-          <div className="flex items-center mb-3">
-            {displayReviewCount > 0 ? (
-              <>
-                <div className="flex">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      size={14}
-                      fill={i < Math.floor(rating) ? "currentColor" : "none"}
-                      stroke="currentColor"
-                      className={i < rating && i >= Math.floor(rating) ? "fill-[50%] text-amber-400" : (i < Math.floor(rating) ? "text-amber-400" : "text-neutral-300")}
-                    />
-                  ))}
-                </div>
-                <span className="text-xs font-medium text-neutral-500 ml-1.5">({displayReviewCount})</span>
-              </>
-            ) : (
-               <span className="text-xs text-neutral-400 italic font-medium">No ratings yet</span>
-            )}
-          </div>
+      <div className="flex items-center mb-3">
+          {displayReviewCount > 0 ? (
+            <>
+              <div className="flex">
+                {[...Array(5)].map((_, i) => (
+                  <Star
+                    key={i}
+                    size={14}
+                    fill={i < Math.round(rating) ? "currentColor" : "none"}
+                    className={
+                      i < Math.round(rating)
+                        ? "text-amber-400"
+                        : "text-neutral-300"
+                    }
+                  />
+                ))}
+              </div>
+
+              <span className="text-xs font-medium text-neutral-500 ml-2">
+               ({displayReviewCount} review{displayReviewCount !== 1 ? "s" : ""})
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-neutral-400 italic">
+              No reviews yet
+            </span>
+          )}
+        </div>
           <p className="text-xl font-extrabold text-green-800 tracking-tight">₹{price.toFixed(2)}</p>
         </Link>
 

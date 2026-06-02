@@ -39,6 +39,12 @@ const Products = () => {
 
         const { data, error: fetchError } = await query;
 
+        const { data: reviewsData, error: reviewError } = await supabase
+        .from('reviews')
+        .select('product_id');
+
+        if (reviewError) throw reviewError;
+
         if (fetchError) throw fetchError;
 
         console.log("PRODUCT DATA:", data);
@@ -47,14 +53,21 @@ const Products = () => {
         console.log("FIRST PRODUCT:", data[0]);
       }
 
-        const formatted = (data || []).map((item) => ({
-          ...item,
-          image: item.image_url,
-          rating: item.rating || 4,
-        }));
+      const formatted = (data || []).map((item) => {
+      const reviewCount =
+          reviewsData?.filter(
+           (review) => review.product_id === item.id
+           ).length || 0;
 
+       return {
+            ...item,
+            image: item.image_url,
+            rating: item.rating || 4,
+            reviewCount,
+          };
+        });
         setProducts(formatted);
-
+        console.log("FORMATTED PRODUCTS:", formatted);
       } catch (err: any) {
         console.error("FETCH ERROR:", err);
         setError(err.message || "Something went wrong");
@@ -159,6 +172,7 @@ const Products = () => {
                   image={product.image}
                   category={product.category}
                   rating={product.rating}
+                  reviewCount={product.reviewCount}
                   slug={slug}
                 />
                 );

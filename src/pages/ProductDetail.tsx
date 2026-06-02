@@ -42,6 +42,7 @@ const ProductDetail = () => {
         .select('*')
         .eq('product_id', productId)
         .order('created_at', { ascending: false });
+        console.log("REVIEWS DATA:", revData);
 
       if (revError && !(revError.message || '').includes('relation')) {
         console.error("Reviews fetch error:", revError);
