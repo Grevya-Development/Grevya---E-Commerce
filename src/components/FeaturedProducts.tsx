@@ -21,15 +21,32 @@ const FeaturedProducts = () => {
           .limit(4);
 
         if (error) throw error;
+        console.log("FEATURED PRODUCT:", data?.[0]);
 
         // ✅ Normalize data
-        const formatted = (data || []).map((item) => ({
-          ...item,
-          image: item.image_url,
-          rating: item.rating || 4,
-        }));
+        const { data: reviewsData, error: reviewError } = await supabase
+          .from('reviews')
+          .select('product_id');
+
+        if (reviewError) throw reviewError;
+
+        const formatted = (data || []).map((item) => {
+          const reviewCount =
+            reviewsData?.filter(
+              (review) => review.product_id === item.id
+            ).length || 0;
+
+          return {
+            ...item,
+            image: item.image_url,
+            rating: item.rating || 4,
+            reviewCount,
+          };
+        });
 
         setFeaturedProducts(formatted);
+
+        console.log("FEATURED FORMATTED:", formatted);
 
       } catch (err: any) {
         console.error("Error fetching featured products:", err);
@@ -120,6 +137,7 @@ const FeaturedProducts = () => {
                   image={product.image} // ✅ FIXED
                   category={product.category}
                   rating={product.rating}
+                  reviewCount={product.reviewCount}
                   slug={slug}
                 />
               );
