@@ -50,6 +50,7 @@ import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 import ProtectedRoute from './routes/ProtectedRoute';
+import AuthInitializer from './components/AuthInitializer'
 
 // Public Pages
 const Index = lazy(() => import('./pages/Index'));
@@ -75,6 +76,7 @@ const App = () => {
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <AuthInitializer />
 
       <BrowserRouter>
         <Suspense
