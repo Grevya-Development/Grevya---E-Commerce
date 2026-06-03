@@ -1,155 +1,58 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import { User } from '@supabase/supabase-js'
-import { Profile } from '../services/authService'
-
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { User } from '@supabase/supabase-js';
+import { Profile } from '../services/authService';
 
 interface AuthState {
+  // Current auth user
+  user: User | null;
+  // User profile from profiles table
+  profile: Profile | null;
+  // Global auth loading state
+  isLoading: boolean;
+  // Actions
+  setUser: (user: User | null) => void;
+  setProfile: (profile: Profile | null) => void;
+  setLoading: (loading: boolean) => void;
+  clearAuth: () => void;
 
-  // CURRENT AUTH USER
-  user: User | null
-  
-  // USER PROFILE FROM profiles TABLE
-  profile: Profile | null
-
-  // GLOBAL AUTH LOADING STATE
-  isLoading: boolean
-
-  // ─────────────────────────────────────────
-  // ACTIONS
-  // ─────────────────────────────────────────
-
-  setUser: (
-    user: User | null
-  ) => void
-
-  setProfile: (
-    profile: Profile | null
-  ) => void
-
-  setLoading: (
-    loading: boolean
-  ) => void
-
-  clearAuth: () => void
-
-  // ─────────────────────────────────────────
-  // ROLE CHECKERS
-  // ─────────────────────────────────────────
-
-  isAdmin: () => boolean
-
-  isSeller: () => boolean
-
-  isBuyer: () => boolean
+  // Role checkers
+  isAdmin: () => boolean;
+  isSeller: () => boolean;
+  isBuyer: () => boolean;
 }
 
-// ─────────────────────────────────────────────
-// AUTH STORE
-// ─────────────────────────────────────────────
-
 export const useAuthStore = create<AuthState>()(
-
   persist(
-
     (set, get) => ({
-
-      // ─────────────────────────────────────
-      // INITIAL STATE
-      // ─────────────────────────────────────
-
+      // Initial state
       user: null,
-
       profile: null,
-
       isLoading: true,
 
-      // ─────────────────────────────────────
-      // SET USER
-      // ─────────────────────────────────────
-
-      setUser: (
-        user
-      ) => set({
-        user
-      }),
-
-      // ─────────────────────────────────────
-      // SET PROFILE
-      // ─────────────────────────────────────
-
-      setProfile: (
-        profile
-      ) => set({
-        profile
-      }),
-
-      // ─────────────────────────────────────
-      // SET LOADING
-      // ─────────────────────────────────────
-
-      setLoading: (
-        isLoading
-      ) => set({
-        isLoading
-      }),
-
-      // ─────────────────────────────────────
-      // CLEAR AUTH
-      // ─────────────────────────────────────
-
+      // Actions
+      setUser: (user) => set({ user }),
+      setProfile: (profile) => set({ profile }),
+      setLoading: (isLoading) => set({ isLoading }),
       clearAuth: () =>
-
         set({
-
           user: null,
-
           profile: null,
-
           isLoading: false,
-
         }),
 
-      // ─────────────────────────────────────
-      // ROLE CHECKERS
-      // ─────────────────────────────────────
-
-      isAdmin: () =>
-
-        !!get().profile &&
-        get().profile?.role === 'admin',
-
-      isSeller: () =>
-
-        !!get().profile &&
-        get().profile?.role === 'seller',
-
-      isBuyer: () =>
-
-        !!get().profile &&
-        get().profile?.role === 'buyer',
-
+      // Role checkers
+      isAdmin: () => get().profile?.role === 'admin',
+      isSeller: () => get().profile?.role === 'seller',
+      isBuyer: () => get().profile?.role === 'buyer',
     }),
-
-    // ───────────────────────────────────────
-    // PERSIST CONFIG
-    // ───────────────────────────────────────
-
     {
-
       name: 'auth-storage',
-
-      // ONLY PERSIST NECESSARY DATA
+      // Only persist necessary data
       partialize: (state) => ({
-
         user: state.user,
-
         profile: state.profile,
-
       }),
-
     }
-
   )
-
-)
+);

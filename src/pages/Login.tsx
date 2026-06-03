@@ -169,6 +169,8 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Lock, XCircle, Leaf } from 'lucide-react'
 import { loginUser } from '../services/authService'
 import { useAuthStore } from '../store/authStore'
+import { createNotification }
+from '../services/notificationService'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -202,6 +204,12 @@ export default function Login() {
 
       setUser(user)
       setProfile(profile)
+
+      await createNotification(
+  user.id,
+  'Login Successful',
+  'Welcome back to Grevya'
+)
 
       if (profile.role === 'admin') navigate('/admin/dashboard')
       else if (profile.role === 'seller') navigate('/seller/dashboard')
