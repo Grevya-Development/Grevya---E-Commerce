@@ -5,9 +5,12 @@ import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/store/useCartStore';
 import { toast } from '@/components/ui/use-toast';
 import { motion } from 'framer-motion';
+import { supabase } from '@/lib/supabaseClient';
+import { Heart } from 'lucide-react';
+import { useWishlistStore } from '@/store/useWishlistStore';
 
 export interface ProductProps {
-  id: number;
+  id: string;
   name: string;
   price: number;
   rating: number;
@@ -22,6 +25,10 @@ export interface ProductProps {
 const ProductCard = (props: ProductProps) => {
   const { id, name, price, rating, image, category, featured = false, eco = true, slug, reviewCount } = props;
   const addItem = useCartStore((state) => state.addItem);
+  const wishlistItems = useWishlistStore((state) => state.items);
+  const addWishlistItem = useWishlistStore((state) => state.addItem);
+  const removeWishlistItem = useWishlistStore((state) => state.removeItem);
+  const isWishlisted = wishlistItems.includes(id);
 
   const addToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -32,6 +39,72 @@ const ProductCard = (props: ProductProps) => {
       description: `${name} added to your cart`,
     });
   };
+  const addToWishlist = async (e: React.MouseEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    toast({
+      title: "Login Required",
+      description: "Please login to use wishlist",
+    });
+    return;
+  }
+
+  // Remove from wishlist
+  if (isWishlisted) {
+    const { error } = await supabase
+      .from("wishlist")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("product_id", id);
+
+    if (error) {
+      toast({
+        title: "Wishlist Error",
+        description: error.message,
+      });
+      return;
+    }
+
+    removeWishlistItem(id);
+
+    toast({
+      title: "Wishlist",
+      description: "Removed from wishlist",
+    });
+
+    return;
+  }
+
+  // Add to wishlist
+  const { error } = await supabase
+    .from("wishlist")
+    .insert({
+      user_id: user.id,
+      product_id: id,
+    });
+
+  if (error) {
+    toast({
+      title: "Wishlist Error",
+      description: error.message,
+    });
+    return;
+  }
+
+  addWishlistItem(id);
+
+  toast({
+    title: "Wishlist",
+    description: "Added to wishlist",
+  });
+};
+ 
 
     const displayReviewCount = reviewCount ?? 0;
   return (
@@ -58,7 +131,20 @@ const ProductCard = (props: ProductProps) => {
       )}
 
       <Link to={`/products/${category}/${slug}`} className="block relative overflow-hidden h-72 bg-neutral-50/50">
-        <img
+      <button
+      onClick={addToWishlist}
+      className="absolute top-3 left-3 z-20 bg-white rounded-full p-2 shadow-md"
+    >
+      <Heart
+        size={18}
+        className={
+          isWishlisted
+            ? "text-red-500 fill-red-500"
+            : "text-gray-500"
+        }
+      />
+    </button>  
+      <img
           src={image}
           alt={name}
           className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out"

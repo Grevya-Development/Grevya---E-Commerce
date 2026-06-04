@@ -11,6 +11,8 @@ import {
   DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import NotificationBell from './NotificationBell';
+import { supabase } from '@/lib/supabaseClient';
+import { useWishlistStore } from '@/store/useWishlistStore';
 import { useAuthStore } from '@/store/authStore';
 import { logoutUser } from '@/services/authService';
 
@@ -28,6 +30,12 @@ const Navbar = () => {
 
   const location = useLocation();
   const { user, profile, clearAuth } = useAuthStore();
+  const clearWishlist = useWishlistStore(
+  (state) => state.clearItems
+);
+  const setWishlistItems = useWishlistStore(
+  (state) => state.setItems
+);
 
   useEffect(() => { setCartCount(getTotalItems()); }, [getTotalItems]);
 
@@ -45,6 +53,27 @@ const Navbar = () => {
   useEffect(() => {
     if (searchOpen) searchRef.current?.focus();
   }, [searchOpen]);
+  useEffect(() => {
+  const loadWishlist = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("wishlist")
+      .select("product_id")
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setWishlistItems(
+      data.map((item) => item.product_id)
+    );
+  };
+
+  loadWishlist();
+}, [user, setWishlistItems]);
 
   const isActive = (path: string) =>
     location.pathname === path
@@ -60,6 +89,7 @@ const Navbar = () => {
     try {
       await logoutUser();
       clearAuth();
+      clearWishlist();
       navigate('/login');
     } catch (error) {
       console.error(error);
