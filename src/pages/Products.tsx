@@ -25,7 +25,9 @@ const Products = () => {
         let query = supabase
           .from('products')
           .select('*')
+          .eq("is_hidden", false)
           .order('id', { ascending: true });
+          
 
         // Category filter
         if (categoryFilter) {
@@ -46,12 +48,6 @@ const Products = () => {
         if (reviewError) throw reviewError;
 
         if (fetchError) throw fetchError;
-
-        console.log("PRODUCT DATA:", data);
-
-        if (data && data.length > 0) {
-        console.log("FIRST PRODUCT:", data[0]);
-      }
 
       const formatted = (data || []).map((item) => {
       const reviewCount =

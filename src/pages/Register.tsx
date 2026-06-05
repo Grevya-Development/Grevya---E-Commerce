@@ -33,7 +33,7 @@ export default function Register() {
     setLoading(true);
     try {
       await registerUser({ ...form, role: 'buyer' });
-      navigate('/login');
+      navigate('/');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
