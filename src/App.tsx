@@ -70,6 +70,7 @@ const Register = lazy(() => import('./pages/Register'));
 
 // Dashboard Pages
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
 const SellerDashboard = lazy(() => import('./pages/seller/SellerDashboard'));
 
 const App = () => {
@@ -119,6 +120,14 @@ const App = () => {
               element={
                 <ProtectedRoute allowedRoles={['admin']}>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminUsers />
                 </ProtectedRoute>
               }
             />
