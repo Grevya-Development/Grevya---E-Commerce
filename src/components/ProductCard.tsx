@@ -20,10 +20,13 @@ export interface ProductProps {
   eco?: boolean;
   slug: string;
   reviewCount?: number;
+  onWishlistRemoved?: (id: string) => void;
+
 }
 
 const ProductCard = (props: ProductProps) => {
-  const { id, name, price, rating, image, category, featured = false, eco = true, slug, reviewCount } = props;
+  const { id, name, price, rating, image, category, featured = false, eco = true, slug, reviewCount,  onWishlistRemoved,
+ } = props;
   const addItem = useCartStore((state) => state.addItem);
   const wishlistItems = useWishlistStore((state) => state.items);
   const addWishlistItem = useWishlistStore((state) => state.addItem);
@@ -72,6 +75,7 @@ const ProductCard = (props: ProductProps) => {
     }
 
     removeWishlistItem(id);
+    onWishlistRemoved?.(id);
 
     toast({
       title: "Wishlist",
@@ -133,9 +137,8 @@ const ProductCard = (props: ProductProps) => {
       <Link to={`/products/${category}/${slug}`} className="block relative overflow-hidden h-72 bg-neutral-50/50">
       <button
       onClick={addToWishlist}
-      className="absolute top-3 left-3 z-20 bg-white rounded-full p-2 shadow-md"
-    >
-      <Heart
+      className="absolute top-3 left-3 z-20 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-md hover:shadow-lg transition-all duration-300"    >
+      {/* <Heart
         size={18}
         className={
           isWishlisted
@@ -143,6 +146,32 @@ const ProductCard = (props: ProductProps) => {
             : "text-gray-500"
         }
       />
+       */}
+       <motion.div
+        whileTap={{ scale: 0.8 }}
+        animate={
+        isWishlisted
+          ? {
+              scale: [1, 1.4, 0.95, 1],
+            }
+          : {
+              scale: 1,
+            }
+      }
+        transition={{
+          duration: 0.25,
+          ease: "easeOut",
+        }}
+      >
+  <Heart
+    size={18}
+    className={`transition-all duration-300 ${
+      isWishlisted
+        ? "text-red-500 fill-red-500"
+        : "text-gray-500"
+    }`}
+  />
+</motion.div>
     </button>  
       <img
           src={image}

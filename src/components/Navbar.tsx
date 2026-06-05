@@ -12,9 +12,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import NotificationBell from './NotificationBell';
 import { supabase } from '@/lib/supabaseClient';
-import { useWishlistStore } from '@/store/useWishlistStore';
 import { useAuthStore } from '@/store/authStore';
 import { logoutUser } from '@/services/authService';
+import { Heart } from "lucide-react";
+import { useWishlistStore } from "@/store/useWishlistStore";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -25,6 +26,9 @@ const Navbar = () => {
 
   const getTotalItems = useCartStore((state) => state.getTotalItems);
   const [cartCount, setCartCount] = useState(0);
+  const wishlistCount = useWishlistStore(
+  (state) => state.items.length
+);
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -203,6 +207,18 @@ const Navbar = () => {
 
               {/* Notifications */}
               <NotificationBell />
+              <Link
+                to="/wishlist"
+                className="relative p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <Heart size={18} />
+
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] min-h-[18px] flex items-center justify-center">
+                    {wishlistCount}
+                  </span>
+                )}
+              </Link>
 
               {/* Cart */}
               <Link to="/cart" className="relative p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors">

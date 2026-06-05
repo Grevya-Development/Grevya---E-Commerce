@@ -51,6 +51,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 import ProtectedRoute from './routes/ProtectedRoute';
 import AuthInitializer from './components/AuthInitializer'
+import Wishlist from "@/pages/Wishlist";
 
 // Public Pages
 const Index = lazy(() => import('./pages/Index'));
@@ -92,6 +93,7 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/about" element={<About />} />
             <Route path="/products" element={<Products />} />
+            <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/products/:category/:slug" element={<ProductDetail />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/contact" element={<Contact />} />
