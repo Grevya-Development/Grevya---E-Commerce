@@ -1,4 +1,3 @@
-
 // import React, { Suspense, lazy } from 'react';
 // import { Toaster } from "@/components/ui/toaster";
 // import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -41,41 +40,46 @@
 
 // export default App;
 
+import React, { Suspense, lazy } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
-import { Toaster } from '@/components/ui/toaster';
-import { Toaster as Sonner } from '@/components/ui/sonner';
-import { TooltipProvider } from '@/components/ui/tooltip';
-
-import ProtectedRoute from './routes/ProtectedRoute';
-import AuthInitializer from './components/AuthInitializer'
+import ProtectedRoute from "./routes/ProtectedRoute";
+import AuthInitializer from "./components/AuthInitializer";
 import Wishlist from "@/pages/Wishlist";
 
 // Public Pages
-const Index = lazy(() => import('./pages/Index'));
-const About = lazy(() => import('./pages/About'));
-const Products = lazy(() => import('./pages/Products'));
-const ProductDetail = lazy(() => import('./pages/ProductDetail'));
-const Cart = lazy(() => import('./pages/Cart'));
-const Checkout = lazy(() => import('./pages/Checkout'));
-const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
-const Contact = lazy(() => import('./pages/Contact'));
-const NotFound = lazy(() => import('./pages/NotFound'));
+const Index = lazy(() => import("./pages/Index"));
+const About = lazy(() => import("./pages/About"));
+const Products = lazy(() => import("./pages/Products"));
+const ProductDetail = lazy(() => import("./pages/ProductDetail"));
+const Cart = lazy(() => import("./pages/Cart"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+const Contact = lazy(() => import("./pages/Contact"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Auth Pages
-const Login = lazy(() => import('./pages/Login'));
-const Register = lazy(() => import('./pages/Register'));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
 
-// Dashboard Pages
-const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
-const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
-const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'));
-const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'));
-const AdminNotifications = lazy(() => import('./pages/admin/AdminNotifications'));
-const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
-const SellerDashboard = lazy(() => import('./pages/seller/SellerDashboard'));
+//Admin Dashboard Pages
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminProducts = lazy(() => import("./pages/admin/AdminProducts"));
+const AdminOrders = lazy(() => import("./pages/admin/AdminOrders"));
+const AdminNotifications = lazy(
+  () => import("./pages/admin/AdminNotifications"),
+);
+const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
+
+// Seller Pages
+const SellerDashboard = lazy(() => import("./pages/seller/SellerDashboard"));
+const AddProduct = lazy(() => import("./pages/seller/AddProduct"));
+const MyProducts = lazy(() => import("./pages/seller/MyProducts"));
 
 const App = () => {
   return (
@@ -93,13 +97,19 @@ const App = () => {
           }
         >
           <Routes>
-
             {/* Public Routes */}
             <Route path="/" element={<Index />} />
             <Route path="/about" element={<About />} />
             <Route path="/products" element={<Products />} />
             <Route path="/wishlist" element={<Wishlist />} />
-            <Route path="/products/:category/:slug" element={<ProductDetail />} />
+            <Route
+              path="/products/:category/:slug"
+              element={<ProductDetail />}
+            />
+            <Route
+              path="/products/:category/:slug"
+              element={<ProductDetail />}
+            />
             <Route path="/cart" element={<Cart />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
@@ -112,7 +122,7 @@ const App = () => {
             <Route
               path="/checkout"
               element={
-                <ProtectedRoute allowedRoles={['buyer', 'seller', 'admin']}>
+                <ProtectedRoute allowedRoles={["buyer", "seller", "admin"]}>
                   <Checkout />
                 </ProtectedRoute>
               }
@@ -122,7 +132,7 @@ const App = () => {
             <Route
               path="/admin/dashboard"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminDashboard />
                 </ProtectedRoute>
               }
@@ -130,7 +140,7 @@ const App = () => {
             <Route
               path="/admin/users"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminUsers />
                 </ProtectedRoute>
               }
@@ -138,7 +148,7 @@ const App = () => {
             <Route
               path="/admin/products"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminProducts />
                 </ProtectedRoute>
               }
@@ -147,7 +157,7 @@ const App = () => {
             <Route
               path="/admin/orders"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminOrders />
                 </ProtectedRoute>
               }
@@ -156,7 +166,7 @@ const App = () => {
             <Route
               path="/admin/notifications"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminNotifications />
                 </ProtectedRoute>
               }
@@ -165,7 +175,7 @@ const App = () => {
             <Route
               path="/admin/settings"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminSettings />
                 </ProtectedRoute>
               }
@@ -175,15 +185,32 @@ const App = () => {
             <Route
               path="/seller/dashboard"
               element={
-                <ProtectedRoute allowedRoles={['seller', 'admin']}>
+                <ProtectedRoute allowedRoles={["seller", "admin"]}>
                   <SellerDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/seller/add-product"
+              element={
+                <ProtectedRoute allowedRoles={["seller", "admin"]}>
+                  <AddProduct />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/seller/products"
+              element={
+                <ProtectedRoute allowedRoles={["seller", "admin"]}>
+                  <MyProducts />
                 </ProtectedRoute>
               }
             />
 
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
-
           </Routes>
         </Suspense>
       </BrowserRouter>
