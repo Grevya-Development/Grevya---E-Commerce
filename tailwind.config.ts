@@ -24,59 +24,75 @@ export default {
 		},
 		extend: {
 			colors: {
-				// Strong Green Theme
-				border: '#BEE9C3',
-				input: '#BEE9C3',
-				ring: '#118C4F',
-				background: '#ECFFF4', // light green
-				foreground: '#134F31', // deep green
+				// Logo palette — bridged to CSS variables defined in src/index.css
+				border: 'hsl(var(--border))',
+				input: 'hsl(var(--input))',
+				ring: 'hsl(var(--ring))',
+				background: 'hsl(var(--background))',
+				foreground: 'hsl(var(--foreground))',
 				primary: {
-					DEFAULT: '#16A34A', // Vibrant green
-					foreground: '#ECFFF4'
+					DEFAULT: 'hsl(var(--primary))',
+					foreground: 'hsl(var(--primary-foreground))'
 				},
 				secondary: {
-					DEFAULT: '#54C598', // Mint green
-					foreground: '#134F31'
+					DEFAULT: 'hsl(var(--secondary))',
+					foreground: 'hsl(var(--secondary-foreground))'
 				},
 				destructive: {
-					DEFAULT: '#D64545',
-					foreground: '#F3FDF7'
+					DEFAULT: 'hsl(var(--destructive))',
+					foreground: 'hsl(var(--destructive-foreground))'
 				},
 				muted: {
-					DEFAULT: '#DFF3E8',
-					foreground: '#20A068'
+					DEFAULT: 'hsl(var(--muted))',
+					foreground: 'hsl(var(--muted-foreground))'
 				},
 				accent: {
-					DEFAULT: '#A3E6B1',
-					foreground: '#1C5636'
+					DEFAULT: 'hsl(var(--accent))',
+					foreground: 'hsl(var(--accent-foreground))'
 				},
 				popover: {
-					DEFAULT: '#DFF3E8',
-					foreground: '#134F31'
+					DEFAULT: 'hsl(var(--popover))',
+					foreground: 'hsl(var(--popover-foreground))'
 				},
 				card: {
-					DEFAULT: '#F3FDF7',
-					foreground: '#134F31'
+					DEFAULT: 'hsl(var(--card))',
+					foreground: 'hsl(var(--card-foreground))'
 				},
 				sidebar: {
-					DEFAULT: "#ECFFF4",
-					foreground: "#134F31",
-					primary: "#16A34A",
-					'primary-foreground': "#ECFFF4",
-					accent: "#A3E6B1",
-					'accent-foreground': "#134F31",
-					border: "#BEE9C3",
-					ring: "#118C4F"
+					DEFAULT: 'hsl(var(--sidebar-background))',
+					foreground: 'hsl(var(--sidebar-foreground))',
+					primary: 'hsl(var(--sidebar-primary))',
+					'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
+					accent: 'hsl(var(--sidebar-accent))',
+					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+					border: 'hsl(var(--sidebar-border))',
+					ring: 'hsl(var(--sidebar-ring))'
 				},
 				green: {
-					100: "#E5FFF1",
-					400: "#63D993",
-					600: "#20A068",
-					700: "#118C4F",
-					800: "#046D38",
+					50: "#F4F5EE",
+					100: "#E7E9DD",
+					200: "#D3D7BE",
+					400: "#8A8B5A",
+					500: "#6F7245",
+					600: "#5A5E33",
+					700: "#474B26",
+					800: "#33381C",
+					900: "#262A14",
+					950: "#161809",
 				},
-				cream: '#ECFFF4',
-				earth: '#A3E6B1',
+				forest: '#33381C',
+				olive: '#797439',
+				clay: '#A68D65',
+				cream: '#F7EEE4',
+				'cream-light': '#FBF7F1',
+				ink: '#1D1E19',
+				earth: '#A68D65',
+				brown: {
+					100: '#EAE2D5',
+					600: '#5C5C54',
+					700: '#4A4A43',
+					800: '#1D1E19',
+				},
 			},
 			borderRadius: {
 				lg: '0.75rem',
@@ -85,7 +101,7 @@ export default {
 			},
 			fontFamily: {
 				sans: ['Inter', 'sans-serif'],
-				serif: ['Merriweather', 'serif'],
+				serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
 			},
 			keyframes: {
 				"accordion-down": {

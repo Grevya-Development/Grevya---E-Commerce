@@ -360,3 +360,16 @@ pkill -f "vite preview" 2>/dev/null; rm -f /tmp/before-*.png /tmp/after-*.png /t
 **Notes:**
 - `blue-*` in NotificationBell is intentionally left (functional info color, out of palette scope).
 - HSL triplets in Task 3 are computed from the spec hexes; minor visual tuning is allowed during Task 8 screenshot review.
+
+## Implementation deviations (caught during review, all fixed)
+
+These were not in the original task list but were required to actually meet the goal; the two-stage reviews surfaced them and they were fixed before completion:
+
+1. **Missing Tailwind scale steps.** Markup uses `green-{200,500,950}` and `brown-{100,700}` beyond the steps the plan defined. Undefined steps render nothing (silent regression). Added: green-200 `#D3D7BE`, green-500 `#6F7245`, green-950 `#161809`, brown-100 `#EAE2D5`, brown-700 `#4A4A43`.
+2. **shadcn token bridge (CRITICAL).** `tailwind.config.ts` hardcoded the shadcn semantic tokens (`primary`, `background`, `card`, `accent`, `secondary`, `border`, `ring`, `popover`, `muted`, `sidebar`) as literal old hexes instead of `hsl(var(--x))`. So the `index.css` `:root` changes were inert for all Tailwind utilities — every shadcn `<Button>`/`<Card>` still rendered old kelly-green. Fixed by bridging all semantic tokens to `hsl(var(--…))`.
+3. **`.btn-secondary` contrast.** Clay + white = 3.17:1 (fails AA). Changed to clay + ink (matches `--secondary-foreground`).
+4. **Hardcoded off-palette spots missed by the class-based sweep:** AuthPage gradients (`#046d38`/`#034524` + amber `rgba(250,204,21,…)` glow) → forest + clay; `razorpay.ts` checkout `color` → forest; `Testimonials.tsx` star SVG props (`#FFA500`/`#C0C0C0`) → clay/green-200; Footer scroll-to-top `bg-yellow-400` → forest; Contact form `border-gray-300` → `border-input`, map `bg-gray-200` → `bg-muted`.
+
+## Out of scope / deferred (for later workstreams)
+- Products page renders "N items found" but the product grid appeared empty in headless capture (also empty at baseline). Likely Supabase image/CORS or a data-render issue — investigate in the bug/e2e workstream (workstream 3), not palette.
+- `src/App.css` contains unused Vite boilerplate with off-palette hex — dead file (not imported); cleanup workstream.
