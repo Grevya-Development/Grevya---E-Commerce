@@ -182,7 +182,7 @@ const Footer = () => {
         <button
           onClick={scrollToTop}
           aria-label="Scroll to top"
-          className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-400 text-neutral-900 shadow-lg hover:bg-yellow-300 transition-colors"
+          className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-green-800 text-white shadow-lg hover:bg-green-900 transition-colors"
         >
           <ArrowUp size={22} />
         </button>

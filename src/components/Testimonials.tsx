@@ -58,8 +58,8 @@ const Testimonials = () => {
                     key={i}
                     size={16}
                     className="inline mr-1"
-                    fill={i < testimonial.rating ? "#FFA500" : "none"}
-                    stroke={i < testimonial.rating ? "#FFA500" : "#C0C0C0"}
+                    fill={i < testimonial.rating ? "#A68D65" : "none"}
+                    stroke={i < testimonial.rating ? "#A68D65" : "#D3D7BE"}
                   />
                 ))}
               </div>

@@ -51,7 +51,7 @@ const PersonalizedHome = () => {
         <div className="container mx-auto grid gap-8 px-4 py-14 lg:grid-cols-[1.3fr_0.7fr] lg:items-center">
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
             <div className="mb-5 inline-flex items-center rounded-full bg-white/10 px-4 py-2 text-sm font-semibold">
-              <Sparkles className="mr-2 h-4 w-4 text-amber-300" />
+              <Sparkles className="mr-2 h-4 w-4 text-clay" />
               Personalized Grevya
             </div>
             <h1 className="max-w-3xl text-4xl font-extrabold leading-tight md:text-6xl">
@@ -77,7 +77,7 @@ const PersonalizedHome = () => {
               { icon: Bell, label: 'Updates', value: 'Realtime' },
             ].map((item) => (
               <div key={item.label} className="rounded-2xl border border-white/10 bg-white/10 p-5 backdrop-blur">
-                <item.icon className="mb-3 h-6 w-6 text-amber-200" />
+                <item.icon className="mb-3 h-6 w-6 text-clay" />
                 <p className="text-2xl font-extrabold">{item.value}</p>
                 <p className="text-sm text-white/65">{item.label}</p>
               </div>

@@ -45,7 +45,7 @@ const ProductCard = (props: ProductProps) => {
       whileHover={{ y: -8, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)" }}
     >
       {featured && (
-        <span className="absolute top-3 left-3 z-10 bg-amber-400 text-neutral-900 px-3 py-1 text-xs font-bold rounded-full shadow-md">
+        <span className="absolute top-3 left-3 z-10 bg-clay text-neutral-900 px-3 py-1 text-xs font-bold rounded-full shadow-md">
           Featured
         </span>
       )}
@@ -80,7 +80,7 @@ const ProductCard = (props: ProductProps) => {
                       size={14}
                       fill={i < Math.floor(rating) ? "currentColor" : "none"}
                       stroke="currentColor"
-                      className={i < rating && i >= Math.floor(rating) ? "fill-[50%] text-amber-400" : (i < Math.floor(rating) ? "text-amber-400" : "text-neutral-300")}
+                      className={i < rating && i >= Math.floor(rating) ? "fill-[50%] text-clay" : (i < Math.floor(rating) ? "text-clay" : "text-neutral-300")}
                     />
                   ))}
                 </div>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LogOut, Package, Search, Settings, ShoppingCart, Menu, X, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/store/useCartStore';
@@ -25,6 +25,15 @@ const Navbar = () => {
   }, [getTotalItems]);
 
   const location = useLocation();
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchTerm.trim();
+    navigate(q ? `/products?q=${encodeURIComponent(q)}` : '/products');
+    setIsMenuOpen(false);
+  };
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -51,30 +60,23 @@ const Navbar = () => {
           <div className="hidden md:flex space-x-8">
             <Link to="/" className={`nav-link ${isActive('/')}`}>Home</Link>
             <Link to="/about" className={`nav-link ${isActive('/about')}`}>About Us</Link>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className={`nav-link ${location.pathname.includes('/products') ? 'text-green-700 font-medium' : 'text-foreground hover:text-green-700'}`}>Products</button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" className="w-56">
-                <DropdownMenuItem asChild>
-                  <Link to="/products?category=areca" className="w-full">Areca Products</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/products?category=natural" className="w-full">Natural Products</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/products" className="w-full">All Products</Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Link to="/products" className={`nav-link ${location.pathname.includes('/products') ? 'text-green-700 font-medium' : 'text-foreground hover:text-green-700'}`}>Products</Link>
             <Link to="/contact" className={`nav-link ${isActive('/contact')}`}>Contact</Link>
           </div>
 
           {/* Right side icons */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="ghost" size="icon">
-              <Search className="h-5 w-5 text-gray-600" />
-            </Button>
+            <form onSubmit={handleSearch} className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search products..."
+                aria-label="Search products"
+                className="w-40 lg:w-52 rounded-full border border-input bg-white py-1.5 pl-9 pr-3 text-sm text-foreground placeholder:text-gray-400 outline-none transition-all focus:w-56 focus:ring-2 focus:ring-green-700/30"
+              />
+            </form>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" title={user ? 'Account' : 'Login'}>
@@ -153,24 +155,22 @@ const Navbar = () => {
           <div className="container mx-auto px-4 flex flex-col space-y-4">
             <Link to="/" className={`text-foreground py-2 ${isActive('/')}`} onClick={toggleMenu}>Home</Link>
             <Link to="/about" className={`text-foreground py-2 ${isActive('/about')}`} onClick={toggleMenu}>About Us</Link>
-            <button className="text-foreground py-2 text-left flex items-center justify-between">
-              Products
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            <div className="pl-4 border-l-2 border-gray-200 flex flex-col space-y-2">
-              <Link to="/products?category=areca" className="text-foreground py-1" onClick={toggleMenu}>Areca Products</Link>
-              <Link to="/products?category=natural" className="text-foreground py-1" onClick={toggleMenu}>Natural Products</Link>
-              <Link to="/products" className="text-foreground py-1" onClick={toggleMenu}>All Products</Link>
-            </div>
+            <Link to="/products" className={`text-foreground py-2 ${isActive('/products')}`} onClick={toggleMenu}>Products</Link>
             <Link to="/contact" className={`text-foreground py-2 ${isActive('/contact')}`} onClick={toggleMenu}>Contact</Link>
-            <div className="flex items-center space-x-3 pt-2">
-              <Button variant="outline" size="sm" className="w-1/2">Search</Button>
-              <Button asChild variant="outline" size="sm" className="w-1/2">
-                <Link to={user ? '/account' : '/login'} onClick={toggleMenu}>{user ? 'Account' : 'Login'}</Link>
-              </Button>
-            </div>
+            <form onSubmit={handleSearch} className="relative pt-2">
+              <Search className="pointer-events-none absolute left-3 top-1/2 mt-1 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search products..."
+                aria-label="Search products"
+                className="w-full rounded-full border border-input bg-white py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-green-700/30"
+              />
+            </form>
+            <Button asChild variant="outline" size="sm" className="w-full">
+              <Link to={user ? '/account' : '/login'} onClick={toggleMenu}>{user ? 'Account' : 'Login'}</Link>
+            </Button>
           </div>
         </div>
       )}

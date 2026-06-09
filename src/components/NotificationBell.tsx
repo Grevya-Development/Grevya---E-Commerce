@@ -194,7 +194,7 @@ const NotificationBell = () => {
                   markAsRead(notification.id, notification.read);
                 }}
               >
-                <div className={`mt-0.5 p-1.5 rounded-full ${notification.type === 'order' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                <div className={`mt-0.5 p-1.5 rounded-full ${notification.type === 'order' ? 'bg-green-100 text-olive' : 'bg-blue-100 text-blue-700'}`}>
                   {notification.type === 'order' ? <Package className="h-4 w-4" /> : <Info className="h-4 w-4" />}
                 </div>
                 <div className="flex-1 space-y-1">

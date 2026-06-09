@@ -60,7 +60,7 @@ const FeaturedProducts = () => {
           <div>
              <h2 className="section-heading mb-0 relative inline-block">
                Featured Products
-               <div className="absolute -bottom-2 right-0 w-1/2 h-1 bg-amber-400 rounded-full"></div>
+               <div className="absolute -bottom-2 right-0 w-1/2 h-1 bg-clay rounded-full"></div>
              </h2>
           </div>
 
