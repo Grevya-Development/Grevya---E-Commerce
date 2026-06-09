@@ -39,9 +39,12 @@ const Navbar = () => {
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center">
-            <span className="font-serif text-xl md:text-2xl font-bold text-green-700">Grevya</span>
-            <span className="font-serif text-xl md:text-2xl font-normal text-brown-800">Industries</span>
+          <Link to="/" className="flex items-center gap-2.5 md:gap-3" aria-label="Grevya Naturals home">
+            <img src="/logo-mark.svg" alt="" className="h-11 w-11 md:h-14 md:w-14 shrink-0" />
+            <span className="flex flex-col leading-none">
+              <span className="font-serif text-xl md:text-2xl font-bold tracking-[0.18em] text-[#33381C]">GREVYA</span>
+              <span className="text-[9px] md:text-[11px] font-semibold tracking-[0.42em] text-[#A68D65] mt-1">NATURALS</span>
+            </span>
           </Link>
 
           {/* Desktop Navigation */}

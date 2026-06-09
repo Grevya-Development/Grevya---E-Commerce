@@ -13,7 +13,7 @@ const MissionSection = () => {
           <div className="md:w-1/2 order-2 md:order-1">
             <h2 className="section-heading">Our Mission</h2>
             <p className="text-brown-600 mb-6 leading-relaxed">
-              At Grevya Industries, we're dedicated to creating mass employment opportunities
+              At Grevya Naturals, we're dedicated to creating mass employment opportunities
               in rural areas while promoting eco-friendly, sustainable products. By working with
               local communities, we're able to produce high-quality, natural goods that are
               good for consumers and the environment.
