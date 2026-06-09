@@ -63,3 +63,7 @@ npm run build
 ```
 
 The built files will be in the `dist` directory, ready to be deployed to any static hosting service.
+
+## Supabase and Auth
+
+Run `supabase/schema.sql` in your Supabase SQL editor, then follow `supabase/auth-setup.md` for redirect URLs, OAuth providers, storage, and deployment notes.

@@ -54,12 +54,6 @@ const FeaturedProducts = () => {
 
   return (
     <section className="py-20 bg-background overflow-hidden relative">
-      {/* Subtle decorative background blobs if desired, keep it very light */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-green-50 rounded-full blur-3xl opacity-50 mix-blend-multiply"></div>
-        <div className="absolute bottom-10 right-10 w-80 h-80 bg-amber-50 rounded-full blur-3xl opacity-50 mix-blend-multiply"></div>
-      </div>
-
       <div className="container mx-auto px-4 relative z-10">
 
         <div className="flex justify-between items-end mb-12">

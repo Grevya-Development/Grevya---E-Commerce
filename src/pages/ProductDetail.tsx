@@ -94,7 +94,16 @@ const ProductDetail = () => {
 
   const addToCart = () => {
     if (product) {
-      addItem(product, quantity);
+      const slugValue = (product.name || '').toLowerCase().replace(/\s+/g, '-');
+      addItem({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        rating: averageRating || product.rating || 4,
+        image: product.image_url || product.image,
+        category: product.category || 'general',
+        slug: slugValue,
+      }, quantity);
       toast({
         title: "Added to cart",
         description: `${quantity} × ${product.name} added to your cart`,
