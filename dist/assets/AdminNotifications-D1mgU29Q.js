@@ -1,0 +1,1 @@
+import{j as t}from"./index-BHHENSiz.js";import{A as i}from"./AdminLayout-Br7YmhKC.js";function s(){return t.jsxs(i,{children:[t.jsx("h1",{className:"text-3xl font-bold text-green-900",children:"Notifications"}),t.jsx("p",{className:"text-gray-600 mt-2",children:"Manage notifications"})]})}export{s as default};
