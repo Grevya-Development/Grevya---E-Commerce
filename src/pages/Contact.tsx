@@ -41,8 +41,8 @@ const Contact = () => {
                     <div>
                       <h3 className="font-medium text-brown-800 mb-1">Our Location</h3>
                       <p className="text-brown-600">
-                        Nagaranai, Sathyamangalam,<br />
-                        Erode, Tamil Nadu, India
+                        4th South Cross St., Kovai Thiru Nagar,<br />
+                        Kalapatty (E), Coimbatore 641014.
                       </p>
                     </div>
                   </div>
@@ -53,7 +53,7 @@ const Contact = () => {
                     </div>
                     <div>
                       <h3 className="font-medium text-brown-800 mb-1">Phone Number</h3>
-                      <p className="text-brown-600">+91 9597375091</p>
+                      <p className="text-brown-600">95669 66054</p>
                       <p className="text-brown-600 text-sm mt-1">
                         Monday to Friday, 9am to 6pm IST
                       </p>
@@ -66,7 +66,7 @@ const Contact = () => {
                     </div>
                     <div>
                       <h3 className="font-medium text-brown-800 mb-1">Email Address</h3>
-                      <p className="text-brown-600">contact@grevyaindustries.com</p>
+                      <p className="text-brown-600">info@grevya.com</p>
                       <p className="text-brown-600 text-sm mt-1">
                         We'll respond as soon as possible
                       </p>

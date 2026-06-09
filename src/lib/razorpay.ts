@@ -61,7 +61,7 @@ export const openRazorpayCheckout = async ({
     key,
     amount: Math.round(amount * 100),
     currency: 'INR',
-    name: 'Grevya Industries',
+    name: 'Grevya Naturals',
     description: `Order ${orderReference}`,
     prefill: {
       name,

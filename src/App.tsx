@@ -24,6 +24,10 @@ const Account = lazy(() => import("./pages/Account"));
 const Orders = lazy(() => import("./pages/Orders"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail"));
+const Terms = lazy(() => import("./pages/Terms"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const ReturnRefundPolicy = lazy(() => import("./pages/ReturnRefundPolicy"));
+const ShippingPaymentPolicy = lazy(() => import("./pages/ShippingPaymentPolicy"));
 
 const App = () => (
   <TooltipProvider>
@@ -49,6 +53,10 @@ const App = () => (
           <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
           <Route path="/orders/:id" element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/return-refund-policy" element={<ReturnRefundPolicy />} />
+          <Route path="/shipping-payment-policy" element={<ShippingPaymentPolicy />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

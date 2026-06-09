@@ -14,7 +14,7 @@ const About = () => {
             <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-8">
               <h2 className="text-2xl font-serif text-green-700 mb-4">Our Story</h2>
               <p className="text-brown-600 mb-6">
-                Grevya Industries was founded with a vision to create sustainable employment opportunities in rural 
+                Grevya Naturals was founded with a vision to create sustainable employment opportunities in rural
                 areas while promoting eco-friendly alternatives to everyday products. Our journey began in the 
                 serene village of Nagaranai, where we identified the potential of areca palm leaves as a sustainable 
                 alternative to plastic disposables.
@@ -22,7 +22,7 @@ const About = () => {
               
               <h2 className="text-2xl font-serif text-green-700 mb-4">Our Mission</h2>
               <p className="text-brown-600 mb-6">
-                At Grevya Industries, we're dedicated to creating mass employment opportunities in rural areas 
+                At Grevya Naturals, we're dedicated to creating mass employment opportunities in rural areas
                 while promoting sustainable and eco-friendly products. By working with local communities, we produce 
                 high-quality goods that benefit both consumers and the environment.
               </p>
