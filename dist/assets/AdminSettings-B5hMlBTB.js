@@ -1,0 +1,1 @@
+import{j as t}from"./index-BHHENSiz.js";import{A as e}from"./AdminLayout-Br7YmhKC.js";function i(){return t.jsxs(e,{children:[t.jsx("h1",{className:"text-3xl font-bold text-green-900",children:"Settings"}),t.jsx("p",{className:"text-gray-600 mt-2",children:"Admin settings panel"})]})}export{i as default};
