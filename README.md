@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Grevya Industries Eco-Commerce Hub - A platform for sustainable, eco-friendly areca products and natural goods.
+Grevya Naturals Eco-Commerce Hub - A platform for sustainable, eco-friendly areca products and natural goods.
 
 ## How can I edit this code?
 
