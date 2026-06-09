@@ -31,9 +31,7 @@ export default function AdminUsers() {
   const perPage = 10;
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-  const [pendingAction, setPendingAction] = useState<"toggle" | "none">(
-    "none"
-  );
+  const [pendingAction, setPendingAction] = useState<"toggle" | "none">("none");
 
   const { toast } = useToast();
 
@@ -66,7 +64,7 @@ export default function AdminUsers() {
     return users.filter(
       (u) =>
         u.username?.toLowerCase().includes(q) ||
-        u.email?.toLowerCase().includes(q)
+        u.email?.toLowerCase().includes(q),
     );
   }, [users, search]);
 
@@ -111,11 +109,13 @@ export default function AdminUsers() {
     }
   };
 
-  
   // CHANGE ROLE with optimistic feedback
   const changeRole = async (id: string, role: string) => {
     try {
-      const { error } = await supabase.from("profiles").update({ role }).eq("id", id);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ role })
+        .eq("id", id);
       if (error) throw error;
       toast({ title: "Role updated", description: `Role set to ${role}` });
       fetchUsers();
@@ -193,9 +193,13 @@ export default function AdminUsers() {
                     </td>
                     <td className="p-4">
                       {user.is_active ? (
-                        <span className="text-green-600 font-medium">Active</span>
+                        <span className="text-green-600 font-medium">
+                          Active
+                        </span>
                       ) : (
-                        <span className="text-red-600 font-medium">Blocked</span>
+                        <span className="text-red-600 font-medium">
+                          Blocked
+                        </span>
                       )}
                     </td>
                     <td className="p-4">
@@ -246,7 +250,9 @@ export default function AdminUsers() {
           <DialogHeader>
             <DialogTitle>Confirm action</DialogTitle>
             <DialogDescription>
-              Are you sure you want to {selectedUser?.is_active ? "block" : "activate"} user <strong>{selectedUser?.username}</strong>?
+              Are you sure you want to{" "}
+              {selectedUser?.is_active ? "block" : "activate"} user{" "}
+              <strong>{selectedUser?.username}</strong>?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4 flex gap-2 justify-end">
