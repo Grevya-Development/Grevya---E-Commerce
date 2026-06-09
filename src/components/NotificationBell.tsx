@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, Check, Info, Package } from 'lucide-react';
+import { Bell, Check, Info, Package, Circle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/context/AuthContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,15 +19,23 @@ interface Notification {
 }
 
 const NotificationBell = () => {
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [hasError, setHasError] = useState(false);
 
   const fetchNotifications = async () => {
+    if (!user) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -56,14 +65,16 @@ const NotificationBell = () => {
     let channel: any = null;
 
     try {
+      const channelName = user ? `notifications_changes_${user.id}` : 'notifications_changes_guest';
       channel = supabase
-        .channel('notifications_changes')
+        .channel(channelName)
         .on(
           'postgres_changes',
           {
             event: '*',
             schema: 'public',
             table: 'notifications',
+            filter: user ? `user_id=eq.${user.id}` : undefined,
           },
           (payload) => {
             console.log('Change received!', payload);
@@ -88,12 +99,12 @@ const NotificationBell = () => {
         console.error("Failed to remove channel:", e);
       }
     };
-  }, []);
+  }, [user]);
 
   const markAsRead = async (id: string, currentlyRead: boolean) => {
     if (currentlyRead) return;
     try {
-      const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
+      const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id).eq('user_id', user?.id);
       if (error) throw error;
       
       setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
@@ -103,9 +114,21 @@ const NotificationBell = () => {
     }
   };
 
+  const toggleReadStatus = async (id: string, currentlyRead: boolean) => {
+    try {
+      const { error } = await supabase.from('notifications').update({ read: !currentlyRead }).eq('id', id).eq('user_id', user?.id);
+      if (error) throw error;
+      
+      setNotifications(notifications.map(n => n.id === id ? { ...n, read: !currentlyRead } : n));
+      setUnreadCount((prev) => currentlyRead ? prev + 1 : Math.max(0, prev - 1));
+    } catch (err) {
+      console.error("Failed to toggle notification status:", err);
+    }
+  };
+
   const markAllAsRead = async () => {
     try {
-      const { error } = await supabase.from('notifications').update({ read: true }).eq('read', false);
+      const { error } = await supabase.from('notifications').update({ read: true }).eq('read', false).eq('user_id', user?.id);
       if (error) throw error;
       
       setNotifications(notifications.map(n => ({ ...n, read: true })));
@@ -114,6 +137,14 @@ const NotificationBell = () => {
       console.error("Failed to mark all as read:", err);
     }
   };
+
+  if (!user) {
+    return (
+      <Button variant="ghost" size="icon" className="relative cursor-not-allowed opacity-50" title="Login to view notifications">
+        <Bell className="h-5 w-5 text-gray-500" />
+      </Button>
+    );
+  }
 
   if (hasError) {
     return (
@@ -174,9 +205,22 @@ const NotificationBell = () => {
                     {new Date(notification.created_at).toLocaleDateString()} at {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
-                {!notification.read && (
-                  <div className="w-2 h-2 rounded-full bg-green-600 mt-2"></div>
-                )}
+                <button
+                  type="button"
+                  className="p-1 hover:bg-neutral-100 rounded-full text-neutral-400 hover:text-green-700 transition-colors mt-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    toggleReadStatus(notification.id, notification.read);
+                  }}
+                  title={notification.read ? "Mark as unread" : "Mark as read"}
+                >
+                  {notification.read ? (
+                    <Circle className="w-3.5 h-3.5 text-neutral-300" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5 text-green-600 font-bold" />
+                  )}
+                </button>
               </DropdownMenuItem>
             ))
           )}

@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, ShoppingCart, Menu, X, User } from 'lucide-react';
+import { LogOut, Package, Search, Settings, ShoppingCart, Menu, X, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/store/useCartStore';
+import { useAuth } from '@/context/AuthContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,7 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const getTotalItems = useCartStore((state) => state.getTotalItems);
   const [cartCount, setCartCount] = useState(0);
+  const { user, profile, signOut } = useAuth();
 
   // Hydration fix for client-only state vs SSR output mismatch if any
   useEffect(() => {
@@ -70,9 +72,41 @@ const Navbar = () => {
             <Button variant="ghost" size="icon">
               <Search className="h-5 w-5 text-gray-600" />
             </Button>
-            <Button variant="ghost" size="icon">
-              <User className="h-5 w-5 text-gray-600" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" title={user ? 'Account' : 'Login'}>
+                  <User className="h-5 w-5 text-gray-600" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {user ? (
+                  <>
+                    <div className="px-2 py-2 text-sm">
+                      <p className="font-semibold text-brown-800">{profile?.full_name || user.email}</p>
+                      <p className="truncate text-xs text-gray-500">{user.email}</p>
+                    </div>
+                    <DropdownMenuItem asChild>
+                      <Link to="/account" className="w-full"><Settings className="mr-2 h-4 w-4" /> Account</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/orders" className="w-full"><Package className="mr-2 h-4 w-4" /> Orders</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={signOut}>
+                      <LogOut className="mr-2 h-4 w-4" /> Logout
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link to="/login" className="w-full">Login</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/signup" className="w-full">Create account</Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <NotificationBell />
             <Link to="/cart" className="relative">
               <Button variant="ghost" size="icon">
@@ -130,7 +164,9 @@ const Navbar = () => {
             <Link to="/contact" className={`text-foreground py-2 ${isActive('/contact')}`} onClick={toggleMenu}>Contact</Link>
             <div className="flex items-center space-x-3 pt-2">
               <Button variant="outline" size="sm" className="w-1/2">Search</Button>
-              <Button variant="outline" size="sm" className="w-1/2">Login</Button>
+              <Button asChild variant="outline" size="sm" className="w-1/2">
+                <Link to={user ? '/account' : '/login'} onClick={toggleMenu}>{user ? 'Account' : 'Login'}</Link>
+              </Button>
             </div>
           </div>
         </div>
