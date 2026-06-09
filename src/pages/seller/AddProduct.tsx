@@ -53,8 +53,9 @@ export default function AddProduct() {
 
         image_url: form.image_url,
 
-        is_approved: false,
-
+        // is_approved: false,
+        product_status: "pending",
+        
         is_featured: false,
 
         is_hidden: false,

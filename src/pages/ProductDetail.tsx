@@ -71,7 +71,10 @@ const ProductDetail = () => {
         const { data, error } = await supabase
           .from('products')
           .select('*')
-          .ilike('name', `%${formattedName}%`);
+          .ilike('name', `%${formattedName}%`)
+          .eq('is_hidden', false);
+          
+          
 
         if (error) throw error;
 

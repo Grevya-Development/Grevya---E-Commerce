@@ -69,6 +69,9 @@ const Register = lazy(() => import("./pages/Register"));
 //Admin Dashboard Pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminProductRequests = lazy(
+  () => import("./pages/admin/AdminProductRequests"),
+);
 const AdminProducts = lazy(() => import("./pages/admin/AdminProducts"));
 const AdminOrders = lazy(() => import("./pages/admin/AdminOrders"));
 const AdminNotifications = lazy(
@@ -177,6 +180,14 @@ const App = () => {
               element={
                 <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/product-requests"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <AdminProductRequests />
                 </ProtectedRoute>
               }
             />

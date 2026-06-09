@@ -138,15 +138,6 @@ const ProductCard = (props: ProductProps) => {
       <button
       onClick={addToWishlist}
       className="absolute top-3 left-3 z-20 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-md hover:shadow-lg transition-all duration-300"    >
-      {/* <Heart
-        size={18}
-        className={
-          isWishlisted
-            ? "text-red-500 fill-red-500"
-            : "text-gray-500"
-        }
-      />
-       */}
        <motion.div
         whileTap={{ scale: 0.8 }}
         animate={
