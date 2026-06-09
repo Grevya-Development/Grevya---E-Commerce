@@ -53,7 +53,7 @@ const Contact = () => {
                     </div>
                     <div>
                       <h3 className="font-medium text-brown-800 mb-1">Phone Number</h3>
-                      <p className="text-brown-600">95669 66064</p>
+                      <p className="text-brown-600">95669 66054</p>
                       <p className="text-brown-600 text-sm mt-1">
                         Monday to Friday, 9am to 6pm IST
                       </p>
@@ -75,7 +75,7 @@ const Contact = () => {
                 </div>
 
                 {/* Google Maps or Location Image would go here */}
-                <div className="mt-8 bg-gray-200 h-64 rounded-lg flex items-center justify-center">
+                <div className="mt-8 bg-muted h-64 rounded-lg flex items-center justify-center">
                   <p className="text-gray-500">Map placeholder - Google Maps would be integrated here</p>
                 </div>
               </div>
@@ -91,7 +91,7 @@ const Contact = () => {
                       <input 
                         type="text" 
                         id="name" 
-                        className="w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className="w-full border border-input rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                         required
                       />
                     </div>
@@ -100,7 +100,7 @@ const Contact = () => {
                       <input 
                         type="email" 
                         id="email" 
-                        className="w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className="w-full border border-input rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                         required
                       />
                     </div>
@@ -110,7 +110,7 @@ const Contact = () => {
                     <input 
                       type="text" 
                       id="subject" 
-                      className="w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full border border-input rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                       required
                     />
                   </div>
@@ -119,7 +119,7 @@ const Contact = () => {
                     <textarea 
                       id="message" 
                       rows={5} 
-                      className="w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full border border-input rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
                       required
                     ></textarea>
                   </div>

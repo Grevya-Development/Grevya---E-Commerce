@@ -13,6 +13,7 @@ const CATEGORIES = ['all', 'bamboo', 'clay', 'coconut', 'coir', 'jute'];
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const categoryFilter = searchParams.get('category') || 'all';
+  const searchQuery = searchParams.get('q') || '';
 
   const [products, setProducts] = useState<any[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
@@ -63,6 +64,16 @@ const Products = () => {
       );
     }
 
+    // 1b. Search Filter (by name or description)
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter(
+        (p) =>
+          (p.name || '').toLowerCase().includes(q) ||
+          (p.description || '').toLowerCase().includes(q)
+      );
+    }
+
     // 2. Sorting
     if (sortBy === 'price-asc') {
       result.sort((a, b) => a.price - b.price);
@@ -73,7 +84,7 @@ const Products = () => {
     }
 
     setFilteredProducts(result);
-  }, [products, categoryFilter, sortBy]);
+  }, [products, categoryFilter, searchQuery, sortBy]);
 
   const handleCategorySelect = (category: string) => {
     if (category === 'all') {
@@ -101,9 +112,11 @@ const Products = () => {
 
           <div className="mb-8">
             <h1 className="text-4xl font-extrabold text-neutral-900 tracking-tight mb-2">
-              {categoryFilter === 'all' 
-                ? 'Our Catalog' 
-                : `${categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1)} Collection`}
+              {searchQuery
+                ? `Search results for "${searchQuery}"`
+                : categoryFilter === 'all'
+                  ? 'Our Catalog'
+                  : `${categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1)} Collection`}
             </h1>
             <p className="text-neutral-500 text-sm max-w-lg">
               Explore our range of 100% natural, biodegradable, and hand-crafted sustainable items.

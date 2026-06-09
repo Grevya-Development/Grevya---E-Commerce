@@ -35,6 +35,7 @@ const Index = () => {
         ) : (
           <>
             <Hero />
+            <FeaturedProducts />
             <section className="bg-white py-8">
               <div className="container mx-auto grid gap-4 px-4 md:grid-cols-3">
                 {['Fast account setup', 'Wishlist-ready shopping', 'Realtime order updates'].map((item) => (
@@ -44,11 +45,10 @@ const Index = () => {
                 ))}
               </div>
             </section>
-            <FeaturedProducts />
             <section className="bg-green-900 px-4 py-16 text-white">
               <div className="container mx-auto flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
                 <div>
-                  <p className="text-sm font-bold uppercase tracking-[0.2em] text-amber-200">Member benefits</p>
+                  <p className="text-sm font-bold uppercase tracking-[0.2em] text-clay">Member benefits</p>
                   <h2 className="mt-2 max-w-2xl text-3xl font-extrabold md:text-4xl">Create an account for saved addresses, faster checkout, and order tracking.</h2>
                 </div>
                 <div className="flex gap-3">

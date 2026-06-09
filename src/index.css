@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,35 +6,35 @@
 
 @layer base {
   :root {
-    --background: 40 33% 98%;           /* Cream / neutral-50 */
-    --foreground: 0 0% 15%;             /* Neutral 800 */
-    --card: 0 0% 100%;                  /* White for premium cards */
-    --card-foreground: 0 0% 15%;
+    --background: 32 54% 93%;           /* Cream #F7EEE4 */
+    --foreground: 72 9% 11%;            /* Ink #1D1E19 */
+    --card: 0 0% 100%;                  /* White */
+    --card-foreground: 72 9% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 15%;
-    --primary: 142 76% 23%;             /* green-800 / dark emerald */
+    --popover-foreground: 72 9% 11%;
+    --primary: 71 33% 16%;              /* Forest #33381C */
     --primary-foreground: 0 0% 100%;
-    --secondary: 43 96% 56%;            /* amber-400 */
-    --secondary-foreground: 0 0% 10%;
-    --muted: 40 20% 94%;                /* subtle warm mute */
-    --muted-foreground: 0 0% 40%;
-    --accent: 142 40% 90%;              /* light green accent */
-    --accent-foreground: 142 76% 23%;
+    --secondary: 37 27% 52%;            /* Clay #A68D65 */
+    --secondary-foreground: 72 9% 11%;
+    --muted: 39 33% 92%;                /* warm muted #F1ECE3 */
+    --muted-foreground: 60 5% 35%;      /* #5C5C54 */
+    --accent: 70 21% 89%;               /* sage #E7E9DD */
+    --accent-foreground: 71 33% 16%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 142 76% 23%;
-    --radius: 1.5rem;                   /* rounded-2xl for Apple-like feel */
+    --border: 38 28% 87%;               /* #E7E0D4 */
+    --input: 38 28% 87%;
+    --ring: 71 33% 16%;
+    --radius: 0.625rem;
 
-    --sidebar-background: 40 33% 98%;
-    --sidebar-foreground: 0 0% 15%;
-    --sidebar-primary: 142 76% 23%;
+    --sidebar-background: 32 54% 93%;
+    --sidebar-foreground: 72 9% 11%;
+    --sidebar-primary: 71 33% 16%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 40 20% 94%;
-    --sidebar-accent-foreground: 0 0% 15%;
-    --sidebar-border: 0 0% 90%;
-    --sidebar-ring: 142 76% 23%;
+    --sidebar-accent: 39 33% 92%;
+    --sidebar-accent-foreground: 72 9% 11%;
+    --sidebar-border: 38 28% 87%;
+    --sidebar-ring: 71 33% 16%;
   }
 }
 
@@ -49,13 +49,13 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-sans tracking-tight;
+    @apply font-serif font-semibold tracking-normal;
   }
 }
 
 @layer components {
   .eco-badge {
-    @apply bg-green-50 text-green-800 px-3 py-1 text-xs rounded-full font-semibold flex items-center shadow-sm border border-green-100;
+    @apply bg-green-100 text-green-800 px-3 py-1 text-xs rounded-full font-semibold flex items-center shadow-sm border border-green-100;
   }
 
   .nav-link {
@@ -67,7 +67,7 @@
   }
 
   .btn-secondary {
-    @apply bg-amber-400 hover:bg-amber-500 text-neutral-900 px-8 py-3 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0;
+    @apply bg-clay hover:bg-olive text-ink px-8 py-3 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0;
   }
 
   .btn-outline {
@@ -75,6 +75,6 @@
   }
 
   .section-heading {
-    @apply text-4xl md:text-5xl font-extrabold text-neutral-900 mb-8 tracking-tight;
+    @apply font-serif text-4xl md:text-5xl font-semibold text-green-900 mb-8 tracking-normal;
   }
 }

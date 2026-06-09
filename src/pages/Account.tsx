@@ -332,7 +332,7 @@ const Account = () => {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-200">My Account</p>
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-clay">My Account</p>
                   <h1 className="text-3xl font-extrabold">{form.full_name || 'Grevya Customer'}</h1>
                   <p className="text-white/70">{form.email}</p>
                 </div>

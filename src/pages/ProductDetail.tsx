@@ -218,7 +218,7 @@ const ProductDetail = () => {
                className="sticky top-24"
             >
               <div className="bg-neutral-50 rounded-[2rem] overflow-hidden p-8 sm:p-12 border border-neutral-100 relative group max-h-[700px] flex items-center justify-center">
-                 <div className="absolute inset-0 bg-gradient-to-tr from-green-50/50 to-amber-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                 <div className="absolute inset-0 bg-gradient-to-tr from-green-50/50 to-clay/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
                  <img
                    src={product.image_url}
                    alt={product.name}
@@ -244,7 +244,7 @@ const ProductDetail = () => {
                       size={20}
                       fill={i < Math.floor(averageRating > 0 ? averageRating : 0) ? "currentColor" : "none"}
                       stroke="currentColor"
-                      className={i < averageRating && i >= Math.floor(averageRating) ? "fill-[50%] text-amber-400" : (i < Math.floor(averageRating > 0 ? averageRating : 0) ? "text-amber-400" : "text-neutral-300")}
+                      className={i < averageRating && i >= Math.floor(averageRating) ? "fill-[50%] text-clay" : (i < Math.floor(averageRating > 0 ? averageRating : 0) ? "text-clay" : "text-neutral-300")}
                     />
                   ))}
                 </div>
@@ -342,7 +342,7 @@ const ProductDetail = () => {
                               fill={star <= newRating ? "currentColor" : "none"}
                               stroke="currentColor"
                               strokeWidth={1.5}
-                              className={star <= newRating ? "text-amber-400" : "text-neutral-200"}
+                              className={star <= newRating ? "text-clay" : "text-neutral-200"}
                             />
                           </button>
                         ))}
@@ -398,7 +398,7 @@ const ProductDetail = () => {
                                 size={18}
                                 fill={i < review.rating ? "currentColor" : "none"}
                                 stroke="currentColor"
-                                className={i < review.rating ? "text-amber-400" : "text-neutral-200"}
+                                className={i < review.rating ? "text-clay" : "text-neutral-200"}
                               />
                             ))}
                           </div>

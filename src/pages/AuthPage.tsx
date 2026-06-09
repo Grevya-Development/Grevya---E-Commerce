@@ -233,10 +233,10 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
           <section className={`relative hidden min-h-[620px] p-12 text-white md:flex md:flex-col md:justify-between overflow-hidden ${isSignup ? 'md:order-2 border-l border-green-50' : 'md:order-1 border-r border-green-50'}`}>
             {isSignup ? (
               <>
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(250,204,21,0.15),transparent_40%),linear-gradient(135deg,#046d38_0%,#022c16_100%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(166,141,101,0.18),transparent_40%),linear-gradient(135deg,#33381C_0%,#181B0C_100%)]" />
                 <div className="relative z-10 space-y-6">
                   <div className="inline-flex items-center rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider backdrop-blur border border-white/10">
-                    <Leaf className="mr-1.5 h-3.5 w-3.5 text-amber-300" />
+                    <Leaf className="mr-1.5 h-3.5 w-3.5 text-clay" />
                     Member Benefits
                   </div>
                   <h1 className="text-4xl lg:text-5xl font-extrabold leading-tight tracking-tight text-white">
@@ -254,7 +254,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                     { icon: Compass, title: 'Artisan Micro-funding', desc: '1% of every purchase directly supports rural craftspeople.' }
                   ].map((benefit, idx) => (
                     <div key={idx} className="flex gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm hover:bg-white/10 transition-colors">
-                      <benefit.icon className="w-6 h-6 text-amber-300 flex-shrink-0" />
+                      <benefit.icon className="w-6 h-6 text-clay flex-shrink-0" />
                       <div>
                         <h4 className="font-bold text-sm text-white">{benefit.title}</h4>
                         <p className="text-xs text-white/70 mt-0.5">{benefit.desc}</p>
@@ -265,10 +265,10 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
               </>
             ) : (
               <>
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_80%,rgba(250,204,21,0.15),transparent_40%),linear-gradient(135deg,#034524_0%,#081e13_100%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_80%,rgba(166,141,101,0.18),transparent_40%),linear-gradient(135deg,#2B3017_0%,#141710_100%)]" />
                 <div className="relative z-10 space-y-6">
                   <div className="inline-flex items-center rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider backdrop-blur border border-white/10">
-                    <ShieldCheck className="mr-1.5 h-3.5 w-3.5 text-amber-300" />
+                    <ShieldCheck className="mr-1.5 h-3.5 w-3.5 text-clay" />
                     Secure Access
                   </div>
                   <h1 className="text-4xl lg:text-5xl font-extrabold leading-tight tracking-tight text-white">
@@ -286,7 +286,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                     { icon: Leaf, title: 'Zero Waste Operations', desc: 'We package exclusively with compostable starch fillers.' }
                   ].map((indicator, idx) => (
                     <div key={idx} className="flex gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
-                      <indicator.icon className="w-6 h-6 text-amber-300 flex-shrink-0" />
+                      <indicator.icon className="w-6 h-6 text-clay flex-shrink-0" />
                       <div>
                         <h4 className="font-bold text-sm text-white">{indicator.title}</h4>
                         <p className="text-xs text-white/70 mt-0.5">{indicator.desc}</p>

@@ -72,7 +72,7 @@ export const openRazorpayCheckout = async ({
       order_reference: orderReference,
     },
     theme: {
-      color: '#046D38',
+      color: '#33381C',
     },
     handler: onSuccess,
     modal: {
