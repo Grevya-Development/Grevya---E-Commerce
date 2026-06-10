@@ -370,12 +370,14 @@ export default function MyProducts() {
                         </p>
                         <span
                           className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
+                            
                             selectedProduct.product_status === "approved"
                               ? "bg-emerald-100 text-emerald-700"
                               : "bg-orange-100 text-orange-700"
                           }`}
                         >
-                          {selectedProduct.product_status === "approved"
+                          {
+                          selectedProduct.product_status === "approved"
                             ? "Approved"
                             : "Pending"}
                         </span>
