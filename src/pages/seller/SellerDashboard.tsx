@@ -7,7 +7,6 @@ import SellerLayout from "@/layouts/SellerLayout";
 interface SellerProduct {
   id: string;
   product_status?: string | null;
-  is_approved?: boolean | null;
 }
 
 interface OrderItem {
@@ -50,7 +49,7 @@ export default function SellerDashboard() {
     try {
       const { data: products, error: productsError } = await supabase
         .from("products")
-        .select("id,product_status,is_approved")
+        .select("id,product_status")
         .eq("seller_id", user.id);
 
       if (productsError) throw productsError;
@@ -59,8 +58,7 @@ export default function SellerDashboard() {
       setTotalProducts(sellerProducts.length);
 
       const approvedCount = sellerProducts.filter(
-        (product) =>
-          product.is_approved === true || product.product_status === "approved",
+        (product) => product.product_status === "approved",
       ).length;
       setApprovedProducts(approvedCount);
       setPendingProducts(sellerProducts.length - approvedCount);

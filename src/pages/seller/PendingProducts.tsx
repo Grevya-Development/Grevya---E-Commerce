@@ -9,7 +9,6 @@ interface PendingProduct {
   category: string | null;
   price: number;
   stock: number;
-  is_approved?: boolean | null;
   product_status?: string | null;
   created_at?: string | null;
 }
@@ -34,7 +33,7 @@ export default function PendingProducts() {
     const { data, error } = await supabase
       .from("products")
       .select(
-        "id,name,category,price,stock,is_approved,product_status,created_at",
+        "id,name,category,price,stock,product_status,created_at",
       )
       .eq("seller_id", user.id)
       .order("created_at", { ascending: false });
@@ -45,8 +44,7 @@ export default function PendingProducts() {
     } else {
       const allProducts = (data as PendingProduct[]) || [];
       const pendingProducts = allProducts.filter(
-        (product) =>
-          product.is_approved !== true && product.product_status !== "approved",
+        (product) => product.product_status !== "approved",
       );
       setProducts(pendingProducts);
     }

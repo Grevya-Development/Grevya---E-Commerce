@@ -48,7 +48,6 @@ export default function AddProduct() {
       stock: Number(form.stock),
       category: form.category,
       image_url: form.image_url,
-      is_approved: false,
       is_featured: false,
       is_hidden: false,
       created_at: new Date().toISOString(),

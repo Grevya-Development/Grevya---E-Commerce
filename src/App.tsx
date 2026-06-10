@@ -18,6 +18,7 @@ const Cart = lazy(() => import("./pages/Cart"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const Contact = lazy(() => import("./pages/Contact"));
+const Profile = lazy(() => import("./pages/Profile"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Auth Pages
@@ -27,14 +28,10 @@ const Register = lazy(() => import("./pages/Register"));
 //Admin Dashboard Pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
-const AdminProductRequests = lazy(
-  () => import("./pages/admin/AdminProductRequests"),
-);
+const AdminProductRequests = lazy(() => import("./pages/admin/AdminProductRequests"),);
 const AdminProducts = lazy(() => import("./pages/admin/AdminProducts"));
 const AdminOrders = lazy(() => import("./pages/admin/AdminOrders"));
-const AdminNotifications = lazy(
-  () => import("./pages/admin/AdminNotifications"),
-);
+const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications"),);
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 
 // Seller Pages
@@ -87,6 +84,14 @@ const App = () => {
               element={
                 <ProtectedRoute allowedRoles={["buyer", "seller", "admin"]}>
                   <Checkout />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute allowedRoles={["buyer", "seller", "admin"]}>
+                  <Profile />
                 </ProtectedRoute>
               }
             />

@@ -19,7 +19,6 @@ interface Product {
   category?: string | null;
   description?: string | null;
   image_url?: string | null;
-  is_approved: boolean;
   product_status?: string | null;
   is_featured: boolean;
   is_hidden: boolean;
@@ -41,7 +40,7 @@ export default function MyProducts() {
     const { data, error } = await supabase
       .from("products")
       .select(
-        "id,name,price,stock,category,description,image_url,is_approved,product_status,is_featured,is_hidden",
+        "id,name,price,stock,category,description,image_url,product_status,is_featured,is_hidden",
       )
       .eq("seller_id", user.id)
       .order("name", {
@@ -252,14 +251,12 @@ export default function MyProducts() {
                         </div>
                         <span
                           className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                            product.is_approved ||
                             product.product_status === "approved"
                               ? "bg-emerald-100 text-emerald-700"
                               : "bg-orange-100 text-orange-700"
                           }`}
                         >
-                          {product.is_approved ||
-                          product.product_status === "approved"
+                          {product.product_status === "approved"
                             ? "Approved"
                             : "Pending"}
                         </span>
@@ -372,13 +369,13 @@ export default function MyProducts() {
                         </p>
                         <span
                           className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
-                            selectedProduct.is_approved ||
+                            
                             selectedProduct.product_status === "approved"
                               ? "bg-emerald-100 text-emerald-700"
                               : "bg-orange-100 text-orange-700"
                           }`}
                         >
-                          {selectedProduct.is_approved ||
+                          {
                           selectedProduct.product_status === "approved"
                             ? "Approved"
                             : "Pending"}
