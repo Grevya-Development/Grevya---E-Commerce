@@ -207,7 +207,6 @@ const ProductCard = (props: ProductProps) => {
         </Link>
 
         <div className="mt-5 pt-1">
-          {/* @ts-ignore */}
           <Button
             variant="outline"
             className="w-full flex items-center justify-center rounded-xl border-green-200 bg-green-50/50 text-green-800 hover:bg-green-800 hover:text-white hover:border-green-800 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 h-11 font-semibold"

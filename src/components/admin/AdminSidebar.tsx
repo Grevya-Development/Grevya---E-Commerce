@@ -1,4 +1,5 @@
 import {
+  Home,
   LayoutDashboard,
   Users,
   Package,
@@ -11,6 +12,11 @@ import {
 import { NavLink } from "react-router-dom";
 
 const links = [
+  {
+    label: "Home",
+    icon: Home,
+    path: "/",
+  },
   {
     label: "Dashboard",
     icon: LayoutDashboard,

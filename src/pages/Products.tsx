@@ -6,6 +6,10 @@ import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 
 import { supabase } from "@/lib/supabaseClient";
+import type { Product, ProductReviewSummary } from "@/types/product";
+
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : "Something went wrong";
 
 const Products = () => {
   const [searchParams] = useSearchParams();
@@ -13,7 +17,7 @@ const Products = () => {
   const categoryFilter = searchParams.get("category");
   const searchFilter = searchParams.get("search");
 
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,10 +53,11 @@ const Products = () => {
 
         if (fetchError) throw fetchError;
 
-        const formatted = (data || []).map((item) => {
+        const reviews = (reviewsData as ProductReviewSummary[] | null) ?? [];
+        const formatted = ((data as Product[] | null) || []).map((item) => {
           const reviewCount =
-            reviewsData?.filter((review) => review.product_id === item.id)
-              .length || 0;
+            reviews.filter((review) => review.product_id === item.id).length ||
+            0;
 
           return {
             ...item,
@@ -63,9 +68,9 @@ const Products = () => {
         });
         setProducts(formatted);
         console.log("FORMATTED PRODUCTS:", formatted);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("FETCH ERROR:", err);
-        setError(err.message || "Something went wrong");
+        setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -117,9 +122,9 @@ const Products = () => {
                     id={product.id}
                     name={product.name}
                     price={product.price}
-                    image={product.image}
-                    category={product.category}
-                    rating={product.rating}
+                    image={product.image || product.image_url || ""}
+                    category={product.category || "general"}
+                    rating={product.rating || 0}
                     reviewCount={product.reviewCount}
                     slug={slug}
                   />

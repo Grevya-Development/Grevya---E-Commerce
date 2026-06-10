@@ -9,6 +9,7 @@ import Footer from '@/components/Footer';
 import { useCartStore } from '@/store/useCartStore';
 import { supabase } from '@/lib/supabaseClient';
 import { motion } from 'framer-motion';
+import type { Product } from '@/types/product';
 
 interface Review {
   id: string;
@@ -18,12 +19,15 @@ interface Review {
   created_at: string;
 }
 
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : "Something went wrong";
+
 const ProductDetail = () => {
   const { slug } = useParams();
   const [quantity, setQuantity] = useState(1);
   const addItem = useCartStore((state) => state.addItem);
 
-  const [product, setProduct] = useState<any>(null);
+  const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,16 +82,17 @@ const ProductDetail = () => {
 
         if (error) throw error;
 
-        const matchedProduct = data && data.length > 0 ? data[0] : null;
+        const products = (data as Product[] | null) || [];
+        const matchedProduct = products.length > 0 ? products[0] : null;
         setProduct(matchedProduct);
 
         if (matchedProduct) {
           await fetchReviews(matchedProduct.id);
         }
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching product details:", err);
-        setError(err.message);
+        setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -131,7 +136,7 @@ const ProductDetail = () => {
       setNewRating(5);
 
       await fetchReviews(product.id);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to submit review:", err);
       toast({
         title: "Submission failed",

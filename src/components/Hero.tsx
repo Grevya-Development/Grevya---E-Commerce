@@ -47,11 +47,9 @@ const Hero = () => {
                   biodegradable, and sustainably sourced.
                 </motion.p>
                 <motion.div variants={fadeInUp} className="flex flex-wrap gap-4">
-                  {/* @ts-ignore */}
                   <Button asChild className="btn-primary">
                     <Link to="/products">Shop Now</Link>
                   </Button>
-                  {/* @ts-ignore */}
                   <Button asChild variant="outline" className="flex items-center">
                     <Link to="/about">
                       Learn More
@@ -103,11 +101,9 @@ const Hero = () => {
             biodegradable, and sustainably sourced.
           </p>
           <div className="flex flex-wrap gap-3">
-            {/* @ts-ignore */}
             <Button asChild className="btn-primary">
               <Link to="/products">Shop Now</Link>
             </Button>
-            {/* @ts-ignore */}
             <Button asChild variant="outline" className="flex items-center">
               <Link to="/about">
                 Learn More

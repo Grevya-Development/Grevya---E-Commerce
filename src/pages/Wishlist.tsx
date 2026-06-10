@@ -3,9 +3,10 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 import { supabase } from "@/lib/supabaseClient";
+import type { Product } from "@/types/product";
 
 const Wishlist = () => {
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,7 +41,7 @@ const Wishlist = () => {
           .select("*")
           .in("id", productIds);
 
-        setProducts(productsData || []);
+        setProducts((productsData as Product[] | null) || []);
       } catch (error) {
         console.error(error);
       } finally {
@@ -72,11 +73,11 @@ const Wishlist = () => {
                 id={product.id}
                 name={product.name}
                 price={product.price}
-                image={product.image_url}
-                category={product.category}
+                image={product.image_url || ""}
+                category={product.category || "general"}
                 rating={product.rating || 0}
                 reviewCount={product.review_count || 0}
-                slug={product.slug}
+                slug={product.slug || product.name.toLowerCase().replace(/\s+/g, "-")}
                   onWishlistRemoved={(removedId) =>
                 setProducts((prev) =>
                 prev.filter((p) => p.id !== removedId)

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import SellerLayout from "@/layouts/SellerLayout";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuthStore } from "@/store/authStore";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface PendingProduct {
   id: string;
@@ -9,14 +10,13 @@ interface PendingProduct {
   category: string | null;
   price: number;
   stock: number;
-  is_approved?: boolean | null;
   product_status?: string | null;
   created_at?: string | null;
 }
 
 export default function PendingProducts() {
   const { user } = useAuthStore();
-  const channelRef = useRef<any[]>([]);
+  const channelRef = useRef<RealtimeChannel[]>([]);
   const [products, setProducts] = useState<PendingProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,9 +33,7 @@ export default function PendingProducts() {
 
     const { data, error } = await supabase
       .from("products")
-      .select(
-        "id,name,category,price,stock,is_approved,product_status,created_at",
-      )
+      .select("id,name,category,price,stock,product_status,created_at")
       .eq("seller_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -45,8 +43,7 @@ export default function PendingProducts() {
     } else {
       const allProducts = (data as PendingProduct[]) || [];
       const pendingProducts = allProducts.filter(
-        (product) =>
-          product.is_approved !== true && product.product_status !== "approved",
+        (product) => product.product_status !== "approved",
       );
       setProducts(pendingProducts);
     }
