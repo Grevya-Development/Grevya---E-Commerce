@@ -67,7 +67,6 @@ export const registerUser = async (formData: RegisterData) => {
       },
     },
   });
-
   if (error) {
     throw error;
   }
