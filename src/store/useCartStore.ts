@@ -9,8 +9,8 @@ export interface CartItem extends ProductProps {
 interface CartStore {
     items: CartItem[];
     addItem: (item: ProductProps, quantity?: number) => void;
-    removeItem: (id: number) => void;
-    updateQuantity: (id: number, quantity: number) => void;
+    removeItem: (id: string) => void;
+    updateQuantity: (id: string, quantity: number) => void;
     clearCart: () => void;
     getTotalItems: () => number;
     getSubtotal: () => number;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabaseClient";
 import { useAuthStore } from "@/store/authStore";
@@ -29,7 +30,7 @@ export default function SellerDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [live, setLive] = useState(true);
-  const channelRef = useRef<any[]>([]);
+  const channelRef = useRef<RealtimeChannel[]>([]);
 
   const fetchDashboardData = useCallback(async () => {
     if (!user?.id) {

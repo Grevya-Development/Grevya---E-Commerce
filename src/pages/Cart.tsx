@@ -1,21 +1,10 @@
 
-import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
-interface CartItem {
-  id: number;
-  name: string;
-  price: number;
-  image: string;
-  quantity: number;
-  category: string;
-  slug: string;
-}
-
 const Cart = () => {
   const cartItems = useCartStore((state) => state.items);
   const removeItem = useCartStore((state) => state.removeItem);
@@ -105,14 +94,12 @@ const Cart = () => {
                       </div>
                     </div>
                   </div>
-                  {/* @ts-ignore */}
                   <Button asChild className="w-full">
                     <Link to="/checkout">
                       Proceed to Checkout
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
-                  {/* @ts-ignore */}
                   <Button asChild variant="outline" className="w-full mt-4">
                     <Link to="/products">Continue Shopping</Link>
                   </Button>
@@ -128,7 +115,6 @@ const Cart = () => {
               <p className="text-brown-600 mb-8 max-w-md mx-auto">
                 Looks like you haven't added any products to your cart yet.
               </p>
-              {/* @ts-ignore */}
               <Button asChild className="btn-primary">
                 <Link to="/products">
                   Continue Shopping

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+﻿import { useEffect, useState, useCallback, useRef } from 'react'
 import { Bell, Check, Info, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabaseClient'
@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/store/authStore'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 interface Notification {
   id: string
@@ -25,7 +26,7 @@ const NotificationBell = () => {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [hasError, setHasError] = useState(false)
-  const channelRef = useRef<any>(null)          // ← track channel to avoid duplicates
+  const channelRef = useRef<RealtimeChannel | null>(null)
 
   const fetchNotifications = useCallback(async () => {
     if (!user?.id) return
@@ -54,7 +55,7 @@ const NotificationBell = () => {
     fetchNotifications()
   }, [user?.id, fetchNotifications])
 
-  // Realtime — uses ref to prevent StrictMode double-mount duplicate channel crash
+  // Realtime uses a ref to prevent StrictMode double-mount duplicate channel crashes.
   useEffect(() => {
     if (!user?.id) return
 
@@ -85,7 +86,7 @@ const NotificationBell = () => {
       } catch (e) {
         console.warn('Realtime subscription failed:', e)
       }
-    }, 500)   // 500ms delay — lets WebSocket establish first
+    }, 500)
 
     return () => {
       clearTimeout(timer)
@@ -198,3 +199,4 @@ const NotificationBell = () => {
 }
 
 export default NotificationBell
+

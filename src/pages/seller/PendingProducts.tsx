@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import SellerLayout from "@/layouts/SellerLayout";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuthStore } from "@/store/authStore";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface PendingProduct {
   id: string;
@@ -15,7 +16,7 @@ interface PendingProduct {
 
 export default function PendingProducts() {
   const { user } = useAuthStore();
-  const channelRef = useRef<any[]>([]);
+  const channelRef = useRef<RealtimeChannel[]>([]);
   const [products, setProducts] = useState<PendingProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,9 +33,7 @@ export default function PendingProducts() {
 
     const { data, error } = await supabase
       .from("products")
-      .select(
-        "id,name,category,price,stock,product_status,created_at",
-      )
+      .select("id,name,category,price,stock,product_status,created_at")
       .eq("seller_id", user.id)
       .order("created_at", { ascending: false });
 

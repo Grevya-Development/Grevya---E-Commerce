@@ -1,1 +1,0 @@
-import{j as t}from"./index-BHHENSiz.js";import{S as r}from"./SellerLayout-BtpYxFgl.js";function n(){return t.jsx(r,{children:t.jsx("h1",{className:"text-3xl font-bold",children:"Pending Products"})})}export{n as default};

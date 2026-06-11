@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Eye, Trash2 } from "lucide-react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 import SellerLayout from "@/layouts/SellerLayout";
 import { supabase } from "@/lib/supabaseClient";
@@ -26,7 +27,7 @@ interface Product {
 
 export default function MyProducts() {
   const { user } = useAuthStore();
-  const channelRef = useRef<any[]>([]);
+  const channelRef = useRef<RealtimeChannel[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
