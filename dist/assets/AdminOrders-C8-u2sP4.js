@@ -1,0 +1,1 @@
+import{j as e}from"./index-BZEZQa2s.js";import{A as r}from"./AdminLayout-Q8xRyvOs.js";function a(){return e.jsxs(r,{children:[e.jsx("h1",{className:"text-3xl font-bold text-green-900",children:"Orders"}),e.jsx("p",{className:"text-gray-600 mt-2",children:"View and manage customer orders"})]})}export{a as default};
