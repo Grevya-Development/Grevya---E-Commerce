@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Filter, SlidersHorizontal, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const CATEGORIES = ['all', 'bamboo', 'clay', 'coconut', 'coir', 'jute'];
+
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -21,6 +21,8 @@ const Products = () => {
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<string>('featured');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  const categories = ['all', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))];
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -163,7 +165,7 @@ const Products = () => {
               <div>
                 <h3 className="text-xs uppercase font-bold tracking-widest text-neutral-400 mb-3.5">Categories</h3>
                 <div className="flex flex-col gap-1.5">
-                  {CATEGORIES.map((cat) => {
+                  {categories.map((cat) => {
                     const active = categoryFilter === cat;
                     return (
                       <button
@@ -277,7 +279,7 @@ const Products = () => {
                   <div>
                     <h4 className="text-xs uppercase font-bold tracking-widest text-neutral-400 mb-3">Categories</h4>
                     <div className="flex flex-col gap-1">
-                      {CATEGORIES.map((cat) => {
+                      {categories.map((cat) => {
                         const active = categoryFilter === cat;
                         return (
                           <button

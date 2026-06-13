@@ -27,11 +27,6 @@ export const clearPendingProfile = (userId: string) => {
 
 export const ensureUserProfile = async (user: User, seed: ProfileSeed = {}) => {
   const pending = readPendingProfile(user.id);
-  const mergedSeed = {
-    full_name: seed.full_name || pending.full_name || user.user_metadata?.full_name || null,
-    phone: seed.phone || pending.phone || user.user_metadata?.phone || null,
-    avatar_url: user.user_metadata?.avatar_url || null,
-  };
 
   const { data, error } = await supabase
     .from('profiles')
@@ -43,6 +38,12 @@ export const ensureUserProfile = async (user: User, seed: ProfileSeed = {}) => {
     authDebug('profile.read_failed', { code: error.code, message: error.message });
     throw error;
   }
+
+  const mergedSeed = {
+    full_name: seed.full_name || pending.full_name || data?.full_name || user.user_metadata?.full_name || null,
+    phone: seed.phone || pending.phone || data?.phone || user.user_metadata?.phone || null,
+    avatar_url: data?.avatar_url || user.user_metadata?.avatar_url || null,
+  };
 
   let finalProfile = data;
 

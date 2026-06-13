@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 import { authDebug } from '@/lib/authDiagnostics';
 import { ensureUserProfile } from '@/lib/profileSync';
+import { useCartStore } from '@/store/useCartStore';
 
 export interface UserProfile {
   id: string;
@@ -12,6 +13,7 @@ export interface UserProfile {
   phone: string | null;
   email: string | null;
   preferences: Record<string, any> | null;
+  role?: string | null;
   created_at?: string;
 }
 
@@ -105,10 +107,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (data.session) {
           isExchangePendingRef.current = false;
           setSession(data.session);
+          useCartStore.getState().syncUserSession(data.session.user.id);
           await loadProfile(data.session.user);
           if (mounted) setLoading(false);
         } else if (!hasAuthParams) {
           isExchangePendingRef.current = false;
+          setSession(null);
+          useCartStore.getState().syncUserSession(null);
           setProfile(null);
           setProfileLoading(false);
           loadedUserIdRef.current = null;
@@ -143,11 +148,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (nextSession) {
         isExchangePendingRef.current = false;
         setSession(nextSession);
+        useCartStore.getState().syncUserSession(nextSession.user.id);
         loadProfile(nextSession.user).then(() => {
           if (mounted) setLoading(false);
         });
       } else {
         setSession(null);
+        useCartStore.getState().syncUserSession(null);
         if (!isExchangePendingRef.current) {
           setProfile(null);
           setProfileLoading(false);
@@ -170,6 +177,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setProfile(null);
     setProfileLoading(false);
     loadedUserIdRef.current = null;
+    useCartStore.getState().syncUserSession(null);
     authDebug('logout.success');
   }, []);
 

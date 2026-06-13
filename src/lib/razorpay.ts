@@ -45,10 +45,28 @@ export const openRazorpayCheckout = async ({
   onFailure,
 }: RazorpayCheckoutOptions) => {
   const key = import.meta.env.VITE_RAZORPAY_KEY_ID;
+  const isDev = import.meta.env.DEV;
 
-  if (!key) {
-    onFailure('Missing VITE_RAZORPAY_KEY_ID. Add your Razorpay key ID to the frontend environment.');
-    return;
+  if (!key || key === 'rzp_test_dummy') {
+    if (isDev) {
+      console.warn('Razorpay Key ID is not configured. Falling back to test simulation mode.');
+      const confirmPayment = window.confirm(
+        '[Test Mode] Razorpay is not configured or in test mode. Would you like to simulate a successful test payment for this order?'
+      );
+      if (confirmPayment) {
+        onSuccess({
+          razorpay_payment_id: `pay_mock_${Date.now()}`,
+          razorpay_order_id: `order_mock_${Date.now()}`,
+          razorpay_signature: `sig_mock_${Date.now()}`,
+        });
+      } else {
+        onFailure('Payment simulation cancelled by the user.');
+      }
+      return;
+    } else {
+      onFailure('Online payment gateway is currently unavailable. Please choose another payment method.');
+      return;
+    }
   }
 
   const loaded = await loadRazorpayScript();

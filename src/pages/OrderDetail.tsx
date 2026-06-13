@@ -16,7 +16,7 @@ const OrderDetail = () => {
   const [loading, setLoading] = useState(true);
 
   const activeIndex = useMemo(() => {
-    const status = order?.status || 'pending';
+    const status = order?.status || order?.order_status || 'pending';
     return Math.max(0, statuses.indexOf(status));
   }, [order]);
 
@@ -93,7 +93,7 @@ const OrderDetail = () => {
                 </div>
               </section>
 
-              {order.status === 'cancelled' ? (
+              {order.status === 'cancelled' || order.order_status === 'cancelled' ? (
                 <section className="rounded-[2rem] bg-white p-6 shadow-sm md:p-8 border-t-4 border-red-500">
                   <div className="mb-6 flex items-center gap-3">
                     <Truck className="h-6 w-6 text-red-600" />

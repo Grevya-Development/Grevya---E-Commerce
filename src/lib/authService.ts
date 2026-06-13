@@ -34,7 +34,13 @@ export const signInWithEmail = (email: string, password: string) => {
     authDebug('login.start');
     const result = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (result.error) throw result.error;
-    if (result.data.user) await ensureUserProfile(result.data.user);
+    if (result.data.user) {
+      try {
+        await ensureUserProfile(result.data.user);
+      } catch (err) {
+        console.warn('Failed to ensure user profile during login:', err);
+      }
+    }
     authDebug('login.success');
     return result.data;
   });
@@ -93,10 +99,14 @@ export const signUpWithEmail = (input: { email: string; password: string; fullNa
       });
 
       if (isAnonymous || result.data.session) {
-        await ensureUserProfile(result.data.user, {
-          full_name: input.fullName.trim(),
-          phone: normalizedPhone || null,
-        });
+        try {
+          await ensureUserProfile(result.data.user, {
+            full_name: input.fullName.trim(),
+            phone: normalizedPhone || null,
+          });
+        } catch (err) {
+          console.warn('Failed to ensure user profile during signup:', err);
+        }
       }
     }
 
@@ -171,7 +181,13 @@ export const verifyPhoneOtp = (phone: string, token: string) => {
   return withLock(`phone-verify:${normalizedPhone}`, async () => {
     const result = await supabase.auth.verifyOtp({ phone: normalizedPhone, token, type: 'sms' });
     if (result.error) throw result.error;
-    if (result.data.user) await ensureUserProfile(result.data.user, { phone: normalizePhone(phone) });
+    if (result.data.user) {
+      try {
+        await ensureUserProfile(result.data.user, { phone: normalizePhone(phone) });
+      } catch (err) {
+        console.warn('Failed to ensure user profile during phone OTP verification:', err);
+      }
+    }
     return result.data;
   });
 };

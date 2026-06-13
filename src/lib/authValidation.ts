@@ -34,6 +34,10 @@ export const validatePassword = (password: string) => {
 };
 
 export const friendlyAuthError = (message = '') => {
+  if (import.meta.env.DEV) {
+    console.error('[Grevya Auth Diagnostics] Raw error message:', message);
+  }
+
   const lower = message.toLowerCase();
 
   if (lower.includes('email rate limit') || lower.includes('email rate exceeded') || lower.includes('rate limit')) {
@@ -62,6 +66,9 @@ export const friendlyAuthError = (message = '') => {
   }
   if (lower.includes('network')) {
     return 'Network connection failed. Please check your connection and try again.';
+  }
+  if (lower.includes('unable to process request')) {
+    return 'The request could not be processed. This is typically due to SMTP rate limits or provider configuration issues. Please try again in a few minutes or verify your email settings in the Supabase Dashboard.';
   }
 
   return message || 'Something went wrong. Please try again.';

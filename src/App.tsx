@@ -6,6 +6,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
+import { useEffect } from 'react';
+import { supabase } from "@/lib/supabaseClient";
+
 // Lazy-loaded pages
 const Index = lazy(() => import("./pages/Index"));
 const About = lazy(() => import("./pages/About"));
@@ -29,7 +32,42 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const ReturnRefundPolicy = lazy(() => import("./pages/ReturnRefundPolicy"));
 const ShippingPaymentPolicy = lazy(() => import("./pages/ShippingPaymentPolicy"));
 
-const App = () => (
+const App = () => {
+  useEffect(() => {
+    const validateSchema = async () => {
+      try {
+        const { error: orderError } = await supabase
+          .from('orders')
+          .select('estimated_delivery')
+          .limit(1);
+
+        if (orderError && (orderError.message.includes('column') || orderError.message.includes('schema cache'))) {
+          console.warn(
+            '%c[Grevya Dev Warning] Supabase Orders table schema mismatch detected (missing estimated_delivery). Please run supabase/recovery_schema.sql in your Supabase SQL Editor.',
+            'color: #856404; background-color: #fff3cd; border: 1px solid #ffeeba; padding: 4px; border-radius: 4px; font-weight: bold;'
+          );
+        }
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .select('preferences')
+          .limit(1);
+
+        if (profileError && (profileError.message.includes('column') || profileError.message.includes('schema cache'))) {
+          console.warn(
+            '%c[Grevya Dev Warning] Supabase Profiles table schema mismatch detected (missing preferences). Please run supabase/recovery_schema.sql in your Supabase SQL Editor.',
+            'color: #856404; background-color: #fff3cd; border: 1px solid #ffeeba; padding: 4px; border-radius: 4px; font-weight: bold;'
+          );
+        }
+      } catch (err) {
+        console.error('Schema validation check failed:', err);
+      }
+    };
+
+    validateSchema();
+  }, []);
+
+  return (
   <TooltipProvider>
     <Toaster />
     <Sonner />
@@ -63,6 +101,7 @@ const App = () => (
       </Suspense>
     </BrowserRouter>
   </TooltipProvider>
-);
+  );
+};
 
 export default App;

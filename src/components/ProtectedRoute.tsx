@@ -8,7 +8,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   console.log('[ProtectedRoute] Decision - Path:', location.pathname, 'Loading:', loading || profileLoading, 'User:', user?.id, 'IsAnonymous:', user?.is_anonymous);
 
-  if (loading || profileLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-cream/30 text-green-800">
         <div className="text-center">

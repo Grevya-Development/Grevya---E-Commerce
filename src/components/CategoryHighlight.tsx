@@ -38,7 +38,7 @@ const CategoryHighlight = () => {
                 <span className="text-sm bg-cream text-brown-700 px-3 py-1 rounded-full">Dinnerware</span>
               </div>
               <Button asChild variant="outline">
-                <Link to="/products?category=areca">Explore Areca Products</Link>
+                <Link to="/products?category=Home%20%26%20Living">Explore Home & Living</Link>
               </Button>
             </div>
           </div>
@@ -66,7 +66,7 @@ const CategoryHighlight = () => {
                 <span className="text-sm bg-cream text-brown-700 px-3 py-1 rounded-full">Indigo Powder</span>
               </div>
               <Button asChild variant="outline">
-                <Link to="/products?category=natural">Explore Natural Products</Link>
+                <Link to="/products?category=Personal%20Care">Explore Personal Care</Link>
               </Button>
             </div>
           </div>

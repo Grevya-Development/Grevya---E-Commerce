@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { friendlyAuthError, getAuthRedirectUrl } from '@/lib/authValidation';
 
 interface Address {
   id: string;
@@ -53,7 +54,64 @@ const Account = () => {
     postal_code: '',
     landmark: '',
   });
-  const [password, setPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [updatingPass, setUpdatingPass] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [blockUntil, setBlockUntil] = useState<number | null>(null);
+  const [emailCooldownUntil, setEmailCooldownUntil] = useState<number | null>(null);
+  const [emailCooldownSeconds, setEmailCooldownSeconds] = useState(0);
+  const [dismissedPendingEmail, setDismissedPendingEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      const dismissed = localStorage.getItem(`grevya-dismiss-pending-email:${user.id}`);
+      setDismissedPendingEmail(dismissed);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('grevya-email-cooldown');
+    if (stored) {
+      const parsed = Number(stored);
+      if (parsed > Date.now()) {
+        setEmailCooldownUntil(parsed);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!emailCooldownUntil) {
+      setEmailCooldownSeconds(0);
+      return;
+    }
+
+    const updateTimer = () => {
+      const remaining = Math.max(0, Math.ceil((emailCooldownUntil - Date.now()) / 1000));
+      setEmailCooldownSeconds(remaining);
+      if (remaining === 0) {
+        setEmailCooldownUntil(null);
+        localStorage.removeItem('grevya-email-cooldown');
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [emailCooldownUntil]);
+
+  const getPasswordStrength = (pass: string) => {
+    if (!pass) return '';
+    if (pass.length < 6) return 'Weak (min 6 characters)';
+    const hasLetter = /[a-zA-Z]/.test(pass);
+    const hasNumber = /[0-9]/.test(pass);
+    const hasSpecial = /[^a-zA-Z0-9]/.test(pass);
+    const score = [hasLetter, hasNumber, hasSpecial].filter(Boolean).length;
+    if (score === 1) return 'Weak';
+    if (score === 2) return 'Medium';
+    return 'Strong';
+  };
 
   useEffect(() => {
     if (!profile && !user) return;
@@ -85,12 +143,61 @@ const Account = () => {
           .order('is_default', { ascending: false }),
       ]);
 
+      const parseAddressLabelAndLine = (addressLine1: string) => {
+        const match = (addressLine1 || '').match(/^\[(.*?)\]\s*(.*)$/);
+        if (match) {
+          return { label: match[1], cleanLine1: match[2] };
+        }
+        return { label: 'Home', cleanLine1: addressLine1 };
+      };
+
       setOrders(orderRows || []);
-      setAddresses((addressRows || []) as Address[]);
+      setAddresses(((addressRows || []) as any[]).map(addr => {
+        const line1 = addr.address_line_1 || addr.address_line1 || '';
+        const { label, cleanLine1 } = parseAddressLabelAndLine(line1);
+        return {
+          ...addr,
+          label,
+          address_line1: cleanLine1,
+          address_line2: addr.address_line_2 || addr.address_line2 || '',
+          pincode: addr.postal_code || addr.pincode || '',
+          postal_code: addr.postal_code || addr.pincode || '',
+        };
+      }) as Address[]);
     };
 
     fetchAccountData();
   }, [user]);
+
+  const safeUpsertProfile = async (profileData: any) => {
+    let attemptData = { ...profileData };
+    while (true) {
+      const { error } = await supabase.from('profiles').upsert({
+        id: user.id,
+        ...attemptData
+      });
+
+      if (!error) {
+        return { error: null };
+      }
+
+      const errorMsg = error.message || '';
+      const matchSchemaCache = errorMsg.match(/Could not find the '([^']+)' column/);
+      const matchNotExist = errorMsg.match(/column "([^"]+)" of relation "[^"]+" does not exist/);
+      const missingColumn = (matchSchemaCache && matchSchemaCache[1]) || (matchNotExist && matchNotExist[1]);
+
+      if (missingColumn && missingColumn in attemptData) {
+        console.warn(`[Grevya Dev Resilience] Column '${missingColumn}' not found in profiles database. Retrying profile save without it.`);
+        delete attemptData[missingColumn];
+        if (Object.keys(attemptData).length === 0) {
+          return { error };
+        }
+        continue;
+      }
+
+      return { error };
+    }
+  };
 
   const updateProfile = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -98,31 +205,153 @@ const Account = () => {
     setSaving(true);
 
     try {
-      const { error } = await supabase.from('profiles').upsert({
-        id: user.id,
-        username: form.username,
-        full_name: form.full_name,
-        phone: form.phone,
-        email: form.email,
+      const payload = {
+        username: form.username.trim() || null,
+        full_name: form.full_name.trim() || null,
+        phone: form.phone.trim() || null,
+        email: form.email.trim() || null,
         preferences: {
           marketing: form.marketing,
           order_updates: form.order_updates,
         },
-      });
+      };
+
+      // 1. Update the database profiles table
+      const { error } = await safeUpsertProfile(payload);
       if (error) throw error;
 
-      if (form.email && form.email !== user.email) {
-        const { error: emailError } = await supabase.auth.updateUser({ email: form.email });
-        if (emailError) throw emailError;
+      // 2. Update auth metadata and email (if changed) so they stay in sync
+      const authUpdates: any = {
+        data: {
+          full_name: form.full_name.trim() || null,
+          phone: form.phone.trim() || null,
+        }
+      };
+
+      const emailChanged = form.email && form.email.trim() !== user.email;
+      if (emailChanged) {
+        // Check email change cooldown first!
+        if (emailCooldownSeconds > 0) {
+          toast({
+            title: 'Please wait',
+            description: `You can request another email change in ${emailCooldownSeconds} seconds.`,
+            variant: 'destructive',
+          });
+          setSaving(false);
+          return;
+        }
+
+        // Clear dismissed state for new email requests
+        if (user) {
+          localStorage.removeItem(`grevya-dismiss-pending-email:${user.id}`);
+        }
+        setDismissedPendingEmail(null);
+
+        authUpdates.email = form.email.trim();
+      }
+
+      const { error: authError } = await supabase.auth.updateUser(
+        authUpdates,
+        { emailRedirectTo: getAuthRedirectUrl('/account') }
+      );
+      if (authError) {
+        const errorMsg = authError.message.toLowerCase();
+        if (errorMsg.includes('rate limit') || errorMsg.includes('rate exceeded')) {
+          const cooldownTime = Date.now() + 60 * 1000;
+          setEmailCooldownUntil(cooldownTime);
+          localStorage.setItem('grevya-email-cooldown', String(cooldownTime));
+        }
+        throw authError;
+      }
+
+      if (emailChanged) {
+        const cooldownTime = Date.now() + 60 * 1000;
+        setEmailCooldownUntil(cooldownTime);
+        localStorage.setItem('grevya-email-cooldown', String(cooldownTime));
+
+        toast({
+          title: 'Email verification pending',
+          description: 'A confirmation link has been sent to your new email. Please verify it to update your address.',
+        });
+      } else {
+        toast({ title: 'Profile saved', description: 'Your account details are up to date.' });
       }
 
       await refreshProfile();
-      toast({ title: 'Profile saved', description: 'Your account details are up to date.' });
     } catch (error: any) {
-      toast({ title: 'Could not save profile', description: error.message, variant: 'destructive' });
+      toast({
+        title: 'Could not save profile',
+        description: friendlyAuthError(error.message),
+        variant: 'destructive'
+      });
     } finally {
       setSaving(false);
     }
+  };
+
+  const resendEmailVerification = async () => {
+    if (!user) return;
+    if (emailCooldownSeconds > 0) return;
+
+    const isEmailChange = !!user.new_email;
+    const targetEmail = isEmailChange ? user.new_email : user.email;
+    const resendType = isEmailChange ? 'email_change' : 'signup';
+
+    if (!targetEmail) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: resendType,
+        email: targetEmail,
+        options: {
+          emailRedirectTo: getAuthRedirectUrl('/account'),
+        },
+      });
+
+      if (error) {
+        const errorMsg = error.message.toLowerCase();
+        if (errorMsg.includes('rate limit') || errorMsg.includes('rate exceeded')) {
+          const cooldownTime = Date.now() + 60 * 1000;
+          setEmailCooldownUntil(cooldownTime);
+          localStorage.setItem('grevya-email-cooldown', String(cooldownTime));
+        }
+        throw error;
+      }
+
+      const cooldownTime = Date.now() + 60 * 1000;
+      setEmailCooldownUntil(cooldownTime);
+      localStorage.setItem('grevya-email-cooldown', String(cooldownTime));
+
+      toast({
+        title: 'Verification email resent',
+        description: `A new confirmation link has been sent to ${targetEmail}.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Failed to resend email',
+        description: friendlyAuthError(err.message),
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancelEmailChange = () => {
+    if (!user || !user.new_email) return;
+    
+    // Dismiss the pending email change banner locally
+    localStorage.setItem(`grevya-dismiss-pending-email:${user.id}`, user.new_email);
+    setDismissedPendingEmail(user.new_email);
+    
+    // Reset the local form email field back to the current confirmed email
+    setForm((prev) => ({ ...prev, email: user.email || '' }));
+    
+    toast({
+      title: 'Pending email change dismissed',
+      description: 'The verification warning has been hidden. It will remain hidden unless a new request is started.',
+    });
   };
 
   const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,15 +360,28 @@ const Account = () => {
 
     const extension = file.name.split('.').pop();
     const path = `${user.id}/avatar-${Date.now()}.${extension}`;
-    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+    
+    let bucket = 'profile-images';
+    let uploadResult = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
 
-    if (uploadError) {
-      toast({ title: 'Upload failed', description: uploadError.message, variant: 'destructive' });
+    if (uploadResult.error && uploadResult.error.message.includes('Bucket not found')) {
+      console.warn(`[Grevya Dev Resilience] Bucket 'profile-images' not found. Falling back to 'avatars' bucket.`);
+      bucket = 'avatars';
+      uploadResult = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
+    }
+
+    if (uploadResult.error) {
+      toast({
+        title: 'Upload failed',
+        description: `Storage bucket not found. Please run the recovery_schema.sql in your Supabase SQL Editor to initialize the storage buckets.`,
+        variant: 'destructive'
+      });
       return;
     }
 
-    const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-    const { error } = await supabase.from('profiles').upsert({ id: user.id, avatar_url: data.publicUrl });
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    const avatarUrl = `${data.publicUrl}?t=${Date.now()}`;
+    const { error } = await safeUpsertProfile({ avatar_url: avatarUrl });
 
     if (error) {
       toast({ title: 'Could not save avatar', description: error.message, variant: 'destructive' });
@@ -153,14 +395,14 @@ const Account = () => {
   const startEditAddress = (address: Address) => {
     setEditingAddressId(address.id);
     setAddressForm({
-      label: address.label,
+      label: address.label || 'Home',
       full_name: address.full_name,
       phone: address.phone,
-      address_line1: address.address_line1,
-      address_line2: (address as any).address_line2 || '',
+      address_line1: address.address_line1 || (address as any).address_line_1 || '',
+      address_line2: (address as any).address_line2 || (address as any).address_line_2 || '',
       city: address.city,
       state: address.state,
-      pincode: address.pincode,
+      pincode: address.pincode || (address as any).postal_code || '',
       postal_code: (address as any).postal_code || address.pincode || '',
       landmark: (address as any).landmark || '',
     });
@@ -250,17 +492,24 @@ const Account = () => {
       return;
     }
 
+    const labelTag = addressForm.label ? `[${addressForm.label}] ` : '';
     const payload = {
-      label: addressForm.label,
       full_name: addressForm.full_name,
       phone: cleanPhone,
-      address_line1: addressForm.address_line1,
-      address_line2: addressForm.address_line2,
+      address_line_1: labelTag + addressForm.address_line1,
+      address_line_2: addressForm.address_line2 + (addressForm.landmark ? `, Landmark: ${addressForm.landmark}` : ''),
       city: addressForm.city,
       state: addressForm.state,
-      pincode: cleanPincode,
       postal_code: cleanPincode,
-      landmark: addressForm.landmark,
+      country: 'India',
+    };
+
+    const parseAddressLabelAndLine = (addressLine1: string) => {
+      const match = (addressLine1 || '').match(/^\[(.*?)\]\s*(.*)$/);
+      if (match) {
+        return { label: match[1], cleanLine1: match[2] };
+      }
+      return { label: 'Home', cleanLine1: addressLine1 };
     };
 
     if (editingAddressId) {
@@ -277,8 +526,17 @@ const Account = () => {
         return;
       }
 
+      const formattedData = {
+        ...(data as any),
+        label: parseAddressLabelAndLine((data as any).address_line_1 || (data as any).address_line1 || '').label,
+        address_line1: parseAddressLabelAndLine((data as any).address_line_1 || (data as any).address_line1 || '').cleanLine1,
+        address_line2: (data as any).address_line_2 || (data as any).address_line2 || '',
+        pincode: (data as any).postal_code || (data as any).pincode || '',
+        postal_code: (data as any).postal_code || (data as any).pincode || '',
+      };
+
       setAddresses((current) =>
-        current.map((addr) => (addr.id === editingAddressId ? (data as Address) : addr))
+        current.map((addr) => (addr.id === editingAddressId ? (formattedData as Address) : addr))
       );
       cancelEditAddress();
       toast({ title: 'Address updated' });
@@ -294,7 +552,16 @@ const Account = () => {
         return;
       }
 
-      setAddresses((current) => [data as Address, ...current]);
+      const formattedData = {
+        ...(data as any),
+        label: parseAddressLabelAndLine((data as any).address_line_1 || (data as any).address_line1 || '').label,
+        address_line1: parseAddressLabelAndLine((data as any).address_line_1 || (data as any).address_line1 || '').cleanLine1,
+        address_line2: (data as any).address_line_2 || (data as any).address_line2 || '',
+        pincode: (data as any).postal_code || (data as any).pincode || '',
+        postal_code: (data as any).postal_code || (data as any).pincode || '',
+      };
+
+      setAddresses((current) => [formattedData as Address, ...current]);
       cancelEditAddress();
       toast({ title: 'Address saved', description: 'It is ready for your next checkout.' });
     }
@@ -302,15 +569,80 @@ const Account = () => {
 
   const updatePassword = async (event: React.FormEvent) => {
     event.preventDefault();
-    const { error } = await supabase.auth.updateUser({ password });
+    if (!user) return;
 
-    if (error) {
-      toast({ title: 'Password update failed', description: error.message, variant: 'destructive' });
+    if (blockUntil && Date.now() < blockUntil) {
+      const remainingSecs = Math.ceil((blockUntil - Date.now()) / 1000);
+      toast({
+        title: 'Too many attempts',
+        description: `Please wait ${remainingSecs} seconds before trying again.`,
+        variant: 'destructive',
+      });
       return;
     }
 
-    setPassword('');
-    toast({ title: 'Password updated' });
+    if (newPassword.length < 6) {
+      toast({ title: 'Weak password', description: 'Password must be at least 6 characters long.', variant: 'destructive' });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({ title: 'Mismatched passwords', description: 'New password and confirmation do not match.', variant: 'destructive' });
+      return;
+    }
+
+    setUpdatingPass(true);
+
+    try {
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email!,
+        password: currentPassword,
+      });
+
+      if (verifyError) {
+        const attempts = failedAttempts + 1;
+        setFailedAttempts(attempts);
+        if (attempts >= 3) {
+          const blockTime = Date.now() + 5 * 60 * 1000;
+          setBlockUntil(blockTime);
+          setFailedAttempts(0);
+          toast({
+            title: 'Account locked temporarily',
+            description: 'Too many incorrect attempts. Password updating blocked for 5 minutes.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Verification failed',
+            description: 'Incorrect current password. Please try again.',
+            variant: 'destructive',
+          });
+        }
+        return;
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) throw updateError;
+
+      // Force refresh the session tokens to avoid auth desync/stale session states
+      try {
+        await supabase.auth.refreshSession();
+      } catch (refreshErr) {
+        console.warn('Failed to force refresh session after password update:', refreshErr);
+      }
+
+      await refreshProfile();
+
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setFailedAttempts(0);
+      toast({ title: 'Password updated', description: 'Your password has been changed successfully.' });
+    } catch (err: any) {
+      toast({ title: 'Password update failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setUpdatingPass(false);
+    }
   };
 
   return (
@@ -347,8 +679,8 @@ const Account = () => {
                   <p className="text-xs text-white/70">Addresses</p>
                 </div>
                 <div className="rounded-2xl bg-white/10 p-4">
-                  <p className="text-2xl font-bold">RLS</p>
-                  <p className="text-xs text-white/70">Protected</p>
+                  <p className="text-2xl font-bold capitalize">{profile?.role || 'Customer'}</p>
+                  <p className="text-xs text-white/70">Account role</p>
                 </div>
               </div>
             </div>
@@ -359,7 +691,6 @@ const Account = () => {
               <TabsTrigger value="overview"><Home className="mr-2 h-4 w-4" />Overview</TabsTrigger>
               <TabsTrigger value="profile"><UserRound className="mr-2 h-4 w-4" />Profile</TabsTrigger>
               <TabsTrigger value="addresses"><MapPin className="mr-2 h-4 w-4" />Addresses</TabsTrigger>
-              <TabsTrigger value="security"><Shield className="mr-2 h-4 w-4" />Security</TabsTrigger>
               <TabsTrigger value="preferences"><Bell className="mr-2 h-4 w-4" />Preferences</TabsTrigger>
             </TabsList>
 
@@ -386,7 +717,7 @@ const Account = () => {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-green-800">Rs {Number(order.total_amount || 0).toFixed(2)}</p>
-                          <p className="text-sm capitalize text-neutral-500">{order.status}</p>
+                          <p className="text-sm capitalize text-neutral-500">{order.status || order.order_status || 'pending'}</p>
                         </div>
                       </Link>
                     ))}
@@ -410,28 +741,168 @@ const Account = () => {
             </TabsContent>
 
             <TabsContent value="profile">
-              <form onSubmit={updateProfile} className="rounded-2xl bg-white p-6 shadow-sm">
-                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-                  <Avatar className="h-16 w-16">
-                    <AvatarImage src={profile?.avatar_url || undefined} />
-                    <AvatarFallback>{(form.full_name || 'G').slice(0, 1).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <Label htmlFor="avatar">Profile image</Label>
-                    <Input id="avatar" type="file" accept="image/*" onChange={uploadAvatar} className="mt-2" />
+              <div className="space-y-6">
+                <form onSubmit={updateProfile} className="rounded-2xl bg-white p-6 shadow-sm border border-neutral-150/40">
+                  <h2 className="mb-4 text-xl font-bold text-neutral-900 font-serif">Account Details</h2>
+                  <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+                    <Avatar className="h-16 w-16">
+                      <AvatarImage src={profile?.avatar_url || undefined} />
+                      <AvatarFallback className="bg-green-100 text-green-900 font-bold">
+                        {(form.full_name || form.email || 'G').slice(0, 1).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <Label htmlFor="avatar">Profile image</Label>
+                      <Input id="avatar" type="file" accept="image/*" onChange={uploadAvatar} className="mt-2" />
+                    </div>
                   </div>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div><Label>Full name</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="mt-2" /></div>
-                  <div><Label>Username</Label><Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className="mt-2" /></div>
-                  <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-2" /></div>
-                  <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-2" /></div>
-                </div>
-                <Button type="submit" disabled={saving} className="mt-6 rounded-xl bg-green-800 hover:bg-green-900">
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save profile
-                </Button>
-              </form>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div><Label>Full name</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="mt-2" /></div>
+                    <div><Label>Username</Label><Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className="mt-2" /></div>
+                    <div>
+                      <Label htmlFor="profileEmail">Email</Label>
+                      <Input
+                        id="profileEmail"
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        className="mt-2"
+                      />
+                      {emailCooldownSeconds > 0 && (
+                        <p className="text-xs text-amber-600 mt-1 font-semibold">
+                          Email cooldown active: retry in {emailCooldownSeconds}s.
+                        </p>
+                      )}
+                      {user?.new_email && user.new_email !== dismissedPendingEmail ? (
+                        <div className="mt-3 rounded-2xl bg-amber-50 border border-amber-200/60 p-4 text-amber-900 text-sm">
+                          <p className="font-semibold">Verification Pending</p>
+                          <p className="text-xs text-neutral-600 mt-1">
+                            A confirmation link was sent to <strong className="text-amber-950">{user.new_email}</strong>. Please confirm it to finalize your email change.
+                          </p>
+                          <div className="mt-3 flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={saving || emailCooldownSeconds > 0}
+                              onClick={resendEmailVerification}
+                              className="h-8 rounded-xl text-xs bg-white text-amber-900 border-amber-200 hover:bg-amber-50"
+                            >
+                              Resend Verification
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={saving}
+                              onClick={cancelEmailChange}
+                              className="h-8 rounded-xl text-xs text-amber-900 hover:bg-amber-100 hover:text-amber-950"
+                            >
+                              Cancel Request
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        user && !user.email_confirmed_at && (
+                          <div className="mt-3 rounded-2xl bg-amber-50 border border-amber-200/60 p-4 text-amber-900 text-sm">
+                            <p className="font-semibold">Email Not Verified</p>
+                            <p className="text-xs text-neutral-600 mt-1">
+                              Your email address <strong className="text-amber-950">{user.email}</strong> is not verified yet. Please check your inbox for the confirmation link.
+                            </p>
+                            <div className="mt-3 flex gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={saving || emailCooldownSeconds > 0}
+                                onClick={resendEmailVerification}
+                                className="h-8 rounded-xl text-xs bg-white text-amber-900 border-amber-200 hover:bg-amber-50"
+                              >
+                                Resend Verification Email
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
+                    <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-2" /></div>
+                  </div>
+                  <Button type="submit" disabled={saving} className="mt-6 rounded-xl bg-green-800 hover:bg-green-900">
+                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save profile
+                  </Button>
+                </form>
+
+                <form onSubmit={updatePassword} className="rounded-2xl bg-white p-6 shadow-sm border border-neutral-150/40">
+                  <h2 className="mb-4 text-xl font-bold text-neutral-900 font-serif">Change Password</h2>
+                  <div className="grid gap-4 md:grid-cols-1">
+                    <div>
+                      <Label htmlFor="currentPassword">Current Password</Label>
+                      <Input
+                        id="currentPassword"
+                        type="password"
+                        required
+                        autoComplete="current-password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="newPassword">New Password</Label>
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        required
+                        autoComplete="new-password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="mt-2"
+                      />
+                      {newPassword && (
+                        <p className={`text-xs mt-1 font-semibold ${
+                          getPasswordStrength(newPassword).startsWith('Weak')
+                            ? 'text-red-500'
+                            : getPasswordStrength(newPassword) === 'Medium'
+                            ? 'text-yellow-600'
+                            : 'text-green-700'
+                        }`}>
+                          Strength: {getPasswordStrength(newPassword)}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        required
+                        autoComplete="new-password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="mt-2"
+                      />
+                      {confirmPassword && newPassword !== confirmPassword && (
+                        <p className="text-xs text-red-500 mt-1 font-semibold">Passwords do not match.</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-6 flex items-center gap-3">
+                    <Button
+                      type="submit"
+                      disabled={updatingPass || !currentPassword || !newPassword || newPassword !== confirmPassword || getPasswordStrength(newPassword).startsWith('Weak')}
+                      className="rounded-xl bg-green-800 hover:bg-green-900"
+                    >
+                      {updatingPass && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Update password
+                    </Button>
+                    <Button type="button" variant="outline" className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 ml-auto" onClick={signOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Sign Out
+                    </Button>
+                  </div>
+                </form>
+              </div>
             </TabsContent>
 
             <TabsContent value="addresses">
@@ -499,19 +970,6 @@ const Account = () => {
                   )}
                 </div>
               </div>
-            </TabsContent>
-
-            <TabsContent value="security">
-              <form onSubmit={updatePassword} className="max-w-xl rounded-2xl bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-xl font-bold">Update password</h2>
-                <Label>New password</Label>
-                <Input type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className="mt-2" />
-                <Button disabled={!password} className="mt-6 rounded-xl bg-green-800 hover:bg-green-900">Update password</Button>
-                <Button type="button" variant="outline" className="ml-3 mt-6 rounded-xl" onClick={signOut}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Logout
-                </Button>
-              </form>
             </TabsContent>
 
             <TabsContent value="preferences">

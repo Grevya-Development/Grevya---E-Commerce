@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,11 +7,38 @@ import { toast } from '@/components/ui/use-toast';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { motion } from 'framer-motion';
+import { friendlyAuthError, getAuthRedirectUrl } from '@/lib/authValidation';
 
 const VerifyEmail = () => {
   const location = useLocation();
-  const email = (location.state as any)?.email || '';
+  const email = (location.state as any)?.email || localStorage.getItem('grevya-signup-email') || '';
   const [resending, setResending] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('grevya-resend-cooldown');
+    if (stored) {
+      const parsed = Number(stored);
+      const remaining = Math.max(0, Math.ceil((parsed - Date.now()) / 1000));
+      if (remaining > 0) {
+        setCooldownSeconds(remaining);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setCooldownSeconds((prev) => {
+        if (prev <= 1) {
+          localStorage.removeItem('grevya-resend-cooldown');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [cooldownSeconds]);
 
   const handleResend = async () => {
     if (!email) {
@@ -23,26 +50,45 @@ const VerifyEmail = () => {
       return;
     }
 
+    if (cooldownSeconds > 0) {
+      toast({
+        title: 'Please wait',
+        description: `You can request another verification link in ${cooldownSeconds} seconds.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setResending(true);
     try {
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email: email,
         options: {
-          emailRedirectTo: `${window.location.origin}/account`,
+          emailRedirectTo: getAuthRedirectUrl('/account'),
         },
       });
 
       if (error) throw error;
+
+      const cooldownTime = Date.now() + 60 * 1000;
+      setCooldownSeconds(60);
+      localStorage.setItem('grevya-resend-cooldown', String(cooldownTime));
 
       toast({
         title: 'Verification email sent',
         description: `We've sent a new confirmation link to ${email}.`,
       });
     } catch (error: any) {
+      const errorMsg = error.message.toLowerCase();
+      if (errorMsg.includes('rate limit') || errorMsg.includes('rate exceeded')) {
+        const cooldownTime = Date.now() + 60 * 1000;
+        setCooldownSeconds(60);
+        localStorage.setItem('grevya-resend-cooldown', String(cooldownTime));
+      }
       toast({
         title: 'Could not resend email',
-        description: error.message || 'Something went wrong.',
+        description: friendlyAuthError(error.message),
         variant: 'destructive',
       });
     } finally {
@@ -96,11 +142,11 @@ const VerifyEmail = () => {
             {email && (
               <button
                 onClick={handleResend}
-                disabled={resending}
+                disabled={resending || cooldownSeconds > 0}
                 className="mt-3 text-sm font-semibold text-green-700 hover:text-green-800 flex items-center justify-center gap-2 disabled:opacity-50 mx-auto"
               >
                 {resending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                Resend Verification Link
+                {cooldownSeconds > 0 ? `Resend Link (retry in ${cooldownSeconds}s)` : 'Resend Verification Link'}
               </button>
             )}
           </div>
