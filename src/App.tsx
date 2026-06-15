@@ -9,6 +9,13 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { useEffect } from 'react';
 import { supabase } from "@/lib/supabaseClient";
 
+// Global Premium UX Components
+import MemberBenefitsBar from "@/components/MemberBenefitsBar";
+import SpotlightSearch from "@/components/SpotlightSearch";
+import QuickViewModal from "@/components/QuickViewModal";
+import MobileBottomNav from "@/components/MobileBottomNav";
+
+
 // Lazy-loaded pages
 const Index = lazy(() => import("./pages/Index"));
 const About = lazy(() => import("./pages/About"));
@@ -72,6 +79,9 @@ const App = () => {
     <Toaster />
     <Sonner />
     <BrowserRouter>
+      <MemberBenefitsBar />
+      <SpotlightSearch />
+      <QuickViewModal />
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-cream/30 text-green-800"><div className="h-10 w-10 animate-spin rounded-full border-4 border-green-100 border-t-green-800" /></div>}>
         <Routes>
           <Route path="/" element={<Index />} />
@@ -99,6 +109,7 @@ const App = () => {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      <MobileBottomNav />
     </BrowserRouter>
   </TooltipProvider>
   );
