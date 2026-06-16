@@ -37,6 +37,7 @@ const Account = () => {
   const navigate = useNavigate();
   const wishlistItems = useWishlistStore((state) => state.items);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   const [orders, setOrders] = useState<any[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
@@ -889,7 +890,7 @@ const Account = () => {
       
       <main className="flex-grow py-10">
         <div className="container mx-auto px-4 max-w-6xl">
-          <Tabs defaultValue="overview" className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} defaultValue="overview" className="space-y-6">
             {/* PREMIUM SPLIT HEADER PANEL */}
             <div className="grid gap-6 md:grid-cols-[1.3fr_1.7fr] mb-10 items-stretch">
             
@@ -1023,13 +1024,13 @@ const Account = () => {
                             Upload
                           </label>
                         ) : (
-                          <TabsTrigger 
-                            value={item.tab || 'overview'} 
-                            asChild
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab(item.tab || 'overview')}
                             className="text-[10px] text-[#A68D65] font-extrabold uppercase hover:underline p-0 h-auto bg-transparent border-none shadow-none cursor-pointer focus-visible:ring-0 focus-visible:ring-offset-0"
                           >
-                            <span>Add</span>
-                          </TabsTrigger>
+                            Add
+                          </button>
                         )
                       )}
                     </div>
