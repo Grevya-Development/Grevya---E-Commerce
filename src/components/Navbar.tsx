@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LogOut, Package, Search, Settings, ShoppingCart, Menu, X, User } from 'lucide-react';
+import { LogOut, Package, Search, Settings, ShoppingCart, Menu, X, User, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/store/useCartStore';
 import { useAuth } from '@/context/AuthContext';
@@ -19,6 +19,27 @@ const Navbar = () => {
   const [cartCount, setCartCount] = useState(0);
   const { user, profile, signOut } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
+
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('grevya-theme') || 'light';
+    }
+    return 'light';
+  });
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('grevya-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
   // Hydration fix for client-only state vs SSR output mismatch
   useEffect(() => {
@@ -188,6 +209,20 @@ const Navbar = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleTheme}
+              className="rounded-full hover:bg-[#A68D65]/10 text-gray-700 dark:text-[#F7EEE4]"
+              title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+            >
+              {theme === 'light' ? (
+                <Moon className="h-4.5 w-4.5 text-[#33381C] dark:text-[#F7EEE4]" />
+              ) : (
+                <Sun className="h-4.5 w-4.5 text-[#33381C] dark:text-[#F7EEE4]" />
+              )}
+            </Button>
+
             <NotificationBell />
 
             <Link to="/cart" className="relative">
@@ -202,8 +237,21 @@ const Navbar = () => {
             </Link>
           </div>
 
-          {/* Mobile menu trigger */}
           <div className="flex md:hidden items-center space-x-3">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleTheme}
+              className="rounded-full text-gray-750 dark:text-[#F7EEE4]"
+              title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+            >
+              {theme === 'light' ? (
+                <Moon className="h-5 w-5 text-[#33381C] dark:text-[#F7EEE4]" />
+              ) : (
+                <Sun className="h-5 w-5 text-[#33381C] dark:text-[#F7EEE4]" />
+              )}
+            </Button>
+
             <NotificationBell />
             <Link to="/cart" className="relative">
               <Button variant="ghost" size="icon" className="rounded-full text-gray-700">

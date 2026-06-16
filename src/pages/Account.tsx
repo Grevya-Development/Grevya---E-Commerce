@@ -80,6 +80,9 @@ const Account = () => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [uploadingCropped, setUploadingCropped] = useState(false);
   const [isDragOverAvatar, setIsDragOverAvatar] = useState(false);
+  const [imgAspect, setImgAspect] = useState(1);
+  const [initialTouchDist, setInitialTouchDist] = useState(0);
+  const [initialScale, setInitialScale] = useState(1);
 
   // Additional settings state (with persistence via localStorage)
   const [profileSettings, setProfileSettings] = useState({
@@ -438,7 +441,41 @@ const Account = () => {
     reader.readAsDataURL(file);
   };
 
+  const clampPosition = (x: number, y: number, scale: number, aspect: number) => {
+    const w_base = aspect > 1 ? 240 * aspect : 240;
+    const h_base = aspect > 1 ? 240 : 240 / aspect;
+
+    const w_val = w_base * scale;
+    const h_val = h_base * scale;
+
+    const maxDeltaX = w_val > 240 ? (w_val - 240) / 2 : 0;
+    const maxDeltaY = h_val > 240 ? (h_val - 240) / 2 : 0;
+
+    return {
+      x: Math.max(-maxDeltaX, Math.min(maxDeltaX, x)),
+      y: Math.max(-maxDeltaY, Math.min(maxDeltaY, y))
+    };
+  };
+
+  const handleScaleChange = (newScale: number) => {
+    setCropScale(newScale);
+    setCropPosition(prev => clampPosition(prev.x, prev.y, newScale, imgAspect));
+  };
+
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    // Check if double-touch pinch zoom gesture
+    if ('touches' in e && e.touches.length === 2) {
+      e.preventDefault();
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      setInitialTouchDist(dist);
+      setInitialScale(cropScale);
+      setIsDragging(false);
+      return;
+    }
+
     e.preventDefault();
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
@@ -447,17 +484,30 @@ const Account = () => {
   };
 
   const handleDragMove = (e: React.MouseEvent | React.TouchEvent) => {
+    // If pinch zooming
+    if ('touches' in e && e.touches.length === 2 && initialTouchDist > 0) {
+      e.preventDefault();
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const factor = dist / initialTouchDist;
+      const newScale = Math.max(1, Math.min(3, initialScale * factor));
+      handleScaleChange(newScale);
+      return;
+    }
+
     if (!isDragging) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    setCropPosition({
-      x: clientX - dragStart.x,
-      y: clientY - dragStart.y
-    });
+    
+    const newPos = clampPosition(clientX - dragStart.x, clientY - dragStart.y, cropScale, imgAspect);
+    setCropPosition(newPos);
   };
 
   const handleDragEnd = () => {
     setIsDragging(false);
+    setInitialTouchDist(0);
   };
 
   const saveCroppedAvatar = async () => {
@@ -476,21 +526,15 @@ const Account = () => {
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, 300, 300);
 
-        const w_img = img.width;
-        const h_img = img.height;
-        let w_base = 300;
-        let h_base = 300;
-
-        if (w_img > h_img) {
-          w_base = 300 * (w_img / h_img);
-        } else {
-          h_base = 300 * (h_img / w_img);
-        }
+        const w_base = imgAspect > 1 ? 300 * imgAspect : 300;
+        const h_base = imgAspect > 1 ? 300 : 300 / imgAspect;
 
         const drawWidth = w_base * cropScale;
         const drawHeight = h_base * cropScale;
-        const dx = 150 - drawWidth / 2 + cropPosition.x;
-        const dy = 150 - drawHeight / 2 + cropPosition.y;
+        
+        const scaleFactor = 300 / 240;
+        const dx = 150 - drawWidth / 2 + cropPosition.x * scaleFactor;
+        const dy = 150 - drawHeight / 2 + cropPosition.y * scaleFactor;
 
         ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
 
@@ -1902,42 +1946,90 @@ const Account = () => {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 15 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="relative w-full max-w-md bg-white border border-neutral-100 rounded-3xl p-6 text-center shadow-2xl z-10 space-y-5 overflow-hidden"
+              className="relative w-full max-w-xl bg-white dark:bg-[#1D1E19] border border-neutral-100 dark:border-neutral-800 rounded-3xl p-6 shadow-2xl z-10 space-y-6 overflow-hidden"
             >
-              <div>
-                <h3 className="font-serif text-lg font-bold text-[#33381C]">Position & Scale Avatar</h3>
-                <p className="text-xs text-neutral-400 mt-1">Drag to adjust the center, and use slider to crop the ideal framing.</p>
+              <div className="text-center">
+                <h3 className="font-serif text-lg font-bold text-[#33381C] dark:text-[#F7EEE4]">Position & Scale Avatar</h3>
+                <p className="text-xs text-neutral-400 mt-1">Drag inside the circle to position, use the slider to scale, and review preview.</p>
               </div>
 
-              {/* Crop circular boundary container */}
-              <div className="w-[240px] h-[240px] mx-auto rounded-full border-4 border-[#A68D65] overflow-hidden relative cursor-move select-none bg-neutral-900 shadow-inner flex items-center justify-center">
-                {/* Bounding Mask grid for alignment */}
-                <div className="absolute inset-0 border border-white/5 pointer-events-none rounded-full" />
+              {/* Two Column Layout: Editor (Left) & Preview (Right) */}
+              <div className="flex flex-col md:flex-row items-center justify-center gap-6">
                 
-                <img
-                  src={cropperSrc}
-                  alt="Crop preview"
-                  onMouseDown={handleDragStart}
-                  onMouseMove={handleDragMove}
-                  onMouseUp={handleDragEnd}
-                  onMouseLeave={handleDragEnd}
-                  onTouchStart={handleDragStart}
-                  onTouchMove={handleDragMove}
-                  onTouchEnd={handleDragEnd}
-                  className="absolute max-w-none max-h-none pointer-events-auto"
-                  style={{
-                    left: '50%',
-                    top: '50%',
-                    transform: `translate(-50%, -50%) translate(${cropPosition.x}px, ${cropPosition.y}px) scale(${cropScale})`,
-                    transformOrigin: 'center',
-                    cursor: isDragging ? 'grabbing' : 'grab',
-                  }}
-                />
+                {/* Crop circular boundary container */}
+                <div className="relative w-[240px] h-[240px] rounded-full border-4 border-[#A68D65] dark:border-[#A68D65]/40 overflow-hidden cursor-move select-none bg-neutral-950 shadow-inner flex items-center justify-center shadow-[0_0_20px_rgba(166,141,101,0.2)]">
+                  {/* Guideline Grid (3x3 grid for premium alignment helper) */}
+                  <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none rounded-full overflow-hidden">
+                    <div className="border-r border-b border-white/10" />
+                    <div className="border-r border-b border-white/10" />
+                    <div className="border-b border-white/10" />
+                    <div className="border-r border-b border-white/10" />
+                    <div className="border-r border-b border-white/10" />
+                    <div className="border-b border-white/10" />
+                    <div className="border-r border-white/10" />
+                    <div className="border-r border-white/10" />
+                    <div className="" />
+                  </div>
+                  
+                  <img
+                    src={cropperSrc}
+                    alt="Crop preview"
+                    onLoad={(e) => {
+                      const imgEl = e.currentTarget;
+                      const aspect = imgEl.naturalWidth / imgEl.naturalHeight;
+                      setImgAspect(aspect);
+                      // Default fit calculation
+                      setCropScale(1);
+                      setCropPosition({ x: 0, y: 0 });
+                    }}
+                    onMouseDown={handleDragStart}
+                    onMouseMove={handleDragMove}
+                    onMouseUp={handleDragEnd}
+                    onMouseLeave={handleDragEnd}
+                    onTouchStart={handleDragStart}
+                    onTouchMove={handleDragMove}
+                    onTouchEnd={handleDragEnd}
+                    className="absolute max-w-none max-h-none pointer-events-auto"
+                    style={{
+                      width: `${imgAspect > 1 ? 240 * imgAspect : 240}px`,
+                      height: `${imgAspect > 1 ? 240 : 240 / imgAspect}px`,
+                      left: '50%',
+                      top: '50%',
+                      transform: `translate(-50%, -50%) translate(${cropPosition.x}px, ${cropPosition.y}px) scale(${cropScale})`,
+                      transformOrigin: 'center',
+                      cursor: isDragging ? 'grabbing' : 'grab',
+                    }}
+                  />
+                  {/* Subtle edge overlay shade for crop window */}
+                  <div className="absolute inset-0 rounded-full border border-white/5 pointer-events-none" />
+                </div>
+
+                {/* Circular Preview Container */}
+                <div className="flex flex-col items-center gap-2">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Live Preview</span>
+                  <div className="w-24 h-24 rounded-full border border-[#A68D65]/40 overflow-hidden relative bg-neutral-900 shadow-sm flex items-center justify-center select-none pointer-events-none">
+                    <img
+                      src={cropperSrc}
+                      alt="Circular avatar preview"
+                      className="absolute max-w-none max-h-none"
+                      style={{
+                        width: `${imgAspect > 1 ? 96 * imgAspect : 96}px`,
+                        height: `${imgAspect > 1 ? 96 : 96 / imgAspect}px`,
+                        left: '50%',
+                        top: '50%',
+                        transform: `translate(-50%, -50%) translate(${cropPosition.x * (96 / 240)}px, ${cropPosition.y * (96 / 240)}px) scale(${cropScale})`,
+                        transformOrigin: 'center',
+                      }}
+                    />
+                  </div>
+                  <span className="text-[9px] text-[#A68D65] font-semibold">Circular Display</span>
+                </div>
+
               </div>
 
-              {/* Crop Controls */}
-              <div className="space-y-2 px-4">
-                <div className="flex justify-between items-center text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+              {/* Crop Controls inside glass panel */}
+              <div className="space-y-2.5 px-4 py-3 rounded-2xl bg-[#F7EEE4]/40 dark:bg-[#262A14]/30 border border-[#A68D65]/10">
+                <div className="flex justify-between items-center text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
                   <span>Zoom Level</span>
                   <span>{cropScale.toFixed(2)}x</span>
                 </div>
@@ -1947,8 +2039,8 @@ const Account = () => {
                   max="3"
                   step="0.01"
                   value={cropScale}
-                  onChange={(e) => setCropScale(Number(e.target.value))}
-                  className="w-full accent-[#33381C] bg-[#F7EEE4] rounded-lg h-1.5 appearance-none outline-none cursor-pointer"
+                  onChange={(e) => handleScaleChange(Number(e.target.value))}
+                  className="w-full accent-[#33381C] dark:accent-[#A68D65] bg-[#F7EEE4] dark:bg-neutral-800 rounded-lg h-1.5 appearance-none outline-none cursor-pointer"
                 />
               </div>
 
@@ -1958,7 +2050,7 @@ const Account = () => {
                   onClick={() => setIsCropperOpen(false)} 
                   variant="outline" 
                   disabled={uploadingCropped}
-                  className="flex-1 h-11 rounded-xl text-xs font-bold border-neutral-200"
+                  className="flex-1 h-11 rounded-xl text-xs font-bold border-neutral-200 dark:border-neutral-800 dark:text-[#F7EEE4]"
                 >
                   Cancel
                 </Button>
