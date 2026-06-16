@@ -764,6 +764,119 @@ const Account = () => {
     }
   };
 
+  // Reorder a previous order: adds all items from the selected order to the cart
+  const handleReorder = async (orderId: string) => {
+    if (!user) return;
+    try {
+      const { data: orderData, error } = await supabase
+        .from('order_detail')
+        .select('order_items')
+        .eq('id', orderId)
+        .single();
+      if (error) {
+        toast({ title: 'Reorder failed', description: error.message, variant: 'destructive' });
+        return;
+      }
+      const items = (orderData as any)?.order_items || [];
+      const cart = useCartStore.getState();
+      items.forEach((item: any) => {
+        const product = {
+          id: item.product_id,
+          name: item.product_name,
+          price: item.price,
+          image: item.product_image,
+        } as any;
+        cart.addItem(product, item.quantity);
+      });
+      toast({ title: 'Reorder added', description: 'Items added to cart.', variant: 'default' });
+    } catch (err: any) {
+      toast({ title: 'Reorder error', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  // Logout from all devices
+  const handleLogoutAllDevices = async () => {
+    if (!user) return;
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      if (error) throw error;
+      toast({ title: 'Logged out from all devices' });
+      router.push('/auth');
+    } catch (err: any) {
+      toast({ title: 'Logout failed', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  // Download user data as JSON
+  const downloadUserData = async () => {
+    if (!user) return;
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('order_detail')
+        .select('*')
+        .eq('user_id', user.id);
+      if (profileError || ordersError) {
+        throw new Error(profileError?.message || ordersError?.message);
+      }
+      const payload = { profile: profileData, orders: ordersData };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'grevya_user_data.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast({ title: 'Download failed', description: err.message, variant: 'destructive' });
+    }
+  };
+
+  // Floating input component reused across pages
+  const FloatingInput = ({
+    label,
+    type = 'text',
+    value,
+    onChange,
+    placeholder,
+    required = false,
+    disabled = false,
+  }: {
+    label: string;
+    type?: string;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    placeholder?: string;
+    required?: boolean;
+    disabled?: boolean;
+  }) => {
+    return (
+      <div className="relative z-0 w-full group">
+        <input
+          type={type}
+          name={label}
+          id={label}
+          className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-primary peer"
+          placeholder=" "
+          value={value}
+          onChange={onChange}
+          required={required}
+          disabled={disabled}
+        />
+        <label
+          htmlFor={label}
+          className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10 origin-[0] peer-focus:left-0 peer-focus:text-primary peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75"
+        >
+          {label}
+        </label>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-[#FBF9F6]">
       <Navbar />
