@@ -56,18 +56,60 @@ const Products = () => {
       desc: 'Explore everything natural'
     },
     {
-      id: 'Home & Living',
-      name: 'Home & Living',
-      image: productImages.areca.dinnerware,
-      tag: 'Popular Choice',
-      desc: 'Areca dinnerware & plates'
-    },
-    {
       id: 'Personal Care',
       name: 'Personal Care',
+      image: productImages.natural.henna,
+      tag: 'Pure Botanical',
+      desc: 'Oils, henna, scrubs & face wash'
+    },
+    {
+      id: 'Natural Products',
+      name: 'Natural Products',
       image: productImages.natural.coconutOil,
-      tag: 'Trending Now',
-      desc: 'Oils, henna & cosmetics'
+      tag: 'Wood Pressed',
+      desc: 'Virgin oils & organic powder extracts'
+    },
+    {
+      id: 'Home & Living',
+      name: 'Home & Living',
+      image: productImages.backgrounds.sustainability,
+      tag: 'Eco Decor',
+      desc: 'Seagrass baskets, rugs & soy candles'
+    },
+    {
+      id: 'Areca Products',
+      name: 'Areca Products',
+      image: productImages.areca.plates,
+      tag: 'Compostable',
+      desc: 'Areca leaf plates, bowls & platters'
+    },
+    {
+      id: 'Wellness',
+      name: 'Wellness',
+      image: 'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?q=80&w=600&auto=format&fit=crop',
+      tag: 'Daily Vitality',
+      desc: 'Essential oils & adaptogen herbs'
+    },
+    {
+      id: 'Organic Essentials',
+      name: 'Organic Essentials',
+      image: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?q=80&w=600&auto=format&fit=crop',
+      tag: 'Kitchen Pantry',
+      desc: 'Curcumin turmeric, forest honey & spices'
+    },
+    {
+      id: 'Kitchen & Dining',
+      name: 'Kitchen & Dining',
+      image: 'https://images.unsplash.com/photo-1531234799389-d8793a28f317?q=80&w=600&auto=format&fit=crop',
+      tag: 'Earth Table',
+      desc: 'Neem wood spatulas, clay water pots & brassware'
+    },
+    {
+      id: 'Eco Lifestyle',
+      name: 'Eco Lifestyle',
+      image: 'https://images.unsplash.com/photo-1607613009820-a29f7bb81c04?q=80&w=600&auto=format&fit=crop',
+      tag: 'Zero Waste',
+      desc: 'Bamboo toothbrushes, canvas bags & straws'
     }
   ];
 

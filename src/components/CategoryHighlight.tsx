@@ -27,7 +27,7 @@ const CategoryHighlight = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
           {/* Editorial Card 1 - Areca Dinnerware (occupies 7 columns on desktop) */}
           <div 
-            onClick={(e) => handleCardClick('/products?category=Home%20%26%20Living', e)}
+            onClick={(e) => handleCardClick('/products?category=Areca%20Products', e)}
             className="lg:col-span-7 group relative rounded-3xl overflow-hidden shadow-lg border border-[#A68D65]/15 flex flex-col justify-end min-h-[440px] cursor-pointer"
           >
             {/* Background image with zoom transition */}
@@ -52,7 +52,7 @@ const CategoryHighlight = () => {
                 Artisan-molded plates, bowls, and trays handcrafted from naturally fallen Areca palm leaves. Highly durable, microwave-safe, chemical-free, and compostable in 60 days.
               </p>
               <Link 
-                to="/products?category=Home%20%26%20Living"
+                to="/products?category=Areca%20Products"
                 className="inline-flex items-center text-xs font-bold text-[#33381C] hover:text-[#A68D65] transition-colors gap-1.5 group/link"
               >
                 <span>Browse Collection</span>
@@ -63,7 +63,7 @@ const CategoryHighlight = () => {
 
           {/* Editorial Card 2 - Botanical Personal Care (occupies 5 columns on desktop) */}
           <div 
-            onClick={(e) => handleCardClick('/products?category=Personal%20Care', e)}
+            onClick={(e) => handleCardClick('/products?category=Natural%20Products', e)}
             className="lg:col-span-5 group relative rounded-3xl overflow-hidden shadow-lg border border-[#A68D65]/15 flex flex-col justify-end min-h-[440px] cursor-pointer"
           >
             {/* Background image with zoom transition */}
@@ -88,7 +88,7 @@ const CategoryHighlight = () => {
                 Cold-pressed oils, hair colors, and organic powders processed without artificial additives. Sourced ethically to support smallholder farmers.
               </p>
               <Link 
-                to="/products?category=Personal%20Care"
+                to="/products?category=Natural%20Products"
                 className="inline-flex items-center text-xs font-bold text-[#33381C] hover:text-[#A68D65] transition-colors gap-1.5 group/link"
               >
                 <span>Browse Collection</span>
