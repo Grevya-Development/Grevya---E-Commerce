@@ -97,12 +97,12 @@ const Navbar = () => {
         {/* PREMIUM STATIC -> FLOATING BACKGROUND PANEL */}
         <motion.div
           animate={{
-            backgroundColor: isScrolled ? 'rgba(255, 255, 255, 0.85)' : 'rgba(247, 238, 228, 0.7)',
-            borderColor: isScrolled ? 'rgba(166, 141, 101, 0.22)' : 'rgba(166, 141, 101, 0.12)',
+            backgroundColor: isScrolled ? 'var(--nav-bg-scrolled)' : 'var(--nav-bg-top)',
+            borderColor: isScrolled ? 'var(--nav-border-scrolled)' : 'var(--nav-border-top)',
             borderRadius: isScrolled ? (isMobile ? '16px' : '9999px') : '0px',
             boxShadow: isScrolled 
-              ? '0 10px 30px -10px rgba(51, 56, 28, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.6)' 
-              : '0 0px 0px rgba(0,0,0,0)',
+              ? 'var(--nav-shadow-scrolled)' 
+              : 'var(--nav-shadow-top)',
           }}
           transition={{
             type: 'spring',
