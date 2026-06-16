@@ -54,14 +54,14 @@ const PersonalizedHome = () => {
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'customer';
 
   return (
-    <div className="bg-[#F7EEE4]/10 dark:bg-transparent">
+    <div className="bg-[#F7EEE4]/10">
       {/* 1. Tailored Recommendations Section */}
-      <section className="py-16 bg-white/40 dark:bg-transparent border-t border-[#A68D65]/10">
+      <section className="py-16 bg-white/40 border-t border-[#A68D65]/10">
         <div className="container mx-auto px-4">
           <div className="mb-10 text-center lg:text-left">
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#A68D65]">Tailored for You</span>
-            <h2 className="font-serif text-3xl font-bold text-[#33381C] dark:text-[#F7EEE4] mt-1 mb-3">Your Botanical Edit</h2>
-            <p className="text-xs sm:text-sm text-[#1D1E19]/65 dark:text-[#F7EEE4]/60 max-w-xl">
+            <h2 className="font-serif text-3xl font-bold text-[#33381C] mt-1 mb-3">Your Botanical Edit</h2>
+            <p className="text-xs sm:text-sm text-[#1D1E19]/65 max-w-xl">
               Discover unique recommendations handcrafted by local rural communities, curated specifically for your lifestyle.
             </p>
           </div>
@@ -69,7 +69,7 @@ const PersonalizedHome = () => {
           {isLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-6">
               {[1, 2, 3, 4].map((n) => (
-                <div key={n} className="bg-[#FBF7F1] dark:bg-[#1D1E19]/30 rounded-2xl border border-[#A68D65]/12 flex flex-col h-[400px] overflow-hidden animate-pulse">
+                <div key={n} className="bg-[#FBF7F1] rounded-2xl border border-[#A68D65]/12 flex flex-col h-[400px] overflow-hidden animate-pulse">
                   <div className="bg-[#EAE2D5]/30 h-64 w-full shimmer-bg" />
                   <div className="p-4 flex flex-col flex-grow">
                     <div className="h-4 bg-[#EAE2D5]/50 rounded w-1/3 mb-2" />
@@ -100,9 +100,9 @@ const PersonalizedHome = () => {
       </section>
 
       {/* 2. Minimal Personal Hub Card */}
-      <section className="py-12 bg-[#F7EEE4]/60 dark:bg-[#1D1E19]/10 border-t border-[#A68D65]/10">
+      <section className="py-12 bg-[#F7EEE4]/60 border-t border-[#A68D65]/10">
         <div className="container mx-auto px-4 max-w-5xl">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-[#33381C] dark:bg-[#1D1E19]/60 text-[#F7EEE4] p-6 md:p-8 rounded-3xl shadow-sm border border-[#A68D65]/15">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-[#33381C] text-[#F7EEE4] p-6 md:p-8 rounded-3xl shadow-sm border border-[#A68D65]/15">
             <div className="text-center md:text-left">
               <span className="text-[9px] font-bold uppercase tracking-widest text-[#A68D65] flex items-center justify-center md:justify-start gap-1">
                 <Sparkles className="h-3 w-3" /> Member Account

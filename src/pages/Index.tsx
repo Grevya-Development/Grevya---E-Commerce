@@ -84,11 +84,11 @@ const Index = () => {
               whileInView="visible"
               viewport={{ once: true, margin: "-80px" }}
               variants={scrollReveal}
-              className="bg-white/60 dark:bg-[#1D1E19]/30 py-10"
+              className="bg-white/60 py-10"
             >
               <div className="container mx-auto grid gap-4 px-4 md:grid-cols-3">
                 {['Fast Account Setup', 'Wishlist-Ready Shopping', 'Real-time Order Updates'].map((item) => (
-                  <div key={item} className="rounded-2xl border border-[#A68D65]/20 bg-white/50 dark:bg-[#1D1E19]/50 p-5 text-center font-bold text-[#33381C] dark:text-[#F7EEE4] shadow-xs hover:border-[#33381C]/30 transition-colors">
+                  <div key={item} className="rounded-2xl border border-[#A68D65]/20 bg-white/50 p-5 text-center font-bold text-[#33381C] shadow-xs hover:border-[#33381C]/30 transition-colors">
                     {item}
                   </div>
                 ))}
@@ -101,7 +101,7 @@ const Index = () => {
               whileInView="visible"
               viewport={{ once: true, margin: "-80px" }}
               variants={scrollReveal}
-              className="bg-[#33381C] px-4 py-14 text-[#F7EEE4] dark:bg-[#262A14]"
+              className="bg-[#33381C] px-4 py-14 text-[#F7EEE4]"
             >
               <div className="container mx-auto flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
                 <div>

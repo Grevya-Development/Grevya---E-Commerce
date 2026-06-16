@@ -1946,10 +1946,10 @@ const Account = () => {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 15 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="relative w-full max-w-xl bg-white dark:bg-[#1D1E19] border border-neutral-100 dark:border-neutral-800 rounded-3xl p-6 shadow-2xl z-10 space-y-6 overflow-hidden"
+              className="relative w-full max-w-xl bg-white border border-neutral-100 rounded-3xl p-6 shadow-2xl z-10 space-y-6 overflow-hidden"
             >
               <div className="text-center">
-                <h3 className="font-serif text-lg font-bold text-[#33381C] dark:text-[#F7EEE4]">Position & Scale Avatar</h3>
+                <h3 className="font-serif text-lg font-bold text-[#33381C]">Position & Scale Avatar</h3>
                 <p className="text-xs text-neutral-400 mt-1">Drag inside the circle to position, use the slider to scale, and review preview.</p>
               </div>
 
@@ -1957,7 +1957,7 @@ const Account = () => {
               <div className="flex flex-col md:flex-row items-center justify-center gap-6">
                 
                 {/* Crop circular boundary container */}
-                <div className="relative w-[240px] h-[240px] rounded-full border-4 border-[#A68D65] dark:border-[#A68D65]/40 overflow-hidden cursor-move select-none bg-neutral-950 shadow-inner flex items-center justify-center shadow-[0_0_20px_rgba(166,141,101,0.2)]">
+                <div className="relative w-[240px] h-[240px] rounded-full border-4 border-[#A68D65] overflow-hidden cursor-move select-none bg-neutral-950 shadow-inner flex items-center justify-center shadow-[0_0_20px_rgba(166,141,101,0.2)]">
                   {/* Guideline Grid (3x3 grid for premium alignment helper) */}
                   <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none rounded-full overflow-hidden">
                     <div className="border-r border-b border-white/10" />
@@ -2028,8 +2028,8 @@ const Account = () => {
               </div>
 
               {/* Crop Controls inside glass panel */}
-              <div className="space-y-2.5 px-4 py-3 rounded-2xl bg-[#F7EEE4]/40 dark:bg-[#262A14]/30 border border-[#A68D65]/10">
-                <div className="flex justify-between items-center text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
+              <div className="space-y-2.5 px-4 py-3 rounded-2xl bg-[#F7EEE4]/40 border border-[#A68D65]/10">
+                <div className="flex justify-between items-center text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
                   <span>Zoom Level</span>
                   <span>{cropScale.toFixed(2)}x</span>
                 </div>
@@ -2040,7 +2040,7 @@ const Account = () => {
                   step="0.01"
                   value={cropScale}
                   onChange={(e) => handleScaleChange(Number(e.target.value))}
-                  className="w-full accent-[#33381C] dark:accent-[#A68D65] bg-[#F7EEE4] dark:bg-neutral-800 rounded-lg h-1.5 appearance-none outline-none cursor-pointer"
+                  className="w-full accent-[#33381C] bg-[#F7EEE4] rounded-lg h-1.5 appearance-none outline-none cursor-pointer"
                 />
               </div>
 
@@ -2050,7 +2050,7 @@ const Account = () => {
                   onClick={() => setIsCropperOpen(false)} 
                   variant="outline" 
                   disabled={uploadingCropped}
-                  className="flex-1 h-11 rounded-xl text-xs font-bold border-neutral-200 dark:border-neutral-800 dark:text-[#F7EEE4]"
+                  className="flex-1 h-11 rounded-xl text-xs font-bold border-neutral-200"
                 >
                   Cancel
                 </Button>
