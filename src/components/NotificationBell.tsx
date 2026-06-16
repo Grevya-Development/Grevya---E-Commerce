@@ -181,8 +181,14 @@ const NotificationBell = () => {
         </div>
         <div className="max-h-80 overflow-y-auto">
           {notifications.length === 0 ? (
-            <div className="p-4 text-center text-sm text-gray-500">
-              No notifications yet
+            <div className="py-10 px-4 text-center space-y-3">
+              <div className="mx-auto w-12 h-12 rounded-full bg-[#F7EEE4] border border-[#A68D65]/20 flex items-center justify-center text-[#A68D65]">
+                <Bell className="w-5 h-5 opacity-70" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[#33381C] uppercase tracking-wider">All caught up</p>
+                <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">We'll alert you when orders ship or stock arrives.</p>
+              </div>
             </div>
           ) : (
             notifications.map((notification) => (

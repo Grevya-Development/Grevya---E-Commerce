@@ -801,7 +801,7 @@ const Account = () => {
       const { error } = await supabase.auth.signOut({ scope: 'global' });
       if (error) throw error;
       toast({ title: 'Logged out from all devices' });
-      router.push('/auth');
+      navigate('/auth');
     } catch (err: any) {
       toast({ title: 'Logout failed', description: err.message, variant: 'destructive' });
     }
@@ -845,6 +845,8 @@ const Account = () => {
     placeholder,
     required = false,
     disabled = false,
+    id,
+    autoComplete,
   }: {
     label: string;
     type?: string;
@@ -853,23 +855,27 @@ const Account = () => {
     placeholder?: string;
     required?: boolean;
     disabled?: boolean;
+    id?: string;
+    autoComplete?: string;
   }) => {
+    const inputId = id || label;
     return (
       <div className="relative z-0 w-full group">
         <input
           type={type}
           name={label}
-          id={label}
-          className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-primary peer"
+          id={inputId}
+          className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-[#33381C] peer"
           placeholder=" "
           value={value}
           onChange={onChange}
           required={required}
           disabled={disabled}
+          autoComplete={autoComplete}
         />
         <label
-          htmlFor={label}
-          className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10 origin-[0] peer-focus:left-0 peer-focus:text-primary peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75"
+          htmlFor={inputId}
+          className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10 origin-[0] peer-focus:left-0 peer-focus:text-[#33381C] peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75"
         >
           {label}
         </label>

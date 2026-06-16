@@ -290,11 +290,28 @@ export default function SpotlightSearch() {
                   </div>
                 </div>
               ) : (
-                <div className="py-8 text-center">
-                  <p className="text-[#33381C] font-semibold text-lg mb-1">No products found</p>
-                  <p className="text-xs text-[#33381C]/60 max-w-sm mx-auto">
-                    We couldn&apos;t find any matches for &quot;{query}&quot;. Try checking the spelling or searching other terms.
-                  </p>
+                <div className="py-10 px-4 text-center space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-[#33381C] font-serif text-xl font-bold">No matches found</p>
+                    <p className="text-xs text-[#33381C]/60 max-w-sm mx-auto font-medium leading-relaxed">
+                      We couldn&apos;t find any organic products matching &quot;{query}&quot;. Try checking the spelling or searching alternative keywords.
+                    </p>
+                  </div>
+
+                  <div className="pt-4 border-t border-[#A68D65]/10">
+                    <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-3">Try browsing instead</p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {['Serum', 'Plate', 'Soap', 'Oil', 'Clay'].map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          onClick={() => setQuery(suggestion)}
+                          className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#EAE2D5]/50 border border-[#A68D65]/20 text-[#33381C] hover:bg-[#EAE2D5] cursor-pointer transition-colors"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

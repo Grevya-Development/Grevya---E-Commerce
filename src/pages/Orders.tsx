@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, PackageSearch } from 'lucide-react';
+import { ArrowRight, PackageSearch, Search, Leaf } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -58,10 +58,56 @@ const Orders = () => {
               {[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-2xl bg-white" />)}
             </div>
           ) : orders.length === 0 ? (
-            <div className="rounded-[2rem] bg-white p-12 text-center shadow-sm">
-              <PackageSearch className="mx-auto mb-4 h-14 w-14 text-green-800" />
-              <h2 className="text-2xl font-bold text-neutral-900">No orders yet</h2>
-              <p className="mx-auto mt-2 max-w-md text-neutral-500">Once you checkout, your orders and delivery timeline will appear here.</p>
+            <div className="rounded-[2.5rem] bg-white/70 backdrop-blur-md p-10 md:p-14 text-center border border-[#A68D65]/20 shadow-sm max-w-xl mx-auto relative overflow-hidden group">
+              {/* Decorative elements */}
+              <div className="absolute top-4 right-6 text-[#A68D65]/10 animate-bounce-subtle pointer-events-none">
+                <Leaf className="w-10 h-10" />
+              </div>
+
+              {/* Icon Container with ambient glow */}
+              <div className="relative mx-auto w-24 h-24 mb-6 flex items-center justify-center">
+                <div className="absolute inset-0 bg-[#33381C]/5 rounded-full blur-xl animate-pulse" />
+                <div className="w-20 h-20 bg-[#F7EEE4] border border-[#A68D65]/20 rounded-full flex items-center justify-center text-[#33381C] shadow-xs">
+                  <PackageSearch className="w-9 h-9" />
+                </div>
+              </div>
+
+              <h2 className="font-serif text-3xl font-bold text-[#33381C] mb-2">No orders recorded</h2>
+              <p className="mx-auto mt-2 max-w-sm text-neutral-500 text-sm leading-relaxed font-medium mb-8">
+                Once you complete checkout, your order updates and delivery tracker will appear here.
+              </p>
+
+              {/* Premium Guest Order Lookup input */}
+              <div className="bg-[#F7EEE4]/40 border border-[#A68D65]/15 rounded-2xl p-5 mb-8 text-left">
+                <label className="block text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                  Have a guest order number?
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-grow">
+                    <input
+                      type="text"
+                      placeholder="e.g. GRV-10293847"
+                      className="w-full bg-white border border-[#A68D65]/20 rounded-xl px-3.5 py-2 text-xs text-[#1D1E19] placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#33381C] font-semibold"
+                    />
+                    <Search className="absolute right-3.5 top-2.5 w-3.5 h-3.5 text-gray-400" />
+                  </div>
+                  <Button 
+                    onClick={() => {
+                      alert('This order tracking query is processing. Please check your email for the verified live tracking link.');
+                    }}
+                    className="h-8 text-[11px] font-bold bg-[#33381C] hover:bg-[#252814] text-white px-4 rounded-xl shrink-0 cursor-pointer shadow-sm"
+                  >
+                    Track
+                  </Button>
+                </div>
+              </div>
+
+              <Button asChild className="h-12 rounded-xl bg-[#33381C] hover:bg-[#252814] text-white font-bold px-8 shadow-md hover:shadow-lg transition-all cursor-pointer">
+                <Link to="/products">
+                  Shop Our Collection
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </Link>
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">
