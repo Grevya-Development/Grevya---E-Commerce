@@ -59,23 +59,37 @@ const Navbar = () => {
 
   return (
     <div className="sticky top-0 z-40 w-full">
-      <nav className="relative w-full select-none">
+      <motion.nav
+        animate={{
+          y: isScrolled ? 10 : 0,
+          scale: isScrolled ? (isMobile ? 0.95 : 0.97) : 1,
+        }}
+        transition={{
+          type: 'spring',
+          stiffness: 220,
+          damping: 24,
+          mass: 0.8
+        }}
+        className="relative w-full select-none origin-top"
+      >
         
         {/* PREMIUM STATIC -> FLOATING BACKGROUND PANEL */}
         <motion.div
           animate={{
             backgroundColor: isScrolled ? 'rgba(255, 255, 255, 0.85)' : 'rgba(247, 238, 228, 0.7)',
             borderColor: isScrolled ? 'rgba(166, 141, 101, 0.22)' : 'rgba(166, 141, 101, 0.12)',
-            borderRadius: isScrolled ? '0px 0px 12px 12px' : '0px 0px 0px 0px',
+            borderRadius: isScrolled ? (isMobile ? '16px' : '9999px') : '0px',
             boxShadow: isScrolled 
-              ? '0 4px 20px -2px rgba(51, 56, 28, 0.04), inset 0 1px 0px rgba(255, 255, 255, 0.5)' 
+              ? '0 10px 30px -10px rgba(51, 56, 28, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.6)' 
               : '0 0px 0px rgba(0,0,0,0)',
           }}
           transition={{
-            duration: 0.45,
-            ease: [0.16, 1, 0.3, 1] // Apple-like smooth cubic bezier transition
+            type: 'spring',
+            stiffness: 220,
+            damping: 24,
+            mass: 0.8
           }}
-          className="absolute inset-0 -z-10 border-b backdrop-blur-md"
+          className={`absolute inset-0 -z-10 backdrop-blur-md transition-all ${isScrolled ? 'border border-[#A68D65]/20' : 'border-b'}`}
         />
 
         {/* NAVBAR CONTENT CONTAINER */}
@@ -210,7 +224,7 @@ const Navbar = () => {
             </Button>
           </div>
         </div>
-      </nav>
+      </motion.nav>
 
       {/* Mobile Menu Overlay Drawer */}
       <AnimatePresence>

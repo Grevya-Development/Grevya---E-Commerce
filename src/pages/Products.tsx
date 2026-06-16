@@ -324,7 +324,7 @@ const Products = () => {
             {/* Products Listing Area */}
             <div>
               {loading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 md:gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-2 sm:gap-4 md:gap-6">
                   {[1, 2, 3, 4, 5, 6].map((idx) => (
                     <div key={idx} className="bg-[#FBF7F1] rounded-2xl border border-[#A68D65]/12 flex flex-col h-[320px] overflow-hidden animate-pulse">
                       <div className="bg-[#EAE2D5]/30 aspect-[4/5] w-full shimmer-bg" />
@@ -352,7 +352,7 @@ const Products = () => {
                   variants={containerVariants}
                   initial="hidden"
                   animate="show"
-                  className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 md:gap-6"
+                  className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-2 sm:gap-4 md:gap-6"
                 >
                   {filteredProducts.map((product) => {
                     const slug = (product.name || '').toLowerCase().replace(/\s+/g, '-');

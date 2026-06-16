@@ -167,7 +167,7 @@ const PersonalizedHome = () => {
           </div>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-6">
               {[1, 2, 3, 4].map((n) => (
                 <div key={n} className="bg-[#FBF7F1] rounded-2xl border border-[#A68D65]/12 flex flex-col h-[400px] overflow-hidden animate-pulse">
                   <div className="bg-[#EAE2D5]/30 h-64 w-full shimmer-bg" />
@@ -181,7 +181,7 @@ const PersonalizedHome = () => {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-6">
               {products.map((product) => (
                 <ProductCard
                   key={product.id}

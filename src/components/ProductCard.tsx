@@ -78,7 +78,7 @@ const ProductCard = (props: ProductProps) => {
       className="group relative bg-white/70 border border-[#A68D65]/15 overflow-hidden flex flex-col h-full rounded-2xl shadow-xs cursor-pointer select-none"
       initial={{ opacity: 0, y: 15 }}
       whileInView={{ opacity: 1, y: 0 }}
-      whileTap={{ scale: 0.985 }}
+      whileTap={{ scale: 0.96 }}
       viewport={{ once: true, margin: "-40px" }}
       style={{
         rotateX,
@@ -129,11 +129,12 @@ const ProductCard = (props: ProductProps) => {
         </div>
 
         {/* Action icons stack overlaid top-right */}
-        <div className="absolute top-2.5 right-2.5 z-20 flex flex-col space-y-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 z-20 flex flex-col space-y-1.5">
+          {/* Wishlist Button - Always visible for touch comfort */}
           <motion.button
             onClick={handleWishlistToggle}
             whileHover={{ scale: 1.12 }}
-            whileTap={{ scale: 0.88 }}
+            whileTap={{ scale: 0.8 }}
             className={`p-2 rounded-full shadow-md backdrop-blur-xs border transition-all duration-300 cursor-pointer ${
               isWishlisted
                 ? 'bg-[#33381C] text-[#F7EEE4] border-[#33381C]'
@@ -150,24 +151,27 @@ const ProductCard = (props: ProductProps) => {
             </motion.div>
           </motion.button>
 
-          <motion.button
-            onClick={triggerQuickView}
-            whileHover={{ scale: 1.12 }}
-            whileTap={{ scale: 0.88 }}
-            className="p-2 rounded-full bg-white/80 hover:bg-[#33381C] text-[#33381C] hover:text-[#F7EEE4] border border-[#A68D65]/20 shadow-md backdrop-blur-xs transition-all duration-300 cursor-pointer"
-            title="Quick View"
-            aria-label="Quick view product"
-          >
-            <Eye className="h-3.5 w-3.5" />
-          </motion.button>
+          {/* Quick View Button - Desktop hover only */}
+          <div className="hidden sm:block">
+            <motion.button
+              onClick={triggerQuickView}
+              whileHover={{ scale: 1.12 }}
+              whileTap={{ scale: 0.88 }}
+              className="p-2 rounded-full bg-white/80 hover:bg-[#33381C] text-[#33381C] hover:text-[#F7EEE4] border border-[#A68D65]/20 shadow-md backdrop-blur-xs transition-all duration-300 cursor-pointer w-full"
+              title="Quick View"
+              aria-label="Quick view product"
+            >
+              <Eye className="h-3.5 w-3.5 mx-auto" />
+            </motion.button>
+          </div>
         </div>
 
-        {/* Quick Add Shopping Cart overlay bottom-right */}
+        {/* Quick Add Shopping Cart overlay - Desktop hover only */}
         <motion.button
           onClick={addToCart}
           whileHover={{ scale: 1.15, backgroundColor: '#33381C', color: '#F7EEE4', transition: { type: 'spring', stiffness: 400, damping: 10 } }}
           whileTap={{ scale: 0.88 }}
-          className="absolute bottom-2.5 right-2.5 z-20 p-2.5 rounded-full bg-white text-[#33381C] border border-[#A68D65]/20 shadow-md backdrop-blur-xs cursor-pointer sm:opacity-0 sm:translate-y-2 sm:group-hover:opacity-100 sm:group-hover:translate-y-0 transition-all duration-300"
+          className="absolute bottom-2.5 right-2.5 z-20 p-2.5 rounded-full bg-white text-[#33381C] border border-[#A68D65]/20 shadow-md backdrop-blur-xs cursor-pointer sm:opacity-0 sm:translate-y-2 sm:group-hover:opacity-100 sm:group-hover:translate-y-0 transition-all duration-300 hidden sm:flex"
           title="Add to Cart"
           aria-label="Add to cart"
         >
@@ -176,33 +180,44 @@ const ProductCard = (props: ProductProps) => {
       </div>
 
       {/* Details Container */}
-      <div className="p-3 md:p-4 flex flex-col flex-grow bg-white/40">
+      <div className="p-2.5 sm:p-3 md:p-4 flex flex-col flex-grow bg-white/40">
         <Link to={`/products/${category}/${slug}`} className="block mb-auto">
           {/* Category */}
-          <span className="text-[8px] md:text-[9px] font-bold uppercase tracking-wider text-[#A68D65] block mb-0.5">
+          <span className="text-[7.5px] md:text-[9px] font-bold uppercase tracking-wider text-[#A68D65] block mb-0.5">
             {category}
           </span>
           {/* Title */}
-          <h3 className="font-serif text-sm md:text-base text-[#1D1E19] font-bold mb-1 group-hover:text-[#33381C] transition-colors line-clamp-1 leading-snug">
+          <h3 className="font-serif text-xs md:text-base text-[#1D1E19] font-bold mb-0.5 group-hover:text-[#33381C] transition-colors line-clamp-1 leading-snug">
             {name}
           </h3>
 
           {/* Rating & Price row */}
-          <div className="flex items-center justify-between mt-2 pt-0.5">
+          <div className="flex items-center justify-between mt-1.5 md:mt-2.5 pt-0.5">
             <div className="flex items-center">
-              <Star size={11} fill="currentColor" className="text-[#A68D65] mr-0.5" />
-              <span className="text-[10px] font-bold text-[#1D1E19]/70">
+              <Star size={10} fill="currentColor" className="text-[#A68D65] mr-0.5" />
+              <span className="text-[9px] md:text-[10px] font-bold text-[#1D1E19]/70">
                 {rating.toFixed(1)}
               </span>
-              <span className="text-[9px] text-[#1D1E19]/45 ml-1 hidden sm:inline">
+              <span className="text-[8px] text-[#1D1E19]/45 ml-1 hidden sm:inline">
                 ({displayReviewCount})
               </span>
             </div>
-            <p className="text-sm md:text-base font-extrabold text-[#33381C] tracking-tight">
+            <p className="text-xs md:text-base font-extrabold text-[#33381C] tracking-tight">
               ₹{price.toFixed(0)}
             </p>
           </div>
         </Link>
+
+        {/* Mobile Quick Add CTA Button */}
+        <div className="mt-2.5 block sm:hidden">
+          <button
+            onClick={addToCart}
+            className="w-full py-1.5 px-2.5 bg-[#33381C] hover:bg-[#262A14] text-[#F7EEE4] text-[10px] font-bold rounded-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-xs cursor-pointer"
+          >
+            <ShoppingCart size={11} />
+            <span>Add to Cart</span>
+          </button>
+        </div>
       </div>
     </motion.div>
   );
