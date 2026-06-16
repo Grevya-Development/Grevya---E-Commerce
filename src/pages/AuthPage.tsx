@@ -82,7 +82,7 @@ const FloatingInput = ({ id, label, value = '', onChange, type = 'text', error, 
         onChange={onChange}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        className={`w-full rounded-xl border border-[#A68D65]/20 p-3 pt-5 focus:outline-none focus:ring-2 focus:ring-[#33381C]/20 focus:border-[#33381C] bg-white text-sm text-[#1D1E19] font-medium transition-all ${
+        className={`w-full rounded-xl border border-[#A68D65]/20 p-3 pt-5 focus:outline-none focus:ring-2 focus:ring-[#33381C]/10 focus:border-[#33381C] focus:shadow-[0_0_12px_rgba(51,56,28,0.08)] bg-white text-sm text-[#1D1E19] font-medium transition-all ${
           error ? 'border-red-500 focus:ring-red-500/20 focus:border-red-500' : 'hover:border-[#A68D65]/40'
         }`}
         {...props}
@@ -90,6 +90,26 @@ const FloatingInput = ({ id, label, value = '', onChange, type = 'text', error, 
       {error && <p className="text-[10px] text-red-500 font-bold mt-1 ml-1">{error}</p>}
     </div>
   );
+};
+
+const formVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05
+    } as const
+  }
+};
+
+const fieldVariants = {
+  hidden: { opacity: 0, y: 10, filter: 'blur(3px)' },
+  show: { 
+    opacity: 1, 
+    y: 0, 
+    filter: 'blur(0px)',
+    transition: { type: 'spring', stiffness: 240, damping: 25 } as const
+  }
 };
 
 const AuthPage = ({ mode }: { mode: AuthMode }) => {
@@ -541,45 +561,57 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                     </>
                   )}
 
-                  <form className="space-y-4" onSubmit={handleSubmit}>
+                  <motion.form 
+                    variants={formVariants} 
+                    initial="hidden" 
+                    animate="show" 
+                    className="space-y-4" 
+                    onSubmit={handleSubmit}
+                  >
                     {isSignup && (
-                      <FloatingInput
-                        id="name"
-                        label="Full Name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        error={errors.name}
-                        required
-                      />
+                      <motion.div variants={fieldVariants}>
+                        <FloatingInput
+                          id="name"
+                          label="Full Name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          error={errors.name}
+                          required
+                        />
+                      </motion.div>
                     )}
                     
                     {mode !== 'reset' && (
-                      <FloatingInput
-                        id="email"
-                        label="Email Address"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        error={errors.email}
-                        required
-                      />
+                      <motion.div variants={fieldVariants}>
+                        <FloatingInput
+                          id="email"
+                          label="Email Address"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          error={errors.email}
+                          required
+                        />
+                      </motion.div>
                     )}
 
                     {isSignup && (
-                      <FloatingInput
-                        id="phone"
-                        label="Phone Number"
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        error={errors.phone}
-                        placeholder="9876543210"
-                        required
-                      />
+                      <motion.div variants={fieldVariants}>
+                        <FloatingInput
+                          id="phone"
+                          label="Phone Number"
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          error={errors.phone}
+                          placeholder="9876543210"
+                          required
+                        />
+                      </motion.div>
                     )}
 
                     {isLogin && (
-                      <div className="rounded-2xl border border-[#A68D65]/20 bg-[#E7E9DD]/20 p-3.5 space-y-2">
+                      <motion.div variants={fieldVariants} className="rounded-2xl border border-[#A68D65]/20 bg-[#E7E9DD]/20 p-3.5 space-y-2">
                         <span className="text-[9px] uppercase font-bold text-[#33381C]/70 tracking-wider">Mobile OTP Login</span>
                         <div className="flex gap-2 items-center">
                           <div className="flex-grow">
@@ -621,11 +653,11 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                           </div>
                         )}
                         {(errors.phone || errors.otp) && <p className="text-[10px] text-red-500 font-bold">{errors.phone || errors.otp}</p>}
-                      </div>
+                      </motion.div>
                     )}
 
                     {needsPassword && (
-                      <div>
+                      <motion.div variants={fieldVariants}>
                         <div className="relative">
                           <FloatingInput
                             id="password"
@@ -653,24 +685,27 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                             </Link>
                           </div>
                         )}
-                      </div>
+                      </motion.div>
                     )}
 
                     {isSignup && (
-                      <FloatingInput
-                        id="confirmPassword"
-                        label="Confirm Password"
-                        type={showPassword ? 'text' : 'password'}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        error={errors.confirmPassword}
-                        required
-                      />
+                      <motion.div variants={fieldVariants}>
+                        <FloatingInput
+                          id="confirmPassword"
+                          label="Confirm Password"
+                          type={showPassword ? 'text' : 'password'}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          error={errors.confirmPassword}
+                          required
+                        />
+                      </motion.div>
                     )}
 
                     {/* Premium strength progress bar */}
                     {(isSignup || mode === 'reset') && password.length > 0 && (
                       <motion.div 
+                        variants={fieldVariants}
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         className="p-3.5 rounded-xl border border-[#A68D65]/15 bg-[#F7EEE4]/40"
@@ -703,7 +738,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                     )}
 
                     {isLogin && unconfirmedEmail && (
-                      <div className="rounded-2xl border border-amber-100 bg-amber-50/20 p-3.5 text-xs text-amber-900 space-y-2 mt-4 shadow-xs">
+                      <motion.div variants={fieldVariants} className="rounded-2xl border border-amber-100 bg-amber-50/20 p-3.5 text-xs text-amber-900 space-y-2 mt-4 shadow-xs">
                         <div className="flex items-start gap-2">
                           <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                           <div>
@@ -725,14 +760,16 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                             {loginCooldownSeconds > 0 ? `Resend (${loginCooldownSeconds}s)` : 'Resend Verification Email'}
                           </Button>
                         </div>
-                      </div>
+                      </motion.div>
                     )}
 
-                    <Button type="submit" disabled={loading || otpLoading} className="h-12 w-full rounded-xl bg-[#33381C] hover:bg-[#262A14] text-white font-bold shadow-md hover:shadow-lg mt-4 cursor-pointer">
-                      {loading && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-                      {pageCopy.submit}
-                    </Button>
-                  </form>
+                    <motion.div variants={fieldVariants}>
+                      <Button type="submit" disabled={loading || otpLoading} className="h-12 w-full rounded-xl bg-[#33381C] hover:bg-[#262A14] text-white font-bold shadow-md hover:shadow-lg mt-4 cursor-pointer">
+                        {loading && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                        {pageCopy.submit}
+                      </Button>
+                    </motion.div>
+                  </motion.form>
 
                   <div className="mt-5 text-center text-xs border-t border-[#A68D65]/10 pt-4 font-medium">
                     {isLogin && <span className="text-neutral-500">New to Grevya? <Link className="font-bold text-[#33381C] hover:underline" to="/signup">Create an Account</Link></span>}

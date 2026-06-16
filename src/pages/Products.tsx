@@ -223,7 +223,7 @@ const Products = () => {
           </div>
 
           {/* Controls Bar */}
-          <div className="flex items-center justify-between border border-[#A68D65]/15 bg-white px-4 py-2.5 rounded-2xl mb-6 shadow-xs select-none">
+          <div className="sticky top-20 z-20 flex items-center justify-between border border-[#A68D65]/15 bg-white/90 backdrop-blur-md px-4 py-2.5 rounded-2xl mb-6 shadow-md select-none transition-all duration-300 md:relative md:top-0 md:bg-white md:shadow-xs">
             <div className="flex items-center gap-1.5 text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
               <span className="font-extrabold text-[#33381C] text-xs md:text-sm">{filteredProducts.length}</span> items
             </div>
@@ -252,6 +252,26 @@ const Products = () => {
                 Filters
               </Button>
             </div>
+          </div>
+
+          {/* Mobile Swipeable Category Pills */}
+          <div className="md:hidden overflow-x-auto no-scrollbar flex gap-2 mb-5 pb-1 select-none">
+            {categories.map((cat) => {
+              const active = categoryFilter === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => handleCategorySelect(cat)}
+                  className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all border ${
+                    active
+                      ? 'bg-[#33381C] text-[#F7EEE4] border-[#33381C] shadow-sm'
+                      : 'bg-white/80 border-[#A68D65]/15 text-neutral-600'
+                  }`}
+                >
+                  <span className="capitalize">{cat}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Grid Layout */}
@@ -304,7 +324,7 @@ const Products = () => {
             {/* Products Listing Area */}
             <div>
               {loading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 md:gap-6">
                   {[1, 2, 3, 4, 5, 6].map((idx) => (
                     <div key={idx} className="bg-[#FBF7F1] rounded-2xl border border-[#A68D65]/12 flex flex-col h-[320px] overflow-hidden animate-pulse">
                       <div className="bg-[#EAE2D5]/30 aspect-[4/5] w-full shimmer-bg" />
@@ -332,7 +352,7 @@ const Products = () => {
                   variants={containerVariants}
                   initial="hidden"
                   animate="show"
-                  className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6"
+                  className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 md:gap-6"
                 >
                   {filteredProducts.map((product) => {
                     const slug = (product.name || '').toLowerCase().replace(/\s+/g, '-');

@@ -79,6 +79,7 @@ const Account = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [uploadingCropped, setUploadingCropped] = useState(false);
+  const [isDragOverAvatar, setIsDragOverAvatar] = useState(false);
 
   // Additional settings state (with persistence via localStorage)
   const [profileSettings, setProfileSettings] = useState({
@@ -393,6 +394,39 @@ const Account = () => {
   const uploadAvatar = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropperSrc(reader.result as string);
+      setIsCropperOpen(true);
+      setCropScale(1);
+      setCropPosition({ x: 0, y: 0 });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAvatarDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverAvatar(true);
+  };
+
+  const handleAvatarDragLeave = () => {
+    setIsDragOverAvatar(false);
+  };
+
+  const handleAvatarDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverAvatar(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !user) return;
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please drop a valid image file.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -954,24 +988,53 @@ const Account = () => {
               className="rounded-3xl bg-white border border-[#A68D65]/15 p-6 shadow-xs flex flex-col justify-between"
             >
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#A68D65]">Profile Integration</span>
-                    <h2 className="text-base font-bold text-[#33381C] mt-0.5">Membership Readiness</h2>
+                <div className="flex flex-col mb-4">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#A68D65]">Profile Completeness</span>
+                    <span className="text-xs font-serif font-bold italic text-[#33381C] tracking-wide">
+                      {profileCompleteness}% Completed
+                    </span>
                   </div>
-                  <span className="text-sm font-extrabold text-[#33381C] bg-[#F7EEE4] px-2.5 py-0.5 rounded-full border border-[#A68D65]/20">
-                    {profileCompleteness}% Complete
-                  </span>
+                  <h2 className="text-lg font-serif font-bold text-[#33381C] mt-1">Personal Control Center</h2>
                 </div>
 
-                {/* Progress Bar */}
-                <div className="w-full bg-[#F7EEE4] h-2 rounded-full overflow-hidden mb-5">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${profileCompleteness}%` }}
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="h-full bg-gradient-to-r from-[#A68D65] to-[#33381C] rounded-full"
-                  />
+                {/* Horizontal Progress Line with Milestones */}
+                <div className="relative mb-8 pt-2 select-none">
+                  <div className="w-full bg-[#F2EDE4] h-[3px] rounded-full relative">
+                    {/* Glowing progress line */}
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${profileCompleteness}%` }}
+                      transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+                      className="h-full bg-[#33381C] rounded-full relative"
+                      style={{
+                        boxShadow: '0 0 8px rgba(51, 56, 28, 0.35)'
+                      }}
+                    />
+                    
+                    {/* Milestone Dots */}
+                    {[0, 25, 50, 75, 100].map((milestone) => {
+                      const reached = profileCompleteness >= milestone;
+                      return (
+                        <div 
+                          key={milestone}
+                          className="absolute -top-[3.5px] -translate-x-1/2 flex flex-col items-center"
+                          style={{ left: `${milestone}%` }}
+                        >
+                          <div className={`w-2 h-2 rounded-full border transition-all duration-500 ${
+                            reached 
+                              ? 'bg-[#33381C] border-[#33381C] scale-110 shadow-[0_0_6px_rgba(51,56,28,0.3)]' 
+                              : 'bg-[#F2EDE4] border-[#A68D65]/30'
+                          }`} />
+                          <span className={`text-[8px] font-bold mt-1.5 transition-colors ${
+                            reached ? 'text-[#33381C]' : 'text-neutral-400'
+                          }`}>
+                            {milestone}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Checklist Cards */}
@@ -1194,7 +1257,14 @@ const Account = () => {
                 <form onSubmit={updateProfile} className="rounded-3xl bg-white p-6 border border-[#A68D65]/15 shadow-xs space-y-6">
                   <div className="flex items-center space-x-6 border-b border-[#A68D65]/10 pb-5">
                     {/* Avatar Upload Panel */}
-                    <div className="relative shrink-0 group">
+                    <div 
+                      className={`relative shrink-0 group rounded-full transition-all duration-300 ${
+                        isDragOverAvatar ? 'ring-4 ring-[#A68D65] ring-offset-2 scale-102 shadow-lg shadow-[#A68D65]/15' : ''
+                      }`}
+                      onDragOver={handleAvatarDragOver}
+                      onDragLeave={handleAvatarDragLeave}
+                      onDrop={handleAvatarDrop}
+                    >
                       <Avatar className="h-20 w-20 border-4 border-[#A68D65]/20 shadow-md">
                         <AvatarImage src={profile?.avatar_url || undefined} />
                         <AvatarFallback className="bg-[#E7E9DD] text-[#33381C] text-xl font-bold">

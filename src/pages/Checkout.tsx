@@ -1069,7 +1069,7 @@ const Checkout = () => {
               </div>
             </div>
 
-            <aside className="lg:sticky lg:top-24 h-fit bg-white rounded-2xl shadow-sm p-6 border border-neutral-100/50">
+            <aside className="lg:sticky lg:top-24 h-fit liquid-glass rounded-[2rem] p-6 shadow-md border border-[#A68D65]/20">
               <h2 className="text-xl font-semibold text-brown-800 mb-4">Order Summary</h2>
               <div className="mb-4 max-h-64 space-y-3 overflow-y-auto pr-1">
                 {cartItems.map((item) => (
@@ -1144,6 +1144,18 @@ const Checkout = () => {
                   )}
                 </Button>
               )}
+
+              {/* Trust Indicators */}
+              <div className="mt-5 pt-4 border-t border-[#A68D65]/10 space-y-2 text-[10.5px] text-neutral-500 font-semibold select-none">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  <span>Traceable Organic Certified Batches</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  <span>Direct Artisan Support (1% Disbursed)</span>
+                </div>
+              </div>
 
               {/* Secure Trust Strip */}
               <div className="mt-5 pt-4 border-t border-[#A68D65]/15 text-center space-y-2">

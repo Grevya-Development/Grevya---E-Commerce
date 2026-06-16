@@ -4,7 +4,7 @@ import { Star, ShoppingCart, Heart, Eye, Leaf } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useWishlistStore } from '@/store/useWishlistStore';
 import { toast } from '@/components/ui/use-toast';
-import { motion } from 'framer-motion';
+import { motion, useMotionValue, useTransform } from 'framer-motion';
 
 export interface ProductProps {
   id: number;
@@ -25,6 +25,25 @@ const ProductCard = (props: ProductProps) => {
   const addItem = useCartStore((state) => state.addItem);
   const { toggleWishlist, isInWishlist } = useWishlistStore();
   const isWishlisted = isInWishlist(id);
+
+  // Dynamic 3D hover tilt variables
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rotateX = useTransform(y, [-150, 150], [6, -6]);
+  const rotateY = useTransform(x, [-100, 100], [-6, 6]);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left - rect.width / 2;
+    const mouseY = e.clientY - rect.top - rect.height / 2;
+    x.set(mouseX);
+    y.set(mouseY);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
 
   const addToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -56,11 +75,19 @@ const ProductCard = (props: ProductProps) => {
 
   return (
     <motion.div
-      className="group relative bg-white/70 border border-[#A68D65]/15 overflow-hidden flex flex-col h-full rounded-2xl transition-all duration-300 hover:border-[#A68D65]/35 hover:-translate-y-1.5 hover:shadow-lg shadow-xs cursor-pointer select-none"
+      className="group relative bg-white/70 border border-[#A68D65]/15 overflow-hidden flex flex-col h-full rounded-2xl shadow-xs cursor-pointer select-none"
       initial={{ opacity: 0, y: 15 }}
       whileInView={{ opacity: 1, y: 0 }}
       whileTap={{ scale: 0.985 }}
       viewport={{ once: true, margin: "-40px" }}
+      style={{
+        rotateX,
+        rotateY,
+        transformStyle: 'preserve-3d',
+        willChange: 'transform'
+      }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
     >
       {/* Image Container with locked aspect ratio */}
@@ -115,7 +142,12 @@ const ProductCard = (props: ProductProps) => {
             title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
             aria-label="Toggle wishlist"
           >
-            <Heart className={`h-3.5 w-3.5 ${isWishlisted ? 'fill-current' : ''}`} />
+            <motion.div
+              animate={isWishlisted ? { scale: [1, 1.35, 0.95, 1.05, 1] } : { scale: 1 }}
+              transition={{ duration: 0.5, ease: 'easeInOut' }}
+            >
+              <Heart className={`h-3.5 w-3.5 ${isWishlisted ? 'fill-current' : ''}`} />
+            </motion.div>
           </motion.button>
 
           <motion.button
@@ -133,9 +165,9 @@ const ProductCard = (props: ProductProps) => {
         {/* Quick Add Shopping Cart overlay bottom-right */}
         <motion.button
           onClick={addToCart}
-          whileHover={{ scale: 1.12, backgroundColor: '#33381C', color: '#F7EEE4' }}
+          whileHover={{ scale: 1.15, backgroundColor: '#33381C', color: '#F7EEE4', transition: { type: 'spring', stiffness: 400, damping: 10 } }}
           whileTap={{ scale: 0.88 }}
-          className="absolute bottom-2.5 right-2.5 z-20 p-2.5 rounded-full bg-white text-[#33381C] border border-[#A68D65]/20 shadow-md backdrop-blur-xs cursor-pointer"
+          className="absolute bottom-2.5 right-2.5 z-20 p-2.5 rounded-full bg-white text-[#33381C] border border-[#A68D65]/20 shadow-md backdrop-blur-xs cursor-pointer sm:opacity-0 sm:translate-y-2 sm:group-hover:opacity-100 sm:group-hover:translate-y-0 transition-all duration-300"
           title="Add to Cart"
           aria-label="Add to cart"
         >

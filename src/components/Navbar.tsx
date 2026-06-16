@@ -36,6 +36,16 @@ const Navbar = () => {
 
   const location = useLocation();
 
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
+
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
@@ -48,38 +58,99 @@ const Navbar = () => {
   ];
 
   return (
-    <div className={`sticky top-0 z-40 w-full transition-[padding] duration-500 ease-premium ${
-      isScrolled ? 'px-4 md:px-8 pt-3' : 'px-0 pt-0'
-    }`}>
+    <motion.div
+      animate={{
+        paddingTop: isScrolled ? '12px' : '0px',
+        paddingLeft: isScrolled ? (isMobile ? '16px' : '32px') : '0px',
+        paddingRight: isScrolled ? (isMobile ? '16px' : '32px') : '0px',
+      }}
+      transition={{
+        type: 'spring',
+        stiffness: 220,
+        damping: 28,
+        mass: 0.8
+      }}
+      className="sticky top-0 z-40 w-full"
+    >
       <nav className="relative w-full select-none">
         
         {/* MORPHING GLASS BACKGROUND PANEL */}
         <motion.div
-          layout
-          transition={{ type: 'spring', stiffness: 280, damping: 28 }}
-          className={`absolute inset-0 -z-10 ${
-            isScrolled
-              ? 'max-w-6xl mx-auto rounded-full border border-[#A68D65]/25 bg-white/75 backdrop-blur-lg shadow-lg'
-              : 'bg-[#F7EEE4]/85 border-b border-[#A68D65]/15 rounded-none'
-          }`}
+          animate={{
+            width: '100%',
+            maxWidth: isScrolled ? '1152px' : '100%',
+            borderRadius: isScrolled ? '9999px' : '0px',
+            borderWidth: isScrolled ? '1px' : '0px',
+            borderBottomWidth: '1px',
+            borderColor: isScrolled ? 'rgba(166, 141, 101, 0.22)' : 'rgba(166, 141, 101, 0.12)',
+            backgroundColor: isScrolled ? 'rgba(255, 255, 255, 0.78)' : 'rgba(247, 238, 228, 0.88)',
+            boxShadow: isScrolled 
+              ? '0 12px 30px -10px rgba(51, 56, 28, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.6)' 
+              : '0 0px 0px rgba(0,0,0,0)',
+          }}
+          transition={{
+            type: 'spring',
+            stiffness: 220,
+            damping: 28,
+            mass: 0.8
+          }}
+          className="absolute inset-y-0 left-1/2 -translate-x-1/2 -z-10 backdrop-blur-md"
         />
 
         {/* NAVBAR CONTENT CONTAINER */}
-        <div className={`flex items-center justify-between transition-[padding] duration-500 ease-premium ${
-          isScrolled 
-            ? 'max-w-6xl mx-auto py-2 px-6' 
-            : 'max-w-full py-4 px-4 md:px-8'
-        }`}>
+        <motion.div
+          animate={{
+            maxWidth: isScrolled ? '1152px' : '100%',
+            paddingTop: isScrolled ? '8px' : '16px',
+            paddingBottom: isScrolled ? '8px' : '16px',
+            paddingLeft: isScrolled ? '24px' : (isMobile ? '16px' : '32px'),
+            paddingRight: isScrolled ? '24px' : (isMobile ? '16px' : '32px'),
+          }}
+          transition={{
+            type: 'spring',
+            stiffness: 220,
+            damping: 28,
+            mass: 0.8
+          }}
+          className="flex items-center justify-between w-full mx-auto relative"
+        >
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 md:gap-2.5 shrink-0" aria-label="Grevya Naturals home">
-            <img 
+            <motion.img 
               src="/logo-mark.svg" 
               alt="" 
-              className={`transition-all duration-500 shrink-0 ${isScrolled ? 'h-9 w-9 md:h-10 md:w-10' : 'h-11 w-11 md:h-12 md:w-12'}`} 
+              animate={{
+                height: isScrolled ? (isMobile ? 36 : 40) : (isMobile ? 44 : 48),
+                width: isScrolled ? (isMobile ? 36 : 40) : (isMobile ? 44 : 48),
+              }}
+              transition={{
+                type: 'spring',
+                stiffness: 220,
+                damping: 28,
+                mass: 0.8
+              }}
+              className="shrink-0" 
             />
             <span className="flex flex-col leading-none">
-              <span className={`font-serif font-bold tracking-[0.16em] text-[#33381C] transition-all duration-500 ${isScrolled ? 'text-base md:text-lg' : 'text-lg md:text-xl'}`}>GREVYA</span>
-              <span className={`font-semibold tracking-[0.4em] text-[#A68D65] transition-all duration-500 ${isScrolled ? 'text-[7px] md:text-[8px] mt-0.5' : 'text-[8px] md:text-[9px] mt-1'}`}>NATURALS</span>
+              <motion.span 
+                animate={{
+                  fontSize: isScrolled ? (isMobile ? '14px' : '16px') : (isMobile ? '16px' : '18px'),
+                }}
+                transition={{ type: 'spring', stiffness: 220, damping: 28 }}
+                className="font-serif font-bold tracking-[0.16em] text-[#33381C]"
+              >
+                GREVYA
+              </motion.span>
+              <motion.span 
+                animate={{
+                  fontSize: isScrolled ? (isMobile ? '6px' : '7.5px') : (isMobile ? '7.5px' : '8.5px'),
+                  marginTop: isScrolled ? '2px' : '4px',
+                }}
+                transition={{ type: 'spring', stiffness: 220, damping: 28 }}
+                className="font-semibold tracking-[0.4em] text-[#A68D65]"
+              >
+                NATURALS
+              </motion.span>
             </span>
           </Link>
 
@@ -195,7 +266,7 @@ const Navbar = () => {
               )}
             </Button>
           </div>
-        </div>
+        </motion.div>
       </nav>
 
       {/* Mobile Menu Overlay Drawer */}
@@ -240,7 +311,7 @@ const Navbar = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 };
 

@@ -31,19 +31,13 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
 
     Array.from(h2s).forEach((h2, idx) => {
       const originalText = h2.textContent || '';
-      // Generate clean ID
       const cleanId = `section-${originalText.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${idx}`;
       h2.id = cleanId;
-      
-      // Update h2 styles to match our luxury layout
-      h2.className = "font-serif text-2xl font-bold text-[#33381C] mt-10 mb-4 pb-2 border-b border-[#A68D65]/20 scroll-mt-24 flex items-center";
-      
       items.push({ id: cleanId, title: originalText });
     });
 
     setSections(items);
 
-    // Set active section on load
     if (items.length > 0) {
       setActiveSectionId(items[0].id);
     }
@@ -59,7 +53,7 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
 
     const observerOptions = {
       root: null,
-      rootMargin: '-15% 0px -75% 0px',
+      rootMargin: '-15% 0px -70% 0px',
       threshold: 0,
     };
 
@@ -82,6 +76,20 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
     };
   }, [children]);
 
+  // Dynamically update active H2 style to slide and grow a forest green underline
+  useEffect(() => {
+    if (!contentRef.current) return;
+    const h2s = contentRef.current.getElementsByTagName('h2');
+    Array.from(h2s).forEach((h2) => {
+      const isActive = h2.id === activeSectionId;
+      h2.className = `font-serif text-2xl md:text-3xl font-bold mt-12 mb-6 pb-3 border-b scroll-mt-28 flex items-center transition-all duration-500 ease-premium ${
+        isActive 
+          ? 'text-[#33381C] border-[#33381C] translate-x-1 shadow-[inset_0_-2px_0_0_#33381C] pl-3' 
+          : 'text-[#33381C]/75 border-[#A68D65]/15 pl-0'
+      }`;
+    });
+  }, [activeSectionId, sections]);
+
   // Smooth scroll to target section
   const handleScrollTo = (id: string) => {
     const el = document.getElementById(id);
@@ -92,39 +100,41 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#FBF9F6] text-[#1D1E19]">
+    <div className="flex flex-col min-h-screen bg-[#FBF9F6] text-[#1D1E19] overflow-x-hidden">
       <Navbar />
 
       {/* READING PROGRESS INDICATOR BAR */}
-      <div className="fixed top-0 left-0 w-full h-1 z-50 bg-[#EAE2D5]">
+      <div className="fixed top-0 left-0 w-full h-1.5 z-50 bg-[#EAE2D5]">
         <motion.div
-          className="h-full bg-[#33381C]"
+          className="h-full bg-gradient-to-r from-[#A68D65] to-[#33381C]"
           style={{ width: `${readingProgress}%` }}
         />
       </div>
 
-      <main className="flex-grow pt-12 pb-24 relative">
-        {/* Background Ambient Glow */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[60vw] h-[35vw] bg-gradient-to-tr from-[#A68D65]/5 to-[#33381C]/5 rounded-full blur-[100px] pointer-events-none" />
+      <main className="flex-grow pt-16 pb-28 relative">
+        {/* Layered Blurred Ambient backgrounds */}
+        <div className="absolute top-16 left-1/4 w-[600px] h-[600px] bg-gradient-radial from-[#A68D65]/8 to-transparent rounded-full blur-[120px] pointer-events-none animate-pulse-orb" style={{ animationDuration: '24s' }} />
+        <div className="absolute top-1/3 right-1/4 w-[700px] h-[700px] bg-gradient-radial from-[#33381C]/5 to-transparent rounded-full blur-[140px] pointer-events-none animate-pulse-orb" style={{ animationDuration: '30s', animationDelay: '-6s' }} />
+        <div className="absolute bottom-16 left-1/3 w-[500px] h-[500px] bg-gradient-radial from-[#A68D65]/6 to-transparent rounded-full blur-[100px] pointer-events-none animate-pulse-orb" style={{ animationDuration: '28s', animationDelay: '-12s' }} />
 
-        <div className="container mx-auto px-4 max-w-6xl relative z-10">
+        <div className="container mx-auto px-4 max-w-7xl relative z-10">
           
           {/* Header Panel */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
-            className="mb-12 border-b border-[#A68D65]/10 pb-8"
+            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+            className="mb-14 border-b border-[#A68D65]/12 pb-8 max-w-4xl"
           >
-            <span className="text-xs uppercase tracking-[0.25em] font-bold text-[#A68D65] mb-2.5 inline-block">
+            <span className="text-[10px] uppercase tracking-[0.3em] font-extrabold text-[#A68D65] mb-3 inline-block">
               Grevya Integrity & Policies
             </span>
-            <h1 className="font-serif text-4xl md:text-5xl font-bold text-[#33381C] tracking-tight">
+            <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl font-bold text-[#33381C] tracking-tight">
               {title}
             </h1>
             {updated && (
-              <div className="flex items-center gap-1.5 mt-3 text-xs text-neutral-400 font-bold">
-                <Clock className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1.5 mt-4 text-xs text-neutral-400 font-bold">
+                <Clock className="w-3.5 h-3.5 text-[#A68D65]" />
                 <span>Last updated: {updated}</span>
               </div>
             )}
@@ -132,16 +142,16 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
 
           {/* MOBILE TOC FLOATING NAVIGATOR */}
           {sections.length > 0 && (
-            <div className="lg:hidden mb-6 z-30 sticky top-16">
+            <div className="lg:hidden mb-6 z-30 sticky top-20">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="w-full bg-[#F7EEE4] border border-[#A68D65]/25 rounded-2xl py-3 px-4 flex items-center justify-between text-xs font-bold text-[#33381C] shadow-sm select-none"
+                className="w-full liquid-glass border-[#A68D65]/25 rounded-2xl py-3.5 px-5 flex items-center justify-between text-xs font-bold text-[#33381C] shadow-md select-none"
               >
                 <span className="flex items-center">
                   <Compass className="w-4 h-4 mr-2 text-[#A68D65]" />
                   {sections.find((s) => s.id === activeSectionId)?.title || 'Navigate Sections'}
                 </span>
-                <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isMobileMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-[#A68D65] transition-transform duration-300 ${isMobileMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               
               <AnimatePresence>
@@ -172,13 +182,13 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
           )}
 
           {/* DOUBLE-PANE MAIN LAYOUT */}
-          <div className="grid lg:grid-cols-[250px_1fr] gap-12 items-start">
+          <div className="grid lg:grid-cols-[260px_1fr] gap-12 lg:gap-16 items-start">
             
             {/* LEFT COLUMN: STICKY TOC NAVIGATION */}
             {sections.length > 0 && (
-              <aside className="hidden lg:block sticky top-24 self-start">
-                <div className="rounded-3xl bg-white/60 backdrop-blur-md border border-[#A68D65]/15 p-5 shadow-xs space-y-4">
-                  <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest flex items-center">
+              <aside className="hidden lg:block sticky top-28 self-start">
+                <div className="liquid-glass rounded-3xl p-5.5 shadow-md space-y-4">
+                  <h3 className="text-[10px] font-extrabold text-neutral-400 uppercase tracking-widest flex items-center mb-1">
                     <BookOpen className="w-3.5 h-3.5 mr-1.5 text-[#A68D65]" /> Document Sections
                   </h3>
                   <div className="flex flex-col space-y-1 relative">
@@ -188,10 +198,10 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
                         <button
                           key={sect.id}
                           onClick={() => handleScrollTo(sect.id)}
-                          className={`relative text-left py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center group cursor-pointer ${
+                          className={`relative text-left py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center group cursor-pointer ${
                             isActive 
-                              ? 'text-[#33381C] bg-[#F7EEE4] shadow-2xs' 
-                              : 'text-neutral-500 hover:text-[#33381C] hover:translate-x-1'
+                              ? 'text-[#33381C] bg-[#F7EEE4] shadow-xs' 
+                              : 'text-neutral-500 hover:text-[#33381C] hover:translate-x-1.5'
                           }`}
                         >
                           {isActive && (
@@ -203,7 +213,7 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
                           )}
                           <span className="truncate">{sect.title}</span>
                           {!isActive && (
-                            <ArrowRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-150 text-[#A68D65] transition-all" />
+                            <ArrowRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 text-[#A68D65] transition-all transform translate-x-[-4px] group-hover:translate-x-0" />
                           )}
                         </button>
                       );
@@ -215,12 +225,12 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
 
             {/* RIGHT COLUMN: MAIN CONTENT PANEL */}
             <motion.div
-              initial={{ opacity: 0, x: 10 }}
+              initial={{ opacity: 0, x: 15 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.15 }}
+              transition={{ duration: 0.65, delay: 0.1 }}
               ref={contentRef}
               id="policy-content"
-              className="bg-white/70 backdrop-blur-md rounded-[2.5rem] border border-[#A68D65]/15 p-8 md:p-12 shadow-sm space-y-6 text-[#1D1E19]/90 text-sm md:text-base leading-relaxed font-medium"
+              className="liquid-glass rounded-[2.5rem] p-8 md:p-14 shadow-lg space-y-7 text-[#1D1E19]/90 text-sm md:text-base leading-relaxed font-medium max-w-4xl"
             >
               {children}
             </motion.div>
