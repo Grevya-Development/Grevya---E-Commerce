@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import NotificationBell from './NotificationBell';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -48,21 +48,38 @@ const Navbar = () => {
   ];
 
   return (
-    <div className={`sticky top-0 z-40 w-full transition-all duration-500 ${
+    <div className={`sticky top-0 z-40 w-full transition-[padding] duration-500 ease-premium ${
       isScrolled ? 'px-4 md:px-8 pt-3' : 'px-0 pt-0'
     }`}>
-      <nav className={`transition-all duration-500 ${
-        isScrolled 
-          ? 'max-w-6xl mx-auto rounded-full glass-pill shadow-lg border-[#A68D65]/25 py-2 px-6 bg-white/70 backdrop-blur-lg' 
-          : 'bg-[#F7EEE4]/85 backdrop-blur-md border-b border-[#A68D65]/15 py-3 px-4 md:px-8'
-      }`}>
-        <div className="flex items-center justify-between">
+      <nav className="relative w-full select-none">
+        
+        {/* MORPHING GLASS BACKGROUND PANEL */}
+        <motion.div
+          layout
+          transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+          className={`absolute inset-0 -z-10 ${
+            isScrolled
+              ? 'max-w-6xl mx-auto rounded-full border border-[#A68D65]/25 bg-white/75 backdrop-blur-lg shadow-lg'
+              : 'bg-[#F7EEE4]/85 border-b border-[#A68D65]/15 rounded-none'
+          }`}
+        />
+
+        {/* NAVBAR CONTENT CONTAINER */}
+        <div className={`flex items-center justify-between transition-[padding] duration-500 ease-premium ${
+          isScrolled 
+            ? 'max-w-6xl mx-auto py-2 px-6' 
+            : 'max-w-full py-4 px-4 md:px-8'
+        }`}>
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 md:gap-2.5 shrink-0" aria-label="Grevya Naturals home">
-            <img src="/logo-mark.svg" alt="" className={`transition-all duration-500 shrink-0 ${isScrolled ? 'h-9 w-9 md:h-11 md:w-11' : 'h-11 w-11 md:h-13 md:w-13'}`} />
+            <img 
+              src="/logo-mark.svg" 
+              alt="" 
+              className={`transition-all duration-500 shrink-0 ${isScrolled ? 'h-9 w-9 md:h-10 md:w-10' : 'h-11 w-11 md:h-12 md:w-12'}`} 
+            />
             <span className="flex flex-col leading-none">
-              <span className={`font-serif font-bold tracking-[0.16em] text-[#33381C] transition-all duration-500 ${isScrolled ? 'text-lg md:text-xl' : 'text-xl md:text-2xl'}`}>GREVYA</span>
-              <span className={`font-semibold tracking-[0.4em] text-[#A68D65] transition-all duration-500 ${isScrolled ? 'text-[8px] md:text-[9px] mt-0.5' : 'text-[9px] md:text-[10px] mt-1'}`}>NATURALS</span>
+              <span className={`font-serif font-bold tracking-[0.16em] text-[#33381C] transition-all duration-500 ${isScrolled ? 'text-base md:text-lg' : 'text-lg md:text-xl'}`}>GREVYA</span>
+              <span className={`font-semibold tracking-[0.4em] text-[#A68D65] transition-all duration-500 ${isScrolled ? 'text-[7px] md:text-[8px] mt-0.5' : 'text-[8px] md:text-[9px] mt-1'}`}>NATURALS</span>
             </span>
           </Link>
 
@@ -109,7 +126,7 @@ const Navbar = () => {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full hover:bg-[#A68D65]/10 text-gray-700" title={user ? 'Account' : 'Login'}>
+                <Button variant="ghost" size="icon" className="rounded-full hover:bg-[#A68D65]/10 text-gray-750" title={user ? 'Account' : 'Login'}>
                   <User className="h-4.5 w-4.5" />
                 </Button>
               </DropdownMenuTrigger>
@@ -182,39 +199,47 @@ const Navbar = () => {
       </nav>
 
       {/* Mobile Menu Overlay Drawer */}
-      {isMenuOpen && (
-        <div className="md:hidden bg-[#F7EEE4] border-t border-[#A68D65]/15 py-5 px-4 shadow-xl animate-fade-in">
-          <div className="flex flex-col space-y-4">
-            {navItems.map((item) => (
-              <Link 
-                key={item.path}
-                to={item.path} 
-                className={`text-base font-bold py-1 border-b border-[#A68D65]/5 ${
-                  location.pathname === item.path ? 'text-[#33381C]' : 'text-foreground'
-                }`}
-                onClick={toggleMenu}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
+            className="md:hidden bg-[#F7EEE4] border-t border-[#A68D65]/15 py-5 px-4 shadow-xl overflow-hidden"
+          >
+            <div className="flex flex-col space-y-4">
+              {navItems.map((item) => (
+                <Link 
+                  key={item.path}
+                  to={item.path} 
+                  className={`text-base font-bold py-1 border-b border-[#A68D65]/5 ${
+                    location.pathname === item.path ? 'text-[#33381C]' : 'text-[#1D1E19]'
+                  }`}
+                  onClick={toggleMenu}
+                >
+                  {item.name}
+                </Link>
+              ))}
+              
+              <button
+                onClick={() => {
+                  toggleMenu();
+                  window.dispatchEvent(new CustomEvent('open-grevya-search'));
+                }}
+                className="w-full flex items-center space-x-2 rounded-full border border-[#A68D65]/20 bg-white py-2.5 px-4 text-sm text-foreground/50 text-left shadow-xs cursor-pointer"
               >
-                {item.name}
-              </Link>
-            ))}
-            
-            <button
-              onClick={() => {
-                toggleMenu();
-                window.dispatchEvent(new CustomEvent('open-grevya-search'));
-              }}
-              className="w-full flex items-center space-x-2 rounded-full border border-[#A68D65]/20 bg-white py-2.5 px-4 text-sm text-foreground/50 text-left shadow-xs cursor-pointer"
-            >
-              <Search className="h-4 w-4 text-gray-400 shrink-0" />
-              <span>Search products...</span>
-            </button>
-            
-            <Button asChild variant="outline" className="w-full rounded-xl border-[#33381C]/35 text-[#33381C] font-bold">
-              <Link to={user ? '/account' : '/login'} onClick={toggleMenu}>{user ? 'My Account' : 'Login / Signup'}</Link>
-            </Button>
-          </div>
-        </div>
-      )}
+                <Search className="h-4 w-4 text-gray-400 shrink-0" />
+                <span>Search products...</span>
+              </button>
+              
+              <Button asChild variant="outline" className="w-full rounded-xl border-[#33381C]/35 text-[#33381C] font-bold">
+                <Link to={user ? '/account' : '/login'} onClick={toggleMenu}>{user ? 'My Account' : 'Login / Signup'}</Link>
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

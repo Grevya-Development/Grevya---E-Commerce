@@ -56,11 +56,12 @@ const ProductCard = (props: ProductProps) => {
 
   return (
     <motion.div
-      className="group relative bg-white/70 border border-[#A68D65]/15 overflow-hidden flex flex-col h-full rounded-2xl transition-all duration-300 hover:border-[#A68D65]/35 hover:-translate-y-1.5 hover:shadow-lg shadow-xs"
+      className="group relative bg-white/70 border border-[#A68D65]/15 overflow-hidden flex flex-col h-full rounded-2xl transition-all duration-300 hover:border-[#A68D65]/35 hover:-translate-y-1.5 hover:shadow-lg shadow-xs cursor-pointer select-none"
       initial={{ opacity: 0, y: 15 }}
       whileInView={{ opacity: 1, y: 0 }}
+      whileTap={{ scale: 0.985 }}
       viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
     >
       {/* Image Container with locked aspect ratio */}
       <div className="relative aspect-[4/5] overflow-hidden bg-[#EAE2D5]/20 shrink-0 select-none">
@@ -71,7 +72,8 @@ const ProductCard = (props: ProductProps) => {
             src={image}
             alt={name}
             loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+            className="w-full h-full object-cover group-hover:scale-106"
+            style={{ transition: 'transform 850ms cubic-bezier(0.16, 1, 0.3, 1)' }}
           />
           {image_secondary && (
             <img
@@ -101,9 +103,11 @@ const ProductCard = (props: ProductProps) => {
 
         {/* Action icons stack overlaid top-right */}
         <div className="absolute top-2.5 right-2.5 z-20 flex flex-col space-y-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300">
-          <button
+          <motion.button
             onClick={handleWishlistToggle}
-            className={`p-2 rounded-full shadow-md backdrop-blur-xs border transition-all duration-300 ${
+            whileHover={{ scale: 1.12 }}
+            whileTap={{ scale: 0.88 }}
+            className={`p-2 rounded-full shadow-md backdrop-blur-xs border transition-all duration-300 cursor-pointer ${
               isWishlisted
                 ? 'bg-[#33381C] text-[#F7EEE4] border-[#33381C]'
                 : 'bg-white/80 hover:bg-[#33381C] text-[#33381C] hover:text-[#F7EEE4] border-[#A68D65]/20'
@@ -112,27 +116,31 @@ const ProductCard = (props: ProductProps) => {
             aria-label="Toggle wishlist"
           >
             <Heart className={`h-3.5 w-3.5 ${isWishlisted ? 'fill-current' : ''}`} />
-          </button>
+          </motion.button>
 
-          <button
+          <motion.button
             onClick={triggerQuickView}
-            className="p-2 rounded-full bg-white/80 hover:bg-[#33381C] text-[#33381C] hover:text-[#F7EEE4] border border-[#A68D65]/20 shadow-md backdrop-blur-xs transition-all duration-300"
+            whileHover={{ scale: 1.12 }}
+            whileTap={{ scale: 0.88 }}
+            className="p-2 rounded-full bg-white/80 hover:bg-[#33381C] text-[#33381C] hover:text-[#F7EEE4] border border-[#A68D65]/20 shadow-md backdrop-blur-xs transition-all duration-300 cursor-pointer"
             title="Quick View"
             aria-label="Quick view product"
           >
             <Eye className="h-3.5 w-3.5" />
-          </button>
+          </motion.button>
         </div>
 
         {/* Quick Add Shopping Cart overlay bottom-right */}
-        <button
+        <motion.button
           onClick={addToCart}
-          className="absolute bottom-2.5 right-2.5 z-20 p-2.5 rounded-full bg-white hover:bg-[#33381C] text-[#33381C] hover:text-[#F7EEE4] border border-[#A68D65]/20 shadow-md backdrop-blur-xs transition-all duration-300 transform active:scale-90"
+          whileHover={{ scale: 1.12, backgroundColor: '#33381C', color: '#F7EEE4' }}
+          whileTap={{ scale: 0.88 }}
+          className="absolute bottom-2.5 right-2.5 z-20 p-2.5 rounded-full bg-white text-[#33381C] border border-[#A68D65]/20 shadow-md backdrop-blur-xs cursor-pointer"
           title="Add to Cart"
           aria-label="Add to cart"
         >
           <ShoppingCart className="h-3.5 w-3.5" />
-        </button>
+        </motion.button>
       </div>
 
       {/* Details Container */}

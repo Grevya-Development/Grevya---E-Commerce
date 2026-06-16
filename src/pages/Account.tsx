@@ -889,9 +889,9 @@ const Account = () => {
       
       <main className="flex-grow py-10">
         <div className="container mx-auto px-4 max-w-6xl">
-          
-          {/* PREMIUM SPLIT HEADER PANEL */}
-          <div className="grid gap-6 md:grid-cols-[1.3fr_1.7fr] mb-10 items-stretch">
+          <Tabs defaultValue="overview" className="space-y-6">
+            {/* PREMIUM SPLIT HEADER PANEL */}
+            <div className="grid gap-6 md:grid-cols-[1.3fr_1.7fr] mb-10 items-stretch">
             
             {/* LEFT: Frosted Metallic Membership Card */}
             <motion.div
@@ -1039,7 +1039,6 @@ const Account = () => {
             </motion.div>
           </div>
 
-          <Tabs defaultValue="overview" className="space-y-6">
             {/* Scrollable frosted tabs header */}
             <TabsList className="flex h-auto w-full flex-wrap justify-start rounded-2xl bg-white p-1.5 shadow-xs border border-[#A68D65]/10 select-none overflow-x-auto no-scrollbar gap-1">
               <TabsTrigger value="overview" className="rounded-xl px-4 py-2 font-bold text-xs uppercase tracking-wider cursor-pointer"><Home className="mr-1.5 h-3.5 w-3.5" />Overview</TabsTrigger>
@@ -1054,9 +1053,9 @@ const Account = () => {
             {/* OVERVIEW CONTENT */}
             <TabsContent value="overview" className="focus:outline-none">
               <motion.div
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, y: 15, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
                 className="grid gap-6 lg:grid-cols-[1.35fr_0.85fr]"
               >
                 {/* Timeline Orders */}
@@ -1186,9 +1185,9 @@ const Account = () => {
             {/* PROFILE TAB */}
             <TabsContent value="profile" className="focus:outline-none">
               <motion.div
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, y: 15, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
                 className="max-w-2xl"
               >
                 <form onSubmit={updateProfile} className="rounded-3xl bg-white p-6 border border-[#A68D65]/15 shadow-xs space-y-6">
@@ -1321,9 +1320,9 @@ const Account = () => {
             {/* SECURITY TAB */}
             <TabsContent value="security" className="focus:outline-none">
               <motion.div
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, y: 15, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
                 className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]"
               >
                 {/* Password Form */}
@@ -1474,9 +1473,9 @@ const Account = () => {
             {/* ADDRESSES TAB */}
             <TabsContent value="addresses" className="focus:outline-none">
               <motion.div
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, y: 15, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
                 className="grid gap-6 lg:grid-cols-[1fr_1.1fr]"
               >
                 {/* Address Form */}
@@ -1659,9 +1658,9 @@ const Account = () => {
             {/* WISHLIST TAB */}
             <TabsContent value="wishlist" className="focus:outline-none">
               <motion.div
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, y: 15, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
               >
                 <div className="mb-6">
                   <h3 className="font-serif text-lg font-bold text-[#33381C] border-b border-[#A68D65]/10 pb-3">Premium Wishlist Showcase</h3>
@@ -1694,9 +1693,9 @@ const Account = () => {
             {/* PREFERENCES TAB */}
             <TabsContent value="preferences" className="focus:outline-none">
               <motion.div 
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, y: 15, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
                 className="max-w-xl"
               >
                 <form onSubmit={updateProfile} className="space-y-5 rounded-3xl bg-white p-6 border border-[#A68D65]/15 shadow-xs">
@@ -1749,9 +1748,9 @@ const Account = () => {
             {/* PRIVACY TAB */}
             <TabsContent value="privacy" className="focus:outline-none">
               <motion.div
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, y: 15, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
                 className="max-w-2xl space-y-6"
               >
                 {/* Privacy Card */}
