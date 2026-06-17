@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bell, Heart, Package, ShoppingCart, Sparkles } from 'lucide-react';
+import { ArrowRight, Bell, Heart, Package, ShoppingCart, Sparkles, User, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard';
@@ -13,129 +13,119 @@ const PersonalizedHome = () => {
   const totalItems = useCartStore((state) => state.getTotalItems());
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
 
     const fetchHomeData = async () => {
-      const [{ data: orderRows }, { data: productRows }] = await Promise.all([
-        supabase
-          .from('orders')
-          .select('id, status, total_amount, created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(3),
-        supabase
-          .from('products')
-          .select('*')
-          .limit(4),
-      ]);
+      try {
+        setIsLoading(true);
+        const [{ data: orderRows }, { data: productRows }] = await Promise.all([
+          supabase
+            .from('orders')
+            .select('id, status, total_amount, created_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(3),
+          supabase
+            .from('products')
+            .select('*')
+            .limit(4),
+        ]);
 
-      setOrders(orderRows || []);
-      setProducts((productRows || []).map((item) => ({
-        ...item,
-        image: item.image_url,
-        rating: item.rating || 4,
-        slug: (item.name || '').toLowerCase().replace(/\s+/g, '-'),
-      })));
+        setOrders(orderRows || []);
+        setProducts((productRows || []).map((item) => ({
+          ...item,
+          image: item.image_url,
+          rating: item.rating || 4,
+          slug: (item.name || '').toLowerCase().replace(/\s+/g, '-'),
+        })));
+      } catch (err) {
+        console.error('Error fetching personalized home data:', err);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchHomeData();
   }, [user]);
 
-  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Grevya customer';
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'customer';
 
   return (
-    <>
-      <section className="bg-green-900 text-white">
-        <div className="container mx-auto grid gap-8 px-4 py-14 lg:grid-cols-[1.3fr_0.7fr] lg:items-center">
-          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-            <div className="mb-5 inline-flex items-center rounded-full bg-white/10 px-4 py-2 text-sm font-semibold">
-              <Sparkles className="mr-2 h-4 w-4 text-clay" />
-              Personalized Grevya
-            </div>
-            <h1 className="max-w-3xl text-4xl font-extrabold leading-tight md:text-6xl">
-              Welcome back, {displayName}.
-            </h1>
-            <p className="mt-5 max-w-2xl text-lg text-white/75">
-              Your eco-friendly store is ready with order tracking, saved account details, and faster checkout.
+    <div className="bg-[#F7EEE4]/10">
+      {/* 1. Tailored Recommendations Section */}
+      <section className="py-16 bg-white/40 border-t border-[#A68D65]/10">
+        <div className="container mx-auto px-4">
+          <div className="mb-10 text-center lg:text-left">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#A68D65]">Tailored for You</span>
+            <h2 className="font-serif text-3xl font-bold text-[#33381C] mt-1 mb-3">Your Botanical Edit</h2>
+            <p className="text-xs sm:text-sm text-[#1D1E19]/65 max-w-xl">
+              Discover unique recommendations handcrafted by local rural communities, curated specifically for your lifestyle.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild className="rounded-xl bg-white text-green-900 hover:bg-green-50">
-                <Link to="/products">Shop recommendations</Link>
+          </div>
+
+          {isLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-6">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="bg-[#FBF7F1] rounded-2xl border border-[#A68D65]/12 flex flex-col h-[400px] overflow-hidden animate-pulse">
+                  <div className="bg-[#EAE2D5]/30 h-64 w-full shimmer-bg" />
+                  <div className="p-4 flex flex-col flex-grow">
+                    <div className="h-4 bg-[#EAE2D5]/50 rounded w-1/3 mb-2" />
+                    <div className="h-5 bg-[#EAE2D5]/50 rounded w-3/4 mb-3" />
+                    <div className="h-4 bg-[#EAE2D5]/50 rounded w-1/4 mb-4" />
+                    <div className="h-9 bg-[#EAE2D5]/50 rounded-xl w-full mt-auto" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-6">
+              {products.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  id={product.id}
+                  name={product.name}
+                  price={product.price}
+                  image={product.image}
+                  category={product.category}
+                  rating={product.rating}
+                  slug={product.slug}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 2. Minimal Personal Hub Card */}
+      <section className="py-12 bg-[#F7EEE4]/60 border-t border-[#A68D65]/10">
+        <div className="container mx-auto px-4 max-w-5xl">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-[#33381C] text-[#F7EEE4] p-6 md:p-8 rounded-3xl shadow-sm border border-[#A68D65]/15">
+            <div className="text-center md:text-left">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-[#A68D65] flex items-center justify-center md:justify-start gap-1">
+                <Sparkles className="h-3 w-3" /> Member Account
+              </span>
+              <h3 className="font-serif text-2xl font-bold mt-1 text-white">Hello, {displayName}</h3>
+              <p className="text-xs text-white/60 mt-1.5 max-w-md leading-relaxed">
+                Review your active basket, track your delivery shipments, or update your profiles and settings here.
+              </p>
+            </div>
+            <div className="flex gap-3 shrink-0 flex-wrap justify-center">
+              <Button asChild className="rounded-xl bg-[#A68D65] hover:bg-[#8F7752] text-[#1D1E19] font-bold px-5 py-4 text-xs transition-all shadow-sm cursor-pointer">
+                <Link to="/account">Account Settings</Link>
               </Button>
-              <Button asChild variant="outline" className="rounded-xl border-white/30 bg-transparent text-white hover:bg-white/10">
-                <Link to="/orders">Track orders <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Button asChild variant="outline" className="rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10 px-5 py-4 text-xs transition-all cursor-pointer">
+                <Link to="/orders" className="flex items-center">
+                  Track Orders <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                </Link>
               </Button>
             </div>
-          </motion.div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            {[
-              { icon: ShoppingCart, label: 'Cart items', value: totalItems },
-              { icon: Package, label: 'Recent orders', value: orders.length },
-              { icon: Bell, label: 'Updates', value: 'Realtime' },
-            ].map((item) => (
-              <div key={item.label} className="rounded-2xl border border-white/10 bg-white/10 p-5 backdrop-blur">
-                <item.icon className="mb-3 h-6 w-6 text-clay" />
-                <p className="text-2xl font-extrabold">{item.value}</p>
-                <p className="text-sm text-white/65">{item.label}</p>
-              </div>
-            ))}
           </div>
         </div>
       </section>
-
-      <section className="bg-cream/30 py-12">
-        <div className="container mx-auto px-4">
-          <div className="grid gap-6 lg:grid-cols-[1fr_1fr_1fr]">
-            <Link to="/account" className="rounded-2xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-              <Sparkles className="mb-3 h-6 w-6 text-green-800" />
-              <h2 className="text-xl font-bold">Account overview</h2>
-              <p className="mt-2 text-sm text-neutral-500">Manage profile, addresses, preferences, and security.</p>
-            </Link>
-            <Link to="/orders" className="rounded-2xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-              <Package className="mb-3 h-6 w-6 text-green-800" />
-              <h2 className="text-xl font-bold">Order quick access</h2>
-              <p className="mt-2 text-sm text-neutral-500">{orders[0] ? `Latest order is ${orders[0].status}.` : 'Your first order will appear here.'}</p>
-            </Link>
-            <Link to="/products" className="rounded-2xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-              <Heart className="mb-3 h-6 w-6 text-green-800" />
-              <h2 className="text-xl font-bold">Wishlist ready</h2>
-              <p className="mt-2 text-sm text-neutral-500">Save products and build your next sustainable order.</p>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-background py-16">
-        <div className="container mx-auto px-4">
-          <div className="mb-8 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.2em] text-green-700">Recommended for you</p>
-              <h2 className="text-3xl font-extrabold text-neutral-900">Continue exploring</h2>
-            </div>
-            <Link to="/products" className="inline-flex items-center font-bold text-green-800">
-              View all <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                id={product.id}
-                name={product.name}
-                price={product.price}
-                image={product.image}
-                category={product.category}
-                rating={product.rating}
-                slug={product.slug}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-    </>
+    </div>
   );
 };
 

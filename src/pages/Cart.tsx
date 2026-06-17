@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { Trash2, ShoppingBag, ArrowRight, Minus, Plus, ShieldCheck, ChevronRight } from 'lucide-react';
+import { Trash2, ShoppingBag, ArrowRight, Minus, Plus, ShieldCheck, ChevronRight, Leaf, Sparkles } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -181,16 +181,38 @@ const Cart = () => {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-20 rounded-[2.5rem] bg-white border border-neutral-100 shadow-sm p-8 sm:p-12 max-w-md mx-auto"
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="text-center py-20 rounded-[2.5rem] bg-white/60 backdrop-blur-md border border-[#A68D65]/20 shadow-sm p-8 sm:p-12 max-w-lg mx-auto relative overflow-hidden group"
             >
-              <div className="mx-auto w-20 h-20 bg-green-50 rounded-full flex items-center justify-center text-green-700 mb-6">
-                <ShoppingBag className="w-10 h-10" />
+              {/* Floating Leaf Particles in background */}
+              <div className="absolute top-4 left-6 text-[#A68D65]/10 animate-bounce-subtle pointer-events-none">
+                <Leaf className="w-10 h-10 rotate-12" />
               </div>
-              <h2 className="text-2xl font-extrabold text-neutral-900 mb-2">Your Bag is Empty</h2>
-              <p className="text-neutral-400 text-sm mb-8">
-                Explore our collections of hand-crafted, eco-friendly bamboo and clay items.
+              <div className="absolute bottom-6 right-8 text-[#A68D65]/10 animate-bounce-subtle pointer-events-none" style={{ animationDelay: '1.5s' }}>
+                <Leaf className="w-8 h-8 -rotate-45" />
+              </div>
+
+              {/* Icon Container with ambient glow */}
+              <div className="relative mx-auto w-24 h-24 mb-6 flex items-center justify-center">
+                <motion.div
+                  animate={{ scale: [1, 1.08, 1] }}
+                  transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                  className="absolute inset-0 bg-[#33381C]/5 rounded-full blur-xl"
+                />
+                <div className="w-20 h-20 bg-[#F7EEE4] border border-[#A68D65]/20 rounded-full flex items-center justify-center text-[#33381C] shadow-xs">
+                  <ShoppingBag className="w-9 h-9" />
+                </div>
+                <div className="absolute top-1 right-1 text-[#A68D65] animate-pulse">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+              </div>
+
+              <h2 className="font-serif text-3xl font-bold text-[#33381C] mb-3">Your Bag is Empty</h2>
+              <p className="text-neutral-500 text-sm max-w-sm mx-auto mb-8 font-medium leading-relaxed">
+                Explore our collections of hand-crafted, eco-friendly organic tableware and lifestyle products.
               </p>
-              <Button asChild className="h-12 rounded-xl bg-green-800 hover:bg-green-900 text-base font-bold px-8 shadow-md">
+              
+              <Button asChild className="h-12 rounded-xl bg-[#33381C] hover:bg-[#252814] text-white font-bold px-8 shadow-md hover:shadow-lg transition-all cursor-pointer">
                 <Link to="/products">
                   Shop Our Collection
                   <ArrowRight className="ml-2 w-4 h-4" />

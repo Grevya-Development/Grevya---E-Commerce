@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Notification {
   id: string;
@@ -52,7 +53,6 @@ const NotificationBell = () => {
       setUnreadCount(notifs.filter((n) => !n.read).length);
     } catch (err) {
       console.error("Failed to load notifications:", err);
-      // Failsafe: don't crash, just show empty list
       setNotifications([]);
       setUnreadCount(0);
       setHasError(true);
@@ -77,15 +77,10 @@ const NotificationBell = () => {
             filter: user ? `user_id=eq.${user.id}` : undefined,
           },
           (payload) => {
-            console.log('Change received!', payload);
             fetchNotifications();
           }
         )
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            console.log('Realtime subscribed');
-          }
-        });
+        .subscribe();
     } catch (e) {
       console.warn("Realtime disabled", e);
     }
@@ -104,7 +99,11 @@ const NotificationBell = () => {
   const markAsRead = async (id: string, currentlyRead: boolean) => {
     if (currentlyRead) return;
     try {
-      const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id).eq('user_id', user?.id);
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true, is_read: true })
+        .eq('id', id)
+        .eq('user_id', user?.id);
       if (error) throw error;
       
       setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
@@ -116,7 +115,11 @@ const NotificationBell = () => {
 
   const toggleReadStatus = async (id: string, currentlyRead: boolean) => {
     try {
-      const { error } = await supabase.from('notifications').update({ read: !currentlyRead }).eq('id', id).eq('user_id', user?.id);
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: !currentlyRead, is_read: !currentlyRead })
+        .eq('id', id)
+        .eq('user_id', user?.id);
       if (error) throw error;
       
       setNotifications(notifications.map(n => n.id === id ? { ...n, read: !currentlyRead } : n));
@@ -128,7 +131,11 @@ const NotificationBell = () => {
 
   const markAllAsRead = async () => {
     try {
-      const { error } = await supabase.from('notifications').update({ read: true }).eq('read', false).eq('user_id', user?.id);
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true, is_read: true })
+        .eq('user_id', user?.id)
+        .or('read.eq.false,is_read.eq.false');
       if (error) throw error;
       
       setNotifications(notifications.map(n => ({ ...n, read: true })));
@@ -136,6 +143,33 @@ const NotificationBell = () => {
     } catch (err) {
       console.error("Failed to mark all as read:", err);
     }
+  };
+
+  // Group notifications helper
+  const groupNotifications = (items: Notification[]) => {
+    const today: Notification[] = [];
+    const yesterday: Notification[] = [];
+    const earlier: Notification[] = [];
+    
+    const now = new Date();
+    const todayStr = now.toDateString();
+    
+    const yest = new Date();
+    yest.setDate(yest.getDate() - 1);
+    const yestStr = yest.toDateString();
+
+    items.forEach(item => {
+      const itemDate = new Date(item.created_at).toDateString();
+      if (itemDate === todayStr) {
+        today.push(item);
+      } else if (itemDate === yestStr) {
+        yesterday.push(item);
+      } else {
+        earlier.push(item);
+      }
+    });
+
+    return { today, yesterday, earlier };
   };
 
   if (!user) {
@@ -154,79 +188,180 @@ const NotificationBell = () => {
     );
   }
 
+  const { today, yesterday, earlier } = groupNotifications(notifications);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.04 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 8 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5 text-gray-600" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
-              {unreadCount}
-            </span>
-          )}
+        <Button variant="ghost" size="icon" className="relative hover:bg-[#A68D65]/10 text-gray-750">
+          <Bell className="h-5 w-5 text-gray-700" />
+          <AnimatePresence>
+            {unreadCount > 0 && (
+              <motion.span
+                initial={{ opacity: 0, scale: 0.4 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.4 }}
+                className="absolute -top-1 -right-1 bg-red-650 text-white text-[9px] rounded-full w-4.5 h-4.5 flex items-center justify-center font-bold"
+              >
+                {unreadCount}
+              </motion.span>
+            )}
+          </AnimatePresence>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <h3 className="font-semibold text-brown-800">Notifications</h3>
-          {unreadCount > 0 && (
-            <button 
-              className="text-xs text-green-700 hover:text-green-800 font-medium flex items-center"
-              onClick={markAllAsRead}
-            >
-              <Check className="h-3 w-3 mr-1" />
-              Mark all read
-            </button>
-          )}
-        </div>
-        <div className="max-h-80 overflow-y-auto">
-          {notifications.length === 0 ? (
-            <div className="p-4 text-center text-sm text-gray-500">
-              No notifications yet
-            </div>
-          ) : (
-            notifications.map((notification) => (
-              <DropdownMenuItem 
-                key={notification.id} 
-                className={`p-4 cursor-pointer border-b border-gray-50 last:border-0 flex items-start space-x-3 ${!notification.read ? 'bg-green-50/50' : 'bg-transparent'}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  markAsRead(notification.id, notification.read);
-                }}
+      <DropdownMenuContent align="end" className="w-80 p-0 border border-[#A68D65]/25 bg-white rounded-2xl overflow-hidden shadow-xl">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: -4 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[#A68D65]/10 bg-[#F7EEE4]/30 select-none">
+            <h3 className="font-serif text-sm font-bold text-[#33381C]">Notifications</h3>
+            {unreadCount > 0 && (
+              <button 
+                className="text-[10px] text-[#A68D65] hover:text-[#33381C] font-extrabold uppercase flex items-center cursor-pointer"
+                onClick={markAllAsRead}
               >
-                <div className={`mt-0.5 p-1.5 rounded-full ${notification.type === 'order' ? 'bg-green-100 text-olive' : 'bg-blue-100 text-blue-700'}`}>
-                  {notification.type === 'order' ? <Package className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+                <Check className="h-3.5 w-3.5 mr-1" />
+                Mark all read
+              </button>
+            )}
+          </div>
+          
+          <div className="max-h-80 overflow-y-auto no-scrollbar">
+            {notifications.length === 0 ? (
+              <div className="py-10 px-4 text-center space-y-3">
+                <div className="mx-auto w-12 h-12 rounded-full bg-[#F7EEE4] border border-[#A68D65]/20 flex items-center justify-center text-[#A68D65]">
+                  <Bell className="w-5 h-5 opacity-70" />
                 </div>
-                <div className="flex-1 space-y-1">
-                  <p className={`text-sm ${!notification.read ? 'font-medium text-brown-800' : 'text-gray-600'}`}>
-                    {notification.message}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {new Date(notification.created_at).toLocaleDateString()} at {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
+                <div>
+                  <p className="text-xs font-bold text-[#33381C] uppercase tracking-wider">All caught up</p>
+                  <p className="text-[10px] text-neutral-400 font-semibold mt-0.5">We'll alert you when orders ship or stock arrives.</p>
                 </div>
-                <button
-                  type="button"
-                  className="p-1 hover:bg-neutral-100 rounded-full text-neutral-400 hover:text-green-700 transition-colors mt-2"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    toggleReadStatus(notification.id, notification.read);
-                  }}
-                  title={notification.read ? "Mark as unread" : "Mark as read"}
-                >
-                  {notification.read ? (
-                    <Circle className="w-3.5 h-3.5 text-neutral-300" />
-                  ) : (
-                    <Check className="w-3.5 h-3.5 text-green-600 font-bold" />
-                  )}
-                </button>
-              </DropdownMenuItem>
-            ))
-          )}
-        </div>
+              </div>
+            ) : (
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="divide-y divide-gray-50"
+              >
+                {/* Render today's notifications */}
+                {today.length > 0 && (
+                  <div>
+                    <div className="bg-[#FBF9F6] px-4 py-1 text-[9px] font-bold text-neutral-400 uppercase tracking-widest border-y border-gray-100/50">Today</div>
+                    {today.map((notification) => (
+                      <motion.div variants={itemVariants} key={notification.id}>
+                        <NotificationItem
+                          notification={notification}
+                          markAsRead={markAsRead}
+                          toggleReadStatus={toggleReadStatus}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Render yesterday's notifications */}
+                {yesterday.length > 0 && (
+                  <div>
+                    <div className="bg-[#FBF9F6] px-4 py-1 text-[9px] font-bold text-neutral-400 uppercase tracking-widest border-y border-gray-100/50">Yesterday</div>
+                    {yesterday.map((notification) => (
+                      <motion.div variants={itemVariants} key={notification.id}>
+                        <NotificationItem
+                          notification={notification}
+                          markAsRead={markAsRead}
+                          toggleReadStatus={toggleReadStatus}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Render earlier notifications */}
+                {earlier.length > 0 && (
+                  <div>
+                    <div className="bg-[#FBF9F6] px-4 py-1 text-[9px] font-bold text-neutral-400 uppercase tracking-widest border-y border-gray-100/50">Earlier</div>
+                    {earlier.map((notification) => (
+                      <motion.div variants={itemVariants} key={notification.id}>
+                        <NotificationItem
+                          notification={notification}
+                          markAsRead={markAsRead}
+                          toggleReadStatus={toggleReadStatus}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </div>
+        </motion.div>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+};
+
+interface NotificationItemProps {
+  notification: Notification;
+  markAsRead: (id: string, read: boolean) => void;
+  toggleReadStatus: (id: string, read: boolean) => void;
+}
+
+const NotificationItem = ({ notification, markAsRead, toggleReadStatus }: NotificationItemProps) => {
+  return (
+    <DropdownMenuItem 
+      className={`p-4 cursor-pointer flex items-start space-x-3 transition-colors ${!notification.read ? 'bg-emerald-50/25' : 'bg-transparent'}`}
+      onClick={(e) => {
+        e.preventDefault();
+        markAsRead(notification.id, notification.read);
+      }}
+    >
+      <div className={`mt-0.5 p-1.5 rounded-xl ${notification.type === 'order' ? 'bg-emerald-100 text-[#33381C]' : 'bg-[#F7EEE4] text-[#A68D65]'}`}>
+        {notification.type === 'order' ? <Package className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+      </div>
+      <div className="flex-1 space-y-0.5">
+        <p className={`text-xs ${!notification.read ? 'font-bold text-[#33381C]' : 'text-neutral-600 font-medium'}`}>
+          {notification.message}
+        </p>
+        <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">
+          {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </p>
+      </div>
+      <button
+        type="button"
+        className="p-1 hover:bg-[#F7EEE4] rounded-full text-neutral-300 hover:text-[#33381C] transition-colors mt-0.5 cursor-pointer focus:outline-none"
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          toggleReadStatus(notification.id, notification.read);
+        }}
+        title={notification.read ? "Mark as unread" : "Mark as read"}
+      >
+        {notification.read ? (
+          <Circle className="w-3.5 h-3.5 text-neutral-200" />
+        ) : (
+          <Check className="w-3.5 h-3.5 text-emerald-600 font-bold" />
+        )}
+      </button>
+    </DropdownMenuItem>
   );
 };
 
