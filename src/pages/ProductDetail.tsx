@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { Star, ShoppingCart, Package, Leaf, TruckIcon, ArrowLeft, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Star, ShoppingCart, Package, Leaf, TruckIcon, ArrowLeft, ShieldCheck, RefreshCw, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useCartStore } from '@/store/useCartStore';
 import { supabase } from '@/lib/supabaseClient';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/context/AuthContext';
 
 interface Review {
   id: string;
@@ -20,6 +21,8 @@ interface Review {
 
 const ProductDetail = () => {
   const { slug } = useParams();
+  const location = useLocation();
+  const { user } = useAuth();
   const [quantity, setQuantity] = useState(1);
   const addItem = useCartStore((state) => state.addItem);
 
@@ -326,48 +329,62 @@ const ProductDetail = () => {
               <div className="lg:col-span-1">
                 <div className="bg-white p-8 rounded-3xl shadow-lg shadow-black/5 border border-neutral-100 sticky top-24">
                   <h3 className="text-2xl font-bold text-neutral-900 mb-6">Write a Review</h3>
-                  <form onSubmit={submitReview}>
-                    <div className="mb-6">
-                      <label className="block text-sm font-bold text-neutral-700 mb-3">Rating</label>
-                      <div className="flex gap-2">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => setNewRating(star)}
-                            className="focus:outline-none transition-transform hover:scale-110 active:scale-95"
-                          >
-                            <Star
-                              size={32}
-                              fill={star <= newRating ? "currentColor" : "none"}
-                              stroke="currentColor"
-                              strokeWidth={1.5}
-                              className={star <= newRating ? "text-clay" : "text-neutral-200"}
-                            />
-                          </button>
-                        ))}
+                  {user ? (
+                    <form onSubmit={submitReview}>
+                      <div className="mb-6">
+                        <label className="block text-sm font-bold text-neutral-700 mb-3">Rating</label>
+                        <div className="flex gap-2">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setNewRating(star)}
+                              className="focus:outline-none transition-transform hover:scale-110 active:scale-95"
+                            >
+                              <Star
+                                size={32}
+                                fill={star <= newRating ? "currentColor" : "none"}
+                                stroke="currentColor"
+                                strokeWidth={1.5}
+                                className={star <= newRating ? "text-clay" : "text-neutral-200"}
+                              />
+                            </button>
+                          ))}
+                        </div>
                       </div>
+                      <div className="mb-6">
+                        <label htmlFor="comment" className="block text-sm font-bold text-neutral-700 mb-3">Review</label>
+                        <textarea
+                          id="comment"
+                          rows={4}
+                          className="w-full border border-neutral-200 rounded-2xl p-4 focus:ring-2 focus:ring-green-800 focus:border-green-800 outline-none transition-all resize-none shadow-sm"
+                          placeholder="What do you think about this product?"
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        className="w-full h-14 text-base font-bold rounded-xl shadow-md bg-green-800 hover:bg-green-900 text-white transition-all transform hover:-translate-y-0.5"
+                        disabled={isSubmittingReview || !newComment.trim()}
+                      >
+                        {isSubmittingReview ? "Submitting..." : "Submit Review"}
+                      </Button>
+                    </form>
+                  ) : (
+                    <div className="text-center py-6">
+                      <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-neutral-100">
+                        <Lock className="w-6 h-6 text-neutral-400" />
+                      </div>
+                      <p className="text-neutral-600 mb-6 text-sm leading-relaxed">
+                        Please sign in to write a review and share your experience with this product.
+                      </p>
+                      <Button asChild className="w-full h-12 text-sm font-bold rounded-xl bg-green-800 hover:bg-green-900 text-white transition-all shadow-md">
+                        <Link to="/auth" state={{ from: location }}>Sign In to Review</Link>
+                      </Button>
                     </div>
-                    <div className="mb-6">
-                      <label htmlFor="comment" className="block text-sm font-bold text-neutral-700 mb-3">Review</label>
-                      <textarea
-                        id="comment"
-                        rows={4}
-                        className="w-full border border-neutral-200 rounded-2xl p-4 focus:ring-2 focus:ring-green-800 focus:border-green-800 outline-none transition-all resize-none shadow-sm"
-                        placeholder="What do you think about this product?"
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      className="w-full h-14 text-base font-bold rounded-xl shadow-md bg-green-800 hover:bg-green-900 text-white transition-all transform hover:-translate-y-0.5"
-                      disabled={isSubmittingReview || !newComment.trim()}
-                    >
-                      {isSubmittingReview ? "Submitting..." : "Submit Review"}
-                    </Button>
-                  </form>
+                  )}
                 </div>
               </div>
 
