@@ -1,14 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { Bell, Check, Info, Package, Circle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabaseClient';
-import { useAuth } from '@/context/AuthContext';
+import React, { useEffect, useState } from "react";
+import { Bell, Check, Info, Package, Circle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/context/AuthContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 
 interface Notification {
   id: string;
@@ -23,6 +31,9 @@ const NotificationBell = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [hasError, setHasError] = useState(false);
+  const [selectedNotification, setSelectedNotification] =
+    useState<Notification | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const fetchNotifications = async () => {
     if (!user) {
@@ -33,20 +44,20 @@ const NotificationBell = () => {
 
     try {
       const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
         .limit(10);
 
-      if (error && (error.message || '').includes('relation')) {
+      if (error && (error.message || "").includes("relation")) {
         setHasError(true);
         return;
       }
       if (error) {
         throw error;
       }
-      
+
       const notifs = data ? (data as Notification[]) : [];
       setNotifications(notifs);
       setUnreadCount(notifs.filter((n) => !n.read).length);
@@ -65,25 +76,27 @@ const NotificationBell = () => {
     let channel: any = null;
 
     try {
-      const channelName = user ? `notifications_changes_${user.id}` : 'notifications_changes_guest';
+      const channelName = user
+        ? `notifications_changes_${user.id}`
+        : "notifications_changes_guest";
       channel = supabase
         .channel(channelName)
         .on(
-          'postgres_changes',
+          "postgres_changes",
           {
-            event: '*',
-            schema: 'public',
-            table: 'notifications',
+            event: "*",
+            schema: "public",
+            table: "notifications",
             filter: user ? `user_id=eq.${user.id}` : undefined,
           },
           (payload) => {
-            console.log('Change received!', payload);
+            console.log("Change received!", payload);
             fetchNotifications();
-          }
+          },
         )
         .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            console.log('Realtime subscribed');
+          if (status === "SUBSCRIBED") {
+            console.log("Realtime subscribed");
           }
         });
     } catch (e) {
@@ -104,10 +117,16 @@ const NotificationBell = () => {
   const markAsRead = async (id: string, currentlyRead: boolean) => {
     if (currentlyRead) return;
     try {
-      const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id).eq('user_id', user?.id);
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: true })
+        .eq("id", id)
+        .eq("user_id", user?.id);
       if (error) throw error;
-      
-      setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
+
+      setNotifications(
+        notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      );
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
       console.error("Failed to mark as read:", err);
@@ -116,11 +135,21 @@ const NotificationBell = () => {
 
   const toggleReadStatus = async (id: string, currentlyRead: boolean) => {
     try {
-      const { error } = await supabase.from('notifications').update({ read: !currentlyRead }).eq('id', id).eq('user_id', user?.id);
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: !currentlyRead })
+        .eq("id", id)
+        .eq("user_id", user?.id);
       if (error) throw error;
-      
-      setNotifications(notifications.map(n => n.id === id ? { ...n, read: !currentlyRead } : n));
-      setUnreadCount((prev) => currentlyRead ? prev + 1 : Math.max(0, prev - 1));
+
+      setNotifications(
+        notifications.map((n) =>
+          n.id === id ? { ...n, read: !currentlyRead } : n,
+        ),
+      );
+      setUnreadCount((prev) =>
+        currentlyRead ? prev + 1 : Math.max(0, prev - 1),
+      );
     } catch (err) {
       console.error("Failed to toggle notification status:", err);
     }
@@ -128,10 +157,14 @@ const NotificationBell = () => {
 
   const markAllAsRead = async () => {
     try {
-      const { error } = await supabase.from('notifications').update({ read: true }).eq('read', false).eq('user_id', user?.id);
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: true })
+        .eq("read", false)
+        .eq("user_id", user?.id);
       if (error) throw error;
-      
-      setNotifications(notifications.map(n => ({ ...n, read: true })));
+
+      setNotifications(notifications.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
     } catch (err) {
       console.error("Failed to mark all as read:", err);
@@ -140,7 +173,12 @@ const NotificationBell = () => {
 
   if (!user) {
     return (
-      <Button variant="ghost" size="icon" className="relative cursor-not-allowed opacity-50" title="Login to view notifications">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="relative cursor-not-allowed opacity-50"
+        title="Login to view notifications"
+      >
         <Bell className="h-5 w-5 text-gray-500" />
       </Button>
     );
@@ -148,7 +186,12 @@ const NotificationBell = () => {
 
   if (hasError) {
     return (
-      <Button variant="ghost" size="icon" className="relative cursor-not-allowed opacity-50" title="Notifications unavailable">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="relative cursor-not-allowed opacity-50"
+        title="Notifications unavailable"
+      >
         <Bell className="h-5 w-5 text-gray-500" />
       </Button>
     );
@@ -170,7 +213,7 @@ const NotificationBell = () => {
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <h3 className="font-semibold text-brown-800">Notifications</h3>
           {unreadCount > 0 && (
-            <button 
+            <button
               className="text-xs text-green-700 hover:text-green-800 font-medium flex items-center"
               onClick={markAllAsRead}
             >
@@ -186,23 +229,38 @@ const NotificationBell = () => {
             </div>
           ) : (
             notifications.map((notification) => (
-              <DropdownMenuItem 
-                key={notification.id} 
-                className={`p-4 cursor-pointer border-b border-gray-50 last:border-0 flex items-start space-x-3 ${!notification.read ? 'bg-green-50/50' : 'bg-transparent'}`}
+              <DropdownMenuItem
+                key={notification.id}
+                className={`p-4 cursor-pointer border-b border-gray-50 last:border-0 flex items-start space-x-3 ${!notification.read ? "bg-green-50/50" : "bg-transparent"}`}
                 onClick={(e) => {
                   e.preventDefault();
+                  // open detail view and mark as read
+                  setSelectedNotification(notification);
+                  setDetailOpen(true);
                   markAsRead(notification.id, notification.read);
                 }}
               >
-                <div className={`mt-0.5 p-1.5 rounded-full ${notification.type === 'order' ? 'bg-green-100 text-olive' : 'bg-blue-100 text-blue-700'}`}>
-                  {notification.type === 'order' ? <Package className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+                <div
+                  className={`mt-0.5 p-1.5 rounded-full ${notification.type === "order" ? "bg-green-100 text-olive" : "bg-blue-100 text-blue-700"}`}
+                >
+                  {notification.type === "order" ? (
+                    <Package className="h-4 w-4" />
+                  ) : (
+                    <Info className="h-4 w-4" />
+                  )}
                 </div>
                 <div className="flex-1 space-y-1">
-                  <p className={`text-sm ${!notification.read ? 'font-medium text-brown-800' : 'text-gray-600'}`}>
+                  <p
+                    className={`text-sm ${!notification.read ? "font-medium text-brown-800" : "text-gray-600"}`}
+                  >
                     {notification.message}
                   </p>
                   <p className="text-xs text-gray-400">
-                    {new Date(notification.created_at).toLocaleDateString()} at {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(notification.created_at).toLocaleDateString()} at{" "}
+                    {new Date(notification.created_at).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </p>
                 </div>
                 <button
@@ -226,6 +284,54 @@ const NotificationBell = () => {
           )}
         </div>
       </DropdownMenuContent>
+      {selectedNotification && (
+        <Dialog
+          open={detailOpen}
+          onOpenChange={(open) => {
+            setDetailOpen(open);
+            if (!open) setSelectedNotification(null);
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {selectedNotification.type === "order"
+                  ? "Order update"
+                  : selectedNotification.type === "alert"
+                    ? "Alert"
+                    : selectedNotification.type === "system"
+                      ? "System message"
+                      : "Notification"}
+              </DialogTitle>
+              <DialogDescription>
+                {new Date(selectedNotification.created_at).toLocaleString()}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-2">
+              <p className="text-sm text-gray-600 mb-2">
+                Type:{" "}
+                <span className="font-medium">{selectedNotification.type}</span>
+              </p>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                {selectedNotification.message}
+              </p>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDetailOpen(false);
+                  setSelectedNotification(null);
+                }}
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </DropdownMenu>
   );
 };

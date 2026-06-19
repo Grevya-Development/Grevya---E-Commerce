@@ -18,6 +18,10 @@ const FeaturedProducts = () => {
         const { data, error } = await supabase
           .from('products')
           .select('*')
+          .eq('product_status', 'approved')
+          .eq('is_hidden', false)
+          .eq('is_featured', true)
+          .order('id', { ascending: true })
           .limit(4);
 
         if (error) throw error;

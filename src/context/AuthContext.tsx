@@ -12,6 +12,8 @@ export interface UserProfile {
   phone: string | null;
   email: string | null;
   preferences: Record<string, any> | null;
+  role?: string | null;
+  is_active?: boolean | null;
   created_at?: string;
 }
 
@@ -38,10 +40,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
      window.location.hash.includes('access_token=') || 
      window.location.search.includes('type=recovery') ||
      window.location.hash.includes('error=')) &&
-    (window.location.pathname.startsWith('/account') || 
-     window.location.pathname.startsWith('/reset-password') || 
-     window.location.pathname.startsWith('/login') || 
-     window.location.pathname.startsWith('/signup') || 
+    (window.location.pathname.startsWith('/account') ||
+     window.location.pathname.startsWith('/seller') ||
+     window.location.pathname.startsWith('/admin') ||
+     window.location.pathname.startsWith('/reset-password') ||
+     window.location.pathname.startsWith('/login') ||
+     window.location.pathname.startsWith('/signup') ||
      window.location.pathname.startsWith('/auth'))
   );
 
@@ -62,6 +66,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         phone: user.user_metadata?.phone || null,
         email: user.email || null,
         preferences: null,
+        role: null,
+        is_active: true,
       });
     } finally {
       setProfileLoading(false);
@@ -90,10 +96,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                             window.location.hash.includes('access_token=') || 
                             window.location.search.includes('type=recovery') ||
                             window.location.hash.includes('error=')) &&
-                            (window.location.pathname.startsWith('/account') || 
-                             window.location.pathname.startsWith('/reset-password') || 
-                             window.location.pathname.startsWith('/login') || 
-                             window.location.pathname.startsWith('/signup') || 
+                            (window.location.pathname.startsWith('/account') ||
+                             window.location.pathname.startsWith('/seller') ||
+                             window.location.pathname.startsWith('/admin') ||
+                             window.location.pathname.startsWith('/reset-password') ||
+                             window.location.pathname.startsWith('/login') ||
+                             window.location.pathname.startsWith('/signup') ||
                              window.location.pathname.startsWith('/auth'));
 
         const { data } = await supabase.auth.getSession();

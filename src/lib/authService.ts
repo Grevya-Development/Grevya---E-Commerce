@@ -3,6 +3,8 @@ import { authDebug } from '@/lib/authDiagnostics';
 import { getAuthRedirectUrl, normalizeEmail, normalizePhone } from '@/lib/authValidation';
 import { ensureUserProfile, rememberPendingProfile } from '@/lib/profileSync';
 
+export type AuthRole = 'buyer' | 'seller' | 'admin';
+
 const locks = new Map<string, Promise<any>>();
 const cooldowns = new Map<string, number>();
 
@@ -28,23 +30,45 @@ const assertCooldown = (key: string, ms: number) => {
   localStorage.setItem(key, String(nextUntil));
 };
 
-export const signInWithEmail = (email: string, password: string) => {
+const roleAccessMessages: Record<AuthRole, string> = {
+  buyer: 'Only buyer accounts can sign in here.',
+  seller: 'Only seller accounts can sign in here.',
+  admin: 'Only admin accounts can sign in here.',
+};
+
+const validateProfileRole = async (profile: any, requiredRole?: AuthRole) => {
+  if (profile?.is_active === false) {
+    await supabase.auth.signOut();
+    throw new Error('Your account has been blocked. Please contact support.');
+  }
+
+  if (requiredRole && profile?.role !== requiredRole) {
+    await supabase.auth.signOut();
+    throw new Error(roleAccessMessages[requiredRole]);
+  }
+};
+
+export const signInWithEmail = (email: string, password: string, requiredRole?: AuthRole) => {
   const normalizedEmail = normalizeEmail(email);
-  return withLock(`login:${normalizedEmail}`, async () => {
+  return withLock(`login:${requiredRole || 'any'}:${normalizedEmail}`, async () => {
     authDebug('login.start');
     const result = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (result.error) throw result.error;
-    if (result.data.user) await ensureUserProfile(result.data.user);
+    if (result.data.user) {
+      const profile = await ensureUserProfile(result.data.user);
+      await validateProfileRole(profile, requiredRole);
+    }
     authDebug('login.success');
     return result.data;
   });
 };
 
-export const signUpWithEmail = (input: { email: string; password: string; fullName: string; phone?: string }) => {
+export const signUpWithEmail = (input: { email: string; password: string; fullName: string; phone?: string; role?: Extract<AuthRole, 'buyer' | 'seller'> }) => {
   const normalizedEmail = normalizeEmail(input.email);
   const normalizedPhone = normalizePhone(input.phone || '');
+  const registrationRole = input.role === 'seller' ? 'seller' : 'buyer';
 
-  return withLock(`signup:${normalizedEmail}`, async () => {
+  return withLock(`signup:${registrationRole}:${normalizedEmail}`, async () => {
     assertCooldown(`grevya-auth-cooldown:signup:${normalizedEmail}`, 90000);
     authDebug('signup.start');
 
@@ -60,6 +84,7 @@ export const signUpWithEmail = (input: { email: string; password: string; fullNa
         data: {
           full_name: input.fullName.trim(),
           phone: normalizedPhone || null,
+          registration_role: registrationRole,
         }
       });
       if (updateResult.error) throw updateResult.error;
@@ -78,8 +103,9 @@ export const signUpWithEmail = (input: { email: string; password: string; fullNa
           data: {
             full_name: input.fullName.trim(),
             phone: normalizedPhone || null,
+            registration_role: registrationRole,
           },
-          emailRedirectTo: getAuthRedirectUrl('/account'),
+          emailRedirectTo: getAuthRedirectUrl(registrationRole === 'seller' ? '/seller/dashboard' : '/account'),
         },
       });
       if (signUpResult.error) throw signUpResult.error;
@@ -90,12 +116,14 @@ export const signUpWithEmail = (input: { email: string; password: string; fullNa
       rememberPendingProfile(result.data.user.id, {
         full_name: input.fullName.trim(),
         phone: normalizedPhone || null,
+        role: registrationRole,
       });
 
       if (isAnonymous || result.data.session) {
         await ensureUserProfile(result.data.user, {
           full_name: input.fullName.trim(),
           phone: normalizedPhone || null,
+          role: registrationRole,
         });
       }
     }
@@ -105,7 +133,7 @@ export const signUpWithEmail = (input: { email: string; password: string; fullNa
   });
 };
 
-export const startOAuthSignIn = (provider: 'google' | 'apple') => {
+export const startOAuthSignIn = (provider: 'google' | 'apple', redirectPath = '/account') => {
   return withLock(`oauth:${provider}`, async () => {
     assertCooldown(`grevya-auth-cooldown:oauth:${provider}`, 5000);
     authDebug('oauth.start', { provider });
@@ -113,7 +141,7 @@ export const startOAuthSignIn = (provider: 'google' | 'apple') => {
     const result = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: getAuthRedirectUrl('/account'),
+        redirectTo: getAuthRedirectUrl(redirectPath),
         skipBrowserRedirect: false,
       },
     });
@@ -166,12 +194,15 @@ export const requestPhoneOtp = (phone: string) => {
   });
 };
 
-export const verifyPhoneOtp = (phone: string, token: string) => {
+export const verifyPhoneOtp = (phone: string, token: string, requiredRole?: AuthRole) => {
   const normalizedPhone = `+91${normalizePhone(phone)}`;
-  return withLock(`phone-verify:${normalizedPhone}`, async () => {
+  return withLock(`phone-verify:${requiredRole || 'any'}:${normalizedPhone}`, async () => {
     const result = await supabase.auth.verifyOtp({ phone: normalizedPhone, token, type: 'sms' });
     if (result.error) throw result.error;
-    if (result.data.user) await ensureUserProfile(result.data.user, { phone: normalizePhone(phone) });
+    if (result.data.user) {
+      const profile = await ensureUserProfile(result.data.user, { phone: normalizePhone(phone) });
+      await validateProfileRole(profile, requiredRole);
+    }
     return result.data;
   });
 };

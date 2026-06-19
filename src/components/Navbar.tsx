@@ -103,10 +103,10 @@ const Navbar = () => {
                 ) : (
                   <>
                     <DropdownMenuItem asChild>
-                      <Link to="/login" className="w-full">Login</Link>
+                      <Link to="/account/login" className="w-full">Login</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link to="/signup" className="w-full">Create account</Link>
+                      <Link to="/account/register" className="w-full">Create account</Link>
                     </DropdownMenuItem>
                   </>
                 )}
@@ -169,7 +169,7 @@ const Navbar = () => {
               />
             </form>
             <Button asChild variant="outline" size="sm" className="w-full">
-              <Link to={user ? '/account' : '/login'} onClick={toggleMenu}>{user ? 'Account' : 'Login'}</Link>
+              <Link to={user ? '/account' : '/account/login'} onClick={toggleMenu}>{user ? 'Account' : 'Login'}</Link>
             </Button>
           </div>
         </div>

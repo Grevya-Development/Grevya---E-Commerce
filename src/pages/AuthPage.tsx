@@ -16,6 +16,7 @@ import {
   validatePhone,
 } from '@/lib/authValidation';
 import {
+  type AuthRole,
   requestPasswordReset,
   requestPhoneOtp,
   signInWithEmail,
@@ -26,6 +27,12 @@ import {
 } from '@/lib/authService';
 
 type AuthMode = 'login' | 'signup' | 'forgot' | 'reset';
+type RegistrationRole = Extract<AuthRole, 'buyer' | 'seller'>;
+
+interface AuthPageProps {
+  mode: AuthMode;
+  role?: AuthRole;
+}
 
 const copy = {
   login: {
@@ -50,10 +57,50 @@ const copy = {
   },
 };
 
-const AuthPage = ({ mode }: { mode: AuthMode }) => {
+const roleHome: Record<AuthRole, string> = {
+  buyer: '/account',
+  seller: '/seller/dashboard',
+  admin: '/admin/dashboard',
+};
+
+const roleLogin: Record<AuthRole, string> = {
+  buyer: '/account/login',
+  seller: '/seller/login',
+  admin: '/admin/login',
+};
+
+const roleRegister: Record<RegistrationRole, string> = {
+  buyer: '/account/register',
+  seller: '/seller/register',
+};
+
+const getLoginTitle = (role: AuthRole) => {
+  if (role === 'admin') return 'Admin sign in';
+  if (role === 'seller') return 'Seller sign in';
+  return copy.login.title;
+};
+
+const getLoginSubtitle = (role: AuthRole) => {
+  if (role === 'admin') return 'Sign in with an admin account to manage Grevya operations.';
+  if (role === 'seller') return 'Sign in with a seller account to manage products, orders, and approvals.';
+  return copy.login.subtitle;
+};
+
+const getSignupTitle = (role: RegistrationRole) => {
+  if (role === 'seller') return 'Create your seller account';
+  return copy.signup.title;
+};
+
+const getSignupSubtitle = (role: RegistrationRole) => {
+  if (role === 'seller') return 'Register as a seller to list products and manage your Grevya catalog.';
+  return copy.signup.subtitle;
+};
+
+const AuthPage = ({ mode, role = 'buyer' }: AuthPageProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as any)?.from?.pathname || '/account';
+  const defaultDestination = roleHome[role];
+  const from = (location.state as any)?.from?.pathname || defaultDestination;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -70,7 +117,12 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   const isLogin = mode === 'login';
   const isSignup = mode === 'signup';
   const needsPassword = mode !== 'forgot';
-  const pageCopy = copy[mode];
+  const registrationRole: RegistrationRole = role === 'seller' ? 'seller' : 'buyer';
+  const pageCopy = mode === 'login'
+    ? { ...copy.login, title: getLoginTitle(role), subtitle: getLoginSubtitle(role) }
+    : mode === 'signup'
+      ? { ...copy.signup, title: getSignupTitle(registrationRole), subtitle: getSignupSubtitle(registrationRole) }
+      : copy[mode];
 
   const passwordChecks = [
     { label: '8+ characters', done: password.length >= 8 },
@@ -117,7 +169,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
     setLoading(true);
 
     try {
-      await startOAuthSignIn(provider);
+      await startOAuthSignIn(provider, defaultDestination);
     } catch (error: any) {
       toast({ title: 'Sign-in failed', description: friendlyAuthError(error.message), variant: 'destructive' });
       setLoading(false);
@@ -152,7 +204,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
 
     setOtpLoading(true);
     try {
-      await verifyPhoneOtp(phone, otp.trim());
+      await verifyPhoneOtp(phone, otp.trim(), role);
       toast({ title: 'Phone verified', description: 'You are signed in securely.' });
       navigate(from, { replace: true });
     } catch (error: any) {
@@ -175,7 +227,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
 
     try {
       if (mode === 'login') {
-        await signInWithEmail(normalizedEmail, password);
+        await signInWithEmail(normalizedEmail, password, role);
         toast({ title: 'Signed in', description: 'Your secure session has been restored.' });
         navigate(from, { replace: true });
       }
@@ -186,6 +238,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
           password,
           fullName: name,
           phone: normalizedPhone,
+          role: registrationRole,
         });
 
         toast({
@@ -194,7 +247,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
         });
         
         if (data.session) {
-          navigate('/account');
+          navigate(roleHome[registrationRole]);
         } else {
           navigate('/verify-email', { state: { email: normalizedEmail } });
         }
@@ -492,9 +545,20 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
             </form>
 
             <div className="mt-6 text-center text-sm border-t border-neutral-100 pt-4">
-              {isLogin && <span className="text-neutral-500">New to Grevya? <Link className="font-bold text-green-700 hover:text-green-800 hover:underline" to="/signup">Create an Account</Link></span>}
-              {isSignup && <span className="text-neutral-500">Already have an account? <Link className="font-bold text-green-700 hover:text-green-800 hover:underline" to="/login">Sign In</Link></span>}
-              {(mode === 'forgot' || mode === 'reset') && <Link className="font-bold text-green-700 hover:text-green-800" to="/login">Back to Login</Link>}
+              {isLogin && role !== 'admin' && (
+                <span className="text-neutral-500">
+                  New to Grevya? <Link className="font-bold text-green-700 hover:text-green-800 hover:underline" to={roleRegister[registrationRole]}>Create an Account</Link>
+                </span>
+              )}
+              {isLogin && role === 'admin' && (
+                <span className="text-neutral-500">Admin access is invitation-only.</span>
+              )}
+              {isSignup && (
+                <span className="text-neutral-500">
+                  Already have an account? <Link className="font-bold text-green-700 hover:text-green-800 hover:underline" to={roleLogin[registrationRole]}>Sign In</Link>
+                </span>
+              )}
+              {(mode === 'forgot' || mode === 'reset') && <Link className="font-bold text-green-700 hover:text-green-800" to="/account/login">Back to Login</Link>}
             </div>
           </section>
         </div>

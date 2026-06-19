@@ -5,6 +5,7 @@ import { authDebug } from '@/lib/authDiagnostics';
 export interface ProfileSeed {
   full_name?: string | null;
   phone?: string | null;
+  role?: 'buyer' | 'seller';
 }
 
 const pendingProfileKey = (userId: string) => `grevya-pending-profile:${userId}`;
@@ -31,6 +32,7 @@ export const ensureUserProfile = async (user: User, seed: ProfileSeed = {}) => {
     full_name: seed.full_name || pending.full_name || user.user_metadata?.full_name || null,
     phone: seed.phone || pending.phone || user.user_metadata?.phone || null,
     avatar_url: user.user_metadata?.avatar_url || null,
+    role: seed.role || pending.role || (user.user_metadata?.registration_role === 'seller' ? 'seller' : 'buyer'),
   };
 
   const { data, error } = await supabase
@@ -83,6 +85,7 @@ export const ensureUserProfile = async (user: User, seed: ProfileSeed = {}) => {
         full_name: mergedSeed.full_name,
         phone: mergedSeed.phone,
         avatar_url: mergedSeed.avatar_url,
+        role: mergedSeed.role,
       }, { onConflict: 'id' })
       .select()
       .single();

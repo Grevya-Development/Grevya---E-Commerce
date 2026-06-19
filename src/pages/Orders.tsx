@@ -18,7 +18,7 @@ const Orders = () => {
     const fetchOrders = async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, created_at, total_amount, status, payment_status, delivery_status')
+        .select('id, created_at, total_amount, order_status, payment_status')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -72,7 +72,7 @@ const Orders = () => {
                     <p className="text-sm text-neutral-500">{new Date(order.created_at).toLocaleString()}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold capitalize text-green-800">{order.status || 'pending'}</span>
+                    <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold capitalize text-green-800">{(order.order_status || 'pending').replace(/_/g, ' ')}</span>
                     <span className="rounded-full bg-cream-light px-3 py-1 text-xs font-bold capitalize text-green-800">{order.payment_status || 'pending'}</span>
                     <span className="font-bold text-green-800">Rs {Number(order.total_amount || 0).toFixed(2)}</span>
                     <ArrowRight className="h-4 w-4 text-neutral-400" />

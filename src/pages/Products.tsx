@@ -31,6 +31,8 @@ const Products = () => {
         const { data, error: fetchError } = await supabase
           .from('products')
           .select('*')
+          .eq('product_status', 'approved')
+          .eq('is_hidden', false)
           .order('id', { ascending: true });
 
         if (fetchError) throw fetchError;
@@ -75,7 +77,9 @@ const Products = () => {
     }
 
     // 2. Sorting
-    if (sortBy === 'price-asc') {
+    if (sortBy === 'featured') {
+      result.sort((a, b) => Number(b.is_featured) - Number(a.is_featured));
+    } else if (sortBy === 'price-asc') {
       result.sort((a, b) => a.price - b.price);
     } else if (sortBy === 'price-desc') {
       result.sort((a, b) => b.price - a.price);

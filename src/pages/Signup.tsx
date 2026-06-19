@@ -1,5 +1,8 @@
 import AuthPage from './AuthPage';
+import type { AuthRole } from '@/lib/authService';
 
-export default function Signup() {
-  return <AuthPage mode="signup" />;
+type RegistrationRole = Extract<AuthRole, 'buyer' | 'seller'>;
+
+export default function Signup({ role = 'buyer' }: { role?: RegistrationRole }) {
+  return <AuthPage mode="signup" role={role} />;
 }

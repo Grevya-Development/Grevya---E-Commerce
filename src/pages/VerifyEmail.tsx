@@ -87,7 +87,7 @@ const VerifyEmail = () => {
 
           <div className="flex flex-col gap-3">
             <Button asChild className="h-12 rounded-xl bg-green-800 hover:bg-green-900 text-base font-bold w-full">
-              <Link to="/login">
+              <Link to="/account/login">
                 Back to Sign In
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Link>

@@ -21,13 +21,16 @@ const PersonalizedHome = () => {
       const [{ data: orderRows }, { data: productRows }] = await Promise.all([
         supabase
           .from('orders')
-          .select('id, status, total_amount, created_at')
+          .select('id, order_status, total_amount, created_at')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(3),
         supabase
           .from('products')
           .select('*')
+          .eq('product_status', 'approved')
+          .eq('is_hidden', false)
+          .order('id', { ascending: true })
           .limit(4),
       ]);
 
@@ -97,7 +100,7 @@ const PersonalizedHome = () => {
             <Link to="/orders" className="rounded-2xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
               <Package className="mb-3 h-6 w-6 text-green-800" />
               <h2 className="text-xl font-bold">Order quick access</h2>
-              <p className="mt-2 text-sm text-neutral-500">{orders[0] ? `Latest order is ${orders[0].status}.` : 'Your first order will appear here.'}</p>
+              <p className="mt-2 text-sm text-neutral-500">{orders[0] ? `Latest order is ${orders[0].order_status || 'pending'}.` : 'Your first order will appear here.'}</p>
             </Link>
             <Link to="/products" className="rounded-2xl bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
               <Heart className="mb-3 h-6 w-6 text-green-800" />

@@ -16,7 +16,7 @@ const OrderDetail = () => {
   const [loading, setLoading] = useState(true);
 
   const activeIndex = useMemo(() => {
-    const status = order?.status || 'pending';
+    const status = order?.order_status || 'pending';
     return Math.max(0, statuses.indexOf(status));
   }, [order]);
 
@@ -28,7 +28,7 @@ const OrderDetail = () => {
         const [{ data, error }, { data: historyData }] = await Promise.all([
           supabase
             .from('orders')
-            .select('*, order_items(*)')
+            .select('*')
             .eq('id', id)
             .eq('user_id', user.id)
             .maybeSingle(),
@@ -40,8 +40,45 @@ const OrderDetail = () => {
         ]);
 
         if (!error && data) {
+          const { data: itemRows } = await supabase
+            .from('order_items')
+            .select('id,product_id,quantity,price,created_at')
+            .eq('order_id', id)
+            .order('created_at', { ascending: true });
+
+          const productIds = Array.from(
+            new Set(((itemRows || []) as any[]).map((item) => item.product_id).filter(Boolean)),
+          );
+          let productsById: Record<string, any> = {};
+
+          if (productIds.length) {
+            const { data: productRows } = await supabase
+              .from('products')
+              .select('id,name,image_url')
+              .in('id', productIds);
+
+            productsById = ((productRows || []) as any[]).reduce(
+              (acc, product) => {
+                acc[String(product.id)] = product;
+                return acc;
+              },
+              {} as Record<string, any>,
+            );
+          }
+
           setOrder({
             ...data,
+            order_items: ((itemRows || []) as any[]).map((item) => {
+              const product = item.product_id
+                ? productsById[String(item.product_id)]
+                : undefined;
+
+              return {
+                ...item,
+                product_name: product?.name || null,
+                product_image: product?.image_url || null,
+              };
+            }),
             history: historyData || []
           });
         }
@@ -93,7 +130,7 @@ const OrderDetail = () => {
                 </div>
               </section>
 
-              {order.status === 'cancelled' ? (
+              {order.order_status === 'cancelled' ? (
                 <section className="rounded-[2rem] bg-white p-6 shadow-sm md:p-8 border-t-4 border-red-500">
                   <div className="mb-6 flex items-center gap-3">
                     <Truck className="h-6 w-6 text-red-600" />

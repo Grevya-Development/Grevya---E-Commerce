@@ -74,7 +74,7 @@ const Account = () => {
       const [{ data: orderRows }, { data: addressRows }] = await Promise.all([
         supabase
           .from('orders')
-          .select('id, created_at, total_amount, status, payment_status')
+          .select('id, created_at, total_amount, order_status, payment_status')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(5),
@@ -386,7 +386,7 @@ const Account = () => {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-green-800">Rs {Number(order.total_amount || 0).toFixed(2)}</p>
-                          <p className="text-sm capitalize text-neutral-500">{order.status}</p>
+                          <p className="text-sm capitalize text-neutral-500">{(order.order_status || 'pending').replace(/_/g, ' ')}</p>
                         </div>
                       </Link>
                     ))}

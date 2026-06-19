@@ -165,3 +165,39 @@ create policy "Avatar deletes are user owned" on storage.objects
     bucket_id = 'avatars' 
     and (auth.uid())::text = (storage.foldername(name))[1]
   );
+
+
+-- --------------------------------------------------------------------
+-- 5. AUTH USERS EMAIL CHANGE TOKENS NULL-NORMALIZATION
+-- Prevents GoTrue daemon from crashing due to NULL values in token fields.
+-- --------------------------------------------------------------------
+create or replace function public.normalize_user_email_change_tokens()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+  if new.email_change_token_new is null then
+    new.email_change_token_new := '';
+  end if;
+  if new.email_change_token_current is null then
+    new.email_change_token_current := '';
+  end if;
+  if new.email_change is null then
+    new.email_change := '';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_normalize_user_email_change_tokens on auth.users;
+create trigger trg_normalize_user_email_change_tokens
+  before insert or update on auth.users
+  for each row execute procedure public.normalize_user_email_change_tokens();
+
+-- Direct repair query to clean up any existing rows during migration:
+update auth.users
+set email_change = coalesce(email_change, ''),
+    email_change_token_new = coalesce(email_change_token_new, ''),
+    email_change_token_current = coalesce(email_change_token_current, '')
+where email_change is null or email_change_token_new is null or email_change_token_current is null;

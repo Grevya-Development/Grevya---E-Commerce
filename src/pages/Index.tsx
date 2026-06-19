@@ -53,10 +53,10 @@ const Index = () => {
                 </div>
                 <div className="flex gap-3">
                   <Button asChild className="rounded-xl bg-white text-green-900 hover:bg-green-50">
-                    <Link to="/signup">Sign up</Link>
+                    <Link to="/account/register">Sign up</Link>
                   </Button>
                   <Button asChild variant="outline" className="rounded-xl border-white/30 bg-transparent text-white hover:bg-white/10">
-                    <Link to="/login">Login</Link>
+                    <Link to="/account/login">Login</Link>
                   </Button>
                 </div>
               </div>

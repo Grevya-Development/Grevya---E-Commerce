@@ -91,24 +91,41 @@ const Checkout = () => {
     }
   ];
 
+  const getCheckoutUser = async () => {
+    const {
+      data: { user: currentUser },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (currentUser) return currentUser;
+    if (userError) console.warn('Checkout user lookup failed:', userError);
+
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error || !data.user) {
+      throw new Error(error?.message || 'Please sign in before checkout.');
+    }
+
+    return data.user;
+  };
+
   const createOrder = async (paymentStatus: string, paymentReference?: RazorpayResponse) => {
-    if (!user) throw new Error('Please sign in before checkout.');
+    const checkoutUser = await getCheckoutUser();
 
     const orderReference = `GI-${Date.now()}`;
     const subtotal = getSubtotal();
+    const orderStatus = paymentStatus === 'paid' ? 'confirmed' : 'pending';
 
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert({
-        user_id: user.id,
+        user_id: checkoutUser.id,
         order_number: orderReference,
         total_amount: subtotal,
-        status: paymentStatus === 'paid' ? 'confirmed' : 'pending',
+        order_status: orderStatus,
         payment_status: paymentStatus,
-        payment_method: selectedPayment,
+        payment_method: selectedPayment === 'cod' ? 'cod' : 'razorpay',
         payment_reference: paymentReference || null,
         shipping_address: deliveryInfo,
-        estimated_delivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
       })
       .select()
       .single();
@@ -118,8 +135,6 @@ const Checkout = () => {
     const orderItems = cartItems.map(item => ({
       order_id: orderData.id,
       product_id: item.id,
-      product_name: item.name,
-      product_image: item.image || (item as any).image_url,
       quantity: item.quantity,
       price: item.price
     }));
@@ -128,7 +143,7 @@ const Checkout = () => {
     if (itemsError) throw itemsError;
 
     await supabase.from('notifications').insert({
-      user_id: user.id,
+      user_id: checkoutUser.id,
       message: `Order ${orderReference} has been placed successfully!`,
       type: 'order'
     });
