@@ -1,12 +1,16 @@
-import { supabase } from '@/lib/supabaseClient';
-import { authDebug } from '@/lib/authDiagnostics';
-import { getAuthRedirectUrl, normalizeEmail, normalizePhone } from '@/lib/authValidation';
-import { ensureUserProfile, rememberPendingProfile } from '@/lib/profileSync';
+import { supabase } from "@/lib/supabaseClient";
+import { authDebug } from "@/lib/authDiagnostics";
+import {
+  getAuthRedirectUrl,
+  normalizeEmail,
+  normalizePhone,
+} from "@/lib/authValidation";
+import { ensureUserProfile, rememberPendingProfile } from "@/lib/profileSync";
 
 const locks = new Map<string, Promise<any>>();
 const cooldowns = new Map<string, number>();
 
-const withLock = async <T,>(key: string, action: () => Promise<T>) => {
+const withLock = async <T>(key: string, action: () => Promise<T>) => {
   const existing = locks.get(key);
   if (existing) return existing as Promise<T>;
 
@@ -20,7 +24,9 @@ const assertCooldown = (key: string, ms: number) => {
   const remaining = until - Date.now();
 
   if (remaining > 0) {
-    throw new Error(`Please wait ${Math.ceil(remaining / 1000)} seconds before trying again.`);
+    throw new Error(
+      `Please wait ${Math.ceil(remaining / 1000)} seconds before trying again.`,
+    );
   }
 
   const nextUntil = Date.now() + ms;
@@ -31,52 +37,64 @@ const assertCooldown = (key: string, ms: number) => {
 export const signInWithEmail = (email: string, password: string) => {
   const normalizedEmail = normalizeEmail(email);
   return withLock(`login:${normalizedEmail}`, async () => {
-    authDebug('login.start');
-    const result = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+    authDebug("login.start");
+    const result = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
     if (result.error) throw result.error;
     if (result.data.user) {
       try {
         await ensureUserProfile(result.data.user);
       } catch (err) {
-        console.warn('Failed to ensure user profile during login:', err);
+        console.warn("Failed to ensure user profile during login:", err);
       }
     }
-    authDebug('login.success');
+    authDebug("login.success");
     return result.data;
   });
 };
 
-export const signUpWithEmail = (input: { email: string; password: string; fullName: string; phone?: string }) => {
+export const signUpWithEmail = (input: {
+  email: string;
+  password: string;
+  fullName: string;
+  phone?: string;
+  role?: string;
+}) => {
   const normalizedEmail = normalizeEmail(input.email);
-  const normalizedPhone = normalizePhone(input.phone || '');
+  const normalizedPhone = normalizePhone(input.phone || "");
 
   return withLock(`signup:${normalizedEmail}`, async () => {
     assertCooldown(`grevya-auth-cooldown:signup:${normalizedEmail}`, 90000);
-    authDebug('signup.start');
+    authDebug("signup.start");
 
-    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    const {
+      data: { session: currentSession },
+    } = await supabase.auth.getSession();
     const isAnonymous = currentSession?.user?.is_anonymous;
 
     let result;
     if (isAnonymous) {
-      authDebug('signup.promote_anonymous');
+      authDebug("signup.promote_anonymous");
       const updateResult = await supabase.auth.updateUser({
         email: normalizedEmail,
         password: input.password,
         data: {
           full_name: input.fullName.trim(),
           phone: normalizedPhone || null,
-        }
+          role: input.role || "customer",
+        },
       });
       if (updateResult.error) throw updateResult.error;
       result = {
         data: {
           user: updateResult.data.user,
-          session: currentSession
-        }
+          session: currentSession,
+        },
       };
     } else {
-      authDebug('signup.standard');
+      authDebug("signup.standard");
       const signUpResult = await supabase.auth.signUp({
         email: normalizedEmail,
         password: input.password,
@@ -84,8 +102,9 @@ export const signUpWithEmail = (input: { email: string; password: string; fullNa
           data: {
             full_name: input.fullName.trim(),
             phone: normalizedPhone || null,
+            role: input.role || "customer",
           },
-          emailRedirectTo: getAuthRedirectUrl('/account'),
+          emailRedirectTo: getAuthRedirectUrl("/account"),
         },
       });
       if (signUpResult.error) throw signUpResult.error;
@@ -96,6 +115,7 @@ export const signUpWithEmail = (input: { email: string; password: string; fullNa
       rememberPendingProfile(result.data.user.id, {
         full_name: input.fullName.trim(),
         phone: normalizedPhone || null,
+        role: input.role || null,
       });
 
       if (isAnonymous || result.data.session) {
@@ -103,27 +123,28 @@ export const signUpWithEmail = (input: { email: string; password: string; fullNa
           await ensureUserProfile(result.data.user, {
             full_name: input.fullName.trim(),
             phone: normalizedPhone || null,
+            role: input.role || null,
           });
         } catch (err) {
-          console.warn('Failed to ensure user profile during signup:', err);
+          console.warn("Failed to ensure user profile during signup:", err);
         }
       }
     }
 
-    authDebug('signup.success', { hasSession: Boolean(result.data.session) });
+    authDebug("signup.success", { hasSession: Boolean(result.data.session) });
     return result.data;
   });
 };
 
-export const startOAuthSignIn = (provider: 'google' | 'apple') => {
+export const startOAuthSignIn = (provider: "google" | "apple") => {
   return withLock(`oauth:${provider}`, async () => {
     assertCooldown(`grevya-auth-cooldown:oauth:${provider}`, 5000);
-    authDebug('oauth.start', { provider });
+    authDebug("oauth.start", { provider });
 
     const result = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: getAuthRedirectUrl('/account'),
+        redirectTo: getAuthRedirectUrl("/account"),
         skipBrowserRedirect: false,
       },
     });
@@ -138,7 +159,7 @@ export const requestPasswordReset = (email: string) => {
   return withLock(`forgot:${normalizedEmail}`, async () => {
     assertCooldown(`grevya-auth-cooldown:forgot:${normalizedEmail}`, 60000);
     const result = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: getAuthRedirectUrl('/reset-password'),
+      redirectTo: getAuthRedirectUrl("/reset-password"),
     });
     if (result.error) throw result.error;
     return result.data;
@@ -146,22 +167,22 @@ export const requestPasswordReset = (email: string) => {
 };
 
 export const updateAuthPassword = (password: string) => {
-  return withLock('reset-password', async () => {
+  return withLock("reset-password", async () => {
     const result = await supabase.auth.updateUser({ password });
     if (result.error) throw result.error;
-    
+
     if (result.data.user) {
       try {
-        await supabase.from('notifications').insert({
+        await supabase.from("notifications").insert({
           user_id: result.data.user.id,
-          message: 'Your account password has been updated successfully.',
-          type: 'security'
+          message: "Your account password has been updated successfully.",
+          type: "security",
         });
       } catch (err) {
-        console.warn('Security notification insertion failed:', err);
+        console.warn("Security notification insertion failed:", err);
       }
     }
-    
+
     return result.data;
   });
 };
@@ -170,7 +191,9 @@ export const requestPhoneOtp = (phone: string) => {
   const normalizedPhone = `+91${normalizePhone(phone)}`;
   return withLock(`phone-otp:${normalizedPhone}`, async () => {
     assertCooldown(`grevya-auth-cooldown:phone:${normalizedPhone}`, 60000);
-    const result = await supabase.auth.signInWithOtp({ phone: normalizedPhone });
+    const result = await supabase.auth.signInWithOtp({
+      phone: normalizedPhone,
+    });
     if (result.error) throw result.error;
     return result.data;
   });
@@ -179,13 +202,22 @@ export const requestPhoneOtp = (phone: string) => {
 export const verifyPhoneOtp = (phone: string, token: string) => {
   const normalizedPhone = `+91${normalizePhone(phone)}`;
   return withLock(`phone-verify:${normalizedPhone}`, async () => {
-    const result = await supabase.auth.verifyOtp({ phone: normalizedPhone, token, type: 'sms' });
+    const result = await supabase.auth.verifyOtp({
+      phone: normalizedPhone,
+      token,
+      type: "sms",
+    });
     if (result.error) throw result.error;
     if (result.data.user) {
       try {
-        await ensureUserProfile(result.data.user, { phone: normalizePhone(phone) });
+        await ensureUserProfile(result.data.user, {
+          phone: normalizePhone(phone),
+        });
       } catch (err) {
-        console.warn('Failed to ensure user profile during phone OTP verification:', err);
+        console.warn(
+          "Failed to ensure user profile during phone OTP verification:",
+          err,
+        );
       }
     }
     return result.data;
