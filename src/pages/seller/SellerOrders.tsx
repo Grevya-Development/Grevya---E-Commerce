@@ -60,14 +60,24 @@ interface Profile {
   phone?: string | null;
 }
 
-// Statuses a seller can set (not Delivered or Out For Delivery, as those are courier/tracking domain)
-const sellerAllowedStatuses = [
-  "pending",
-  "confirmed",
-  "processing",
-  "shipped",
-  "cancelled",
-];
+// Seller status flow. Sellers cannot skip stages or move backward.
+const sellerStatusTransitions: Record<string, string[]> = {
+  pending: ["confirmed", "cancelled"],
+  confirmed: ["processing", "cancelled"],
+  processing: ["shipped", "cancelled"],
+  shipped: [],
+  cancelled: [],
+  out_for_delivery: [],
+  delivered: [],
+  refunded: [],
+  returned: [],
+};
+
+const normalizeStatus = (status?: string | null) =>
+  (status || "pending").toLowerCase().replace(/\s+/g, "_");
+
+const getSellerNextStatuses = (status?: string | null) =>
+  sellerStatusTransitions[normalizeStatus(status)] || [];
 
 const allStatusOptions = [
   "pending",
@@ -86,6 +96,16 @@ const formatStatus = (status?: string | null) =>
 
 const formatCurrency = (value?: number | null) =>
   `₹${Number(value || 0).toFixed(2)}`;
+
+const formatDateForInput = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const getOrderStatusBadgeClass = (value?: string | null) => {
   const status = (value || "pending").toLowerCase();
@@ -137,11 +157,11 @@ export default function SellerOrders() {
   >({});
   const [savingDetails, setSavingDetails] = useState(false);
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (): Promise<Order[]> => {
     if (!user?.id) {
       setOrders([]);
       setLoading(false);
-      return;
+      return [];
     }
 
     setLoading(true);
@@ -178,7 +198,7 @@ export default function SellerOrders() {
         setOrders([]);
         setOrderItems([]);
         setLoading(false);
-        return;
+        return [];
       }
 
       const items = (data as OrderItem[]) || [];
@@ -221,12 +241,15 @@ export default function SellerOrders() {
         // Merge full order details
         const enrichedOrders = uniqueOrders.map((o) => {
           const fullOrder = orderLookup.get(o.id);
+          const normalizedStatus =
+            fullOrder?.status || o.order_status || o.status;
           return {
             ...o,
             user_id: fullOrder?.user_id,
             shipping_address: fullOrder?.shipping_address,
             payment_status: fullOrder?.payment_status || o.payment_status,
-            status: fullOrder?.status || o.order_status,
+            order_status: normalizedStatus,
+            status: normalizedStatus,
           };
         });
         setOrders(enrichedOrders as Order[]);
@@ -251,12 +274,16 @@ export default function SellerOrders() {
             }, {}),
           );
         }
+
+        return enrichedOrders as Order[];
       }
     } catch (err: any) {
       setError(err.message || "Failed to fetch orders");
+      return [];
     } finally {
       setLoading(false);
     }
+    return orders;
   };
 
   const openOrderDetails = async (order: Order) => {
@@ -281,7 +308,8 @@ export default function SellerOrders() {
         ...((fullOrder as any) || {}),
         order_status:
           (fullOrder as any)?.status || order.order_status || order.status,
-        status: (fullOrder as any)?.status || order.status,
+        status:
+          (fullOrder as any)?.status || order.order_status || order.status,
         payment_status:
           (fullOrder as any)?.payment_status || order.payment_status,
         created_at: (fullOrder as any)?.created_at || order.created_at,
@@ -362,6 +390,31 @@ export default function SellerOrders() {
       const inputs = deliveryInputs[selectedOrder.id] || {};
       const updatePayload: any = {};
 
+      const currentStatus = normalizeStatus(
+        selectedOrder.order_status || selectedOrder.status,
+      );
+      const requestedStatus = normalizeStatus(
+        inputs.order_status ||
+          selectedOrder.order_status ||
+          selectedOrder.status,
+      );
+      const allowedNextStatuses = getSellerNextStatuses(currentStatus);
+
+      if (
+        requestedStatus !== currentStatus &&
+        !allowedNextStatuses.includes(requestedStatus)
+      ) {
+        throw new Error(
+          `Invalid status change. This order can move only from "${formatStatus(
+            currentStatus,
+          )}" to: ${
+            allowedNextStatuses.length
+              ? allowedNextStatuses.map(formatStatus).join(", ")
+              : "no further seller status"
+          }.`,
+        );
+      }
+
       // Update estimated delivery
       if (inputs.estimated_delivery) {
         const d = new Date(inputs.estimated_delivery as string);
@@ -374,27 +427,56 @@ export default function SellerOrders() {
 
       updatePayload.tracking_number = inputs.tracking_number || null;
 
-      // Update status (write to `status` column, not `order_status`)
+      // Update status columns in both fields because the DB trigger keeps
+      // `status` and `order_status` synchronized.
       if (inputs.order_status) {
         updatePayload.status = inputs.order_status;
+        updatePayload.order_status = inputs.order_status;
       }
 
-      const { error: updateError } = await supabase
+      console.log("SellerOrders saveOrderDetails", {
+        orderId: selectedOrder.id,
+        updatePayload,
+      });
+
+      const { data: updatedOrder, error: updateError } = await supabase
         .from("orders")
         .update(updatePayload)
-        .eq("id", selectedOrder.id);
+        .eq("id", selectedOrder.id)
+        .select("id,status,estimated_delivery,tracking_number")
+        .single();
 
-      if (updateError) throw updateError;
+      console.log("SellerOrders update response", {
+        updatedOrder,
+        updateError,
+      });
 
-      // Update local state
+      if (updateError) {
+        console.error("SellerOrders update failed", {
+          updateError,
+          updatePayload,
+          orderId: selectedOrder.id,
+        });
+        throw updateError;
+      }
+      if (!updatedOrder) {
+        console.error("SellerOrders update returned no data", {
+          updatePayload,
+          orderId: selectedOrder.id,
+        });
+        throw new Error("Order update did not return any data");
+      }
+
+      // Update local state with the values returned from the database.
       setOrders((current) =>
         current.map((o) =>
           o.id === selectedOrder.id
             ? {
                 ...o,
-                order_status: inputs.order_status || o.order_status,
-                estimated_delivery: updatePayload.estimated_delivery,
-                tracking_number: updatePayload.tracking_number,
+                order_status: updatedOrder.status,
+                status: updatedOrder.status,
+                estimated_delivery: updatedOrder.estimated_delivery,
+                tracking_number: updatedOrder.tracking_number,
               }
             : o,
         ),
@@ -402,7 +484,23 @@ export default function SellerOrders() {
 
       setSelectedOrder(null);
       setSelectedOrderItems([]);
-      await fetchOrders();
+      const refreshedOrders = await fetchOrders();
+      console.log("SellerOrders refreshed order", {
+        orderId: selectedOrder.id,
+        refreshedOrder: refreshedOrders.find((o) => o.id === selectedOrder.id),
+      });
+
+      const { data: orderRow, error: orderRowError } = await supabase
+        .from("orders")
+        .select("id,status,estimated_delivery,tracking_number")
+        .eq("id", selectedOrder.id)
+        .single();
+
+      console.log("SellerOrders direct order row", {
+        orderId: selectedOrder.id,
+        orderRow,
+        orderRowError,
+      });
     } catch (err: any) {
       setDetailsError(err.message || "Failed to save order details");
     } finally {
@@ -469,10 +567,18 @@ export default function SellerOrders() {
 
   const parseShipping = (s: any) => {
     if (!s) return null;
-    const full_name = s.full_name || s.name || s.firstName || s.first_name || null;
+    const full_name =
+      s.full_name || s.name || s.firstName || s.first_name || null;
     const phone = s.phone || s.mobile || null;
-    const line1 = s.address_line1 || s.address_line_1 || s.line1 || s.address || s.address_line || null;
-    const line2 = s.address_line2 || s.address_line_2 || s.line2 || s.address_extra || null;
+    const line1 =
+      s.address_line1 ||
+      s.address_line_1 ||
+      s.line1 ||
+      s.address ||
+      s.address_line ||
+      null;
+    const line2 =
+      s.address_line2 || s.address_line_2 || s.line2 || s.address_extra || null;
     const city = s.city || null;
     const state = s.state || null;
     const pincode = s.pincode || s.postal_code || s.postcode || s.pin || null;
@@ -812,25 +918,38 @@ export default function SellerOrders() {
 
                       {selectedOrder.shipping_address ? (
                         (() => {
-                          const s = parseShipping(selectedOrder.shipping_address);
-                          if (!s) return (
-                            <p className="text-sm text-slate-500">No shipping address on file</p>
+                          const s = parseShipping(
+                            selectedOrder.shipping_address,
                           );
+                          if (!s)
+                            return (
+                              <p className="text-sm text-slate-500">
+                                No shipping address on file
+                              </p>
+                            );
                           return (
                             <div className="flex items-start gap-3">
                               <MapPin className="mt-0.5 h-5 w-5 text-green-700" />
                               <div>
                                 {s.full_name && (
-                                  <p className="font-semibold text-slate-900">{s.full_name}</p>
+                                  <p className="font-semibold text-slate-900">
+                                    {s.full_name}
+                                  </p>
                                 )}
                                 <p className="text-sm text-slate-900">
-                                  {[s.line1, s.line2].filter(Boolean).join(", ")}
+                                  {[s.line1, s.line2]
+                                    .filter(Boolean)
+                                    .join(", ")}
                                 </p>
                                 <p className="mt-1 text-sm text-slate-600">
-                                  {[s.city, s.state, s.pincode].filter(Boolean).join(", ")}
+                                  {[s.city, s.state, s.pincode]
+                                    .filter(Boolean)
+                                    .join(", ")}
                                 </p>
                                 {s.country && (
-                                  <p className="mt-1 text-sm text-slate-600">{s.country}</p>
+                                  <p className="mt-1 text-sm text-slate-600">
+                                    {s.country}
+                                  </p>
                                 )}
                                 {s.phone && (
                                   <p className="mt-1 flex items-center gap-2 text-sm text-slate-600">
@@ -843,7 +962,9 @@ export default function SellerOrders() {
                           );
                         })()
                       ) : (
-                        <p className="text-sm text-slate-500">No shipping address on file</p>
+                        <p className="text-sm text-slate-500">
+                          No shipping address on file
+                        </p>
                       )}
                     </div>
                   </div>
@@ -906,17 +1027,37 @@ export default function SellerOrders() {
                             },
                           }))
                         }
-                        className="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm capitalize"
+                        disabled={
+                          getSellerNextStatuses(
+                            selectedOrder.order_status || selectedOrder.status,
+                          ).length === 0
+                        }
+                        className="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm capitalize disabled:cursor-not-allowed disabled:bg-slate-100"
                       >
-                        {sellerAllowedStatuses.map((status) => (
-                          <option key={status} value={status}>
-                            {formatStatus(status)}
-                          </option>
-                        ))}
+                        {(() => {
+                          const currentStatus = normalizeStatus(
+                            selectedOrder.order_status || selectedOrder.status,
+                          );
+                          const nextStatuses = getSellerNextStatuses(currentStatus);
+
+                          return (
+                            <>
+                              <option value={currentStatus}>
+                                Current: {formatStatus(currentStatus)}
+                              </option>
+                              {nextStatuses.map((status) => (
+                                <option key={status} value={status}>
+                                  Move to: {formatStatus(status)}
+                                </option>
+                              ))}
+                            </>
+                          );
+                        })()}
                       </select>
                       <p className="mt-1 text-xs text-slate-500">
-                        Note: Delivered/Out for Delivery are set by
-                        courier/admin
+                        Orders must move through the fulfillment stages in
+                        sequence. Delivered and out-for-delivery are managed by
+                        courier/admin.
                       </p>
                     </div>
 
@@ -926,10 +1067,11 @@ export default function SellerOrders() {
                       </label>
                       <input
                         type="date"
-                        value={
-                          (deliveryInputs[selectedOrder.id]
-                            ?.estimated_delivery || "") as string
-                        }
+                        value={formatDateForInput(
+                          deliveryInputs[selectedOrder.id]
+                            ?.estimated_delivery ||
+                            selectedOrder.estimated_delivery,
+                        )}
                         onChange={(e) =>
                           setDeliveryInputs((s) => ({
                             ...s,

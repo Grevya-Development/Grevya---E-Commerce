@@ -21,6 +21,7 @@ interface OrderItem {
   order_id?: string;
   product_id: string;
   product_name: string;
+  product_image?: string | null;
   quantity: number;
   price: number;
   created_at: string;
@@ -191,6 +192,42 @@ export default function SellerDashboard() {
         ...(ordersById[String(o.order_id)] || {}),
       }));
 
+      // Fetch product images for the products referenced in these order items
+      const productIds = Array.from(
+        new Set(merged.map((m) => m.product_id).filter(Boolean)),
+      ) as string[];
+
+      let productsById: Record<
+        string,
+        { id: string; name?: string; image_url?: string }
+      > = {};
+      if (productIds.length) {
+        const { data: productRows } = await supabase
+          .from("products")
+          .select("id,name,image_url")
+          .in("id", productIds);
+
+        productsById = ((productRows as any[] | null) || []).reduce(
+          (acc, p) => {
+            acc[String(p.id)] = p;
+            return acc;
+          },
+          {} as Record<string, any>,
+        );
+      }
+
+      // Attach product image and normalized name to each merged order item
+      const mergedWithImages = merged.map((item) => {
+        const prod = item.product_id
+          ? productsById[String(item.product_id)]
+          : undefined;
+        return {
+          ...item,
+          product_name: item.product_name || prod?.name || null,
+          product_image: item.product_image || prod?.image_url || null,
+        };
+      });
+
       // Sort the MERGED list (with order-level fields attached), newest first.
       const sortedMerged = [...merged].sort(
         (a, b) =>
@@ -205,7 +242,12 @@ export default function SellerDashboard() {
           0,
         ),
       );
-      setRecentOrders(sortedMerged.slice(0, 5));
+      // Use the sorted order but map to the version that includes images
+      const sortedWithImages = sortedMerged
+        .map((s) => mergedWithImages.find((m) => m.id === s.id) || s)
+        .filter(Boolean);
+
+      setRecentOrders(sortedWithImages.slice(0, 5));
     } catch (fetchError) {
       const message =
         fetchError instanceof Error
@@ -412,7 +454,14 @@ export default function SellerDashboard() {
                   recentOrders.map((order) => (
                     <tr key={order.id} className="border-t border-slate-100">
                       <td className="p-4 font-medium text-gray-900">
-                        {order.product_name}
+                        <div className="flex items-center">
+                          <img
+                            src={order.product_image || "/placeholder.svg"}
+                            alt={order.product_name || "product"}
+                            className="h-12 w-12 rounded-md object-cover bg-muted"
+                          />
+                          <span className="ml-4">{order.product_name}</span>
+                        </div>
                       </td>
                       <td className="p-4 text-gray-900">{order.quantity}</td>
                       <td className="p-4 text-gray-900">

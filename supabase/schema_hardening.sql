@@ -6,14 +6,23 @@
 -- --------------------------------------------------------------------
 -- 1. ORDER STATUS TRANSITION VALIDATION
 -- Enforces chronological progression and blocks rollback or final state updates.
+-- Admins bypass strict validation but cannot update final states.
 -- --------------------------------------------------------------------
 create or replace function public.validate_order_status_transition()
 returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
+declare
+  is_admin boolean;
 begin
-  -- Prevent any updates to orders that are already cancelled or delivered
+  -- Check if current user is admin
+  select exists(
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role = 'admin'
+  ) into is_admin;
+
+  -- Prevent ANY updates to orders that are already cancelled or delivered (even admins)
   if old.status = 'cancelled' then
     raise exception 'Cannot update a cancelled order';
   end if;
@@ -21,12 +30,17 @@ begin
     raise exception 'Cannot update a delivered order';
   end if;
 
+  -- If admin, allow any status change (except final states already blocked above)
+  if is_admin then
+    return new;
+  end if;
+
   -- Allow direct cancellation from any non-final state
   if new.status = 'cancelled' then
     return new;
   end if;
 
-  -- Enforce standard progression flow. Prevents rolling back status.
+  -- For non-admins, enforce standard progression flow. Prevents rolling back status.
   -- Steps: pending -> confirmed -> processing -> shipped -> out_for_delivery -> delivered
   if (
     (old.status = 'confirmed' and new.status = 'pending') or
@@ -35,7 +49,7 @@ begin
     (old.status = 'out_for_delivery' and new.status in ('pending', 'confirmed', 'processing', 'shipped')) or
     (old.status = 'delivered' and new.status <> 'delivered')
   ) then
-    raise exception 'Invalid status transition rollback from % to %', old.status, new.status;
+    raise exception 'Invalid status transition from % to %', old.status, new.status;
   end if;
 
   return new;
