@@ -34,6 +34,9 @@ interface Product {
   description?: string;
   image_url?: string;
   created_at?: string;
+  profiles?: {
+    username: string;
+  };
 }
 
 interface ImageLoadState {
@@ -55,7 +58,9 @@ export default function AdminProductRequests() {
     setLoading(true);
     const { data, error } = await supabase
       .from("products")
-      .select("*")
+      .select(`
+        *,
+        profiles (username)`)
       .eq("product_status", "pending");
 
     if (error || !data) {
@@ -384,7 +389,7 @@ export default function AdminProductRequests() {
                         Seller:
                       </span>{" "}
                       <span className="text-gray-600">
-                        {product.seller_name || "Unknown"}
+                      {product.profiles?.username || "Unknown"}
                       </span>
                     </p>
                   </div>
