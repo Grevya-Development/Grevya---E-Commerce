@@ -56,7 +56,7 @@ const Footer = () => {
   return (
     <footer className="bg-[#E9E1D4] text-neutral-800">
       <div className="container mx-auto px-4 pt-16 pb-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* Signup + Store */}
           <div>
             <h2 className="font-serif text-3xl md:text-4xl font-medium leading-tight mb-6">
@@ -135,6 +135,22 @@ const Footer = () => {
                   <Link to={to} className="hover:underline">{label}</Link>
                 </li>
               ))}
+            </ul>
+          </div>
+
+          {/* Portals */}
+          <div>
+            <h2 className="font-serif text-3xl md:text-4xl font-medium mb-6">Portals</h2>
+            <ul className="space-y-4 text-neutral-700">
+              <li>
+                <Link to="/login" className="hover:underline">Customer Portal</Link>
+              </li>
+              <li>
+                <Link to="/seller/login" className="hover:underline">Seller Portal</Link>
+              </li>
+              <li>
+                <Link to="/admin/login" className="hover:underline">Admin Portal</Link>
+              </li>
             </ul>
           </div>
         </div>

@@ -167,17 +167,19 @@ export default function SpotlightSearch() {
             className="w-full max-w-2xl bg-[#F7EEE4] border border-[#A68D65]/25 rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col"
           >
             {/* Search Input bar */}
-            <div className="flex items-center px-5 py-4 border-b border-[#A68D65]/15 relative">
-              <Search className="h-5 w-5 text-[#33381C]/60" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-                placeholder="Search premium oils, face serums, natural soaps..."
-                className="w-full ml-3 bg-transparent border-none outline-none text-base text-[#1D1E19] placeholder-[#1D1E19]/40 focus:ring-0"
-              />
+            <div className="flex items-center px-5 py-4 border-b border-[#A68D65]/15 relative bg-[#F7EEE4]/50">
+              <div className="flex items-center flex-grow bg-white border border-[#A68D65]/20 rounded-full px-4.5 py-2.5 shadow-[inset_0_2px_4px_rgba(0,0,0,0.01)] focus-within:border-[#33381C] focus-within:ring-2 focus-within:ring-[#33381C]/10 transition-all duration-300">
+                <Search className="h-5 w-5 text-neutral-400 focus-within:text-[#33381C] transition-colors shrink-0" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search premium oils, face serums, natural soaps..."
+                  className="w-full ml-3.5 bg-transparent border-none outline-none text-sm text-[#1D1E19] placeholder-neutral-400 focus:ring-0 focus:outline-none"
+                />
+              </div>
               <div className="flex items-center space-x-2">
                 <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded border border-[#A68D65]/35 text-[#33381C]/50 font-mono shadow-sm">
                   ESC

@@ -12,11 +12,25 @@ export const supabase = createClient(
     supabaseAnonKey,
     {
         auth: {
-            storageKey: 'grevya-auth-session',
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true,
-            flowType: 'pkce',
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
         },
     }
 )
+
+/**
+ * Temporary Compatibility Layer: Dynamic Token Injection
+ * Connects third-party Clerk JWTs to Supabase queries for RLS check resolution.
+ * This can be safely deprecated if direct client-to-database requests are moved to a backend.
+ */
+export const setSupabaseToken = async (clerkToken: string | null) => {
+    if (clerkToken) {
+        await supabase.auth.setSession({
+            access_token: clerkToken,
+            refresh_token: "",
+        });
+    } else {
+        await supabase.auth.signOut();
+    }
+};

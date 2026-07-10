@@ -122,6 +122,8 @@ const Products = () => {
         const { data, error: fetchError } = await supabase
           .from('products')
           .select('*')
+          .eq('product_status', 'approved')
+          .eq('is_hidden', false)
           .order('id', { ascending: true });
 
         if (fetchError) throw fetchError;
