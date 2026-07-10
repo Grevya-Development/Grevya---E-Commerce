@@ -1,0 +1,159 @@
+====================================================================
+GREVYA NATURALS - COMPREHENSIVE PROJECT CONTEXT
+====================================================================
+
+This document serves as the master technical guide for the Grevya Naturals e-commerce platform. It outlines the system architecture, file responsibilities, data schemas, authentication lifecycles, and developmental guidelines. Future developers should read this document to understand the codebase and execute tasks safely and consistently.
+
+---
+
+1. ARCHITECTURAL OVERVIEW
+=========================
+
+The Grevya Naturals application is structured as a modern, decoupled, client-first architecture:
+
+* Primary Frontend Stack: React (v18.3.1), Vite (v5.4.1), TypeScript, TailwindCSS (v3.4.11), Framer Motion (v12.34.4).
+* Core Backend / Database: Supabase (PostgreSQL, Auth, Storage).
+* Legacy Backend: An Express/MongoDB stack exists inside the `/server` directory, but is currently unused by the frontend codebase.
+
+Client-Side Routing
+-------------------
+Managed client-side in [App.tsx](file:///f:/Grevya/Grevya---ECommerce/src/App.tsx) using React Router DOM's `<BrowserRouter>`.
+* Includes a catch-all route (`<Route path="*" element={<NotFound />} />`) for graceful 404 handling.
+* Protected views (e.g., `/account`, `/orders`) are wrapped in the `<ProtectedRoute>` component.
+* Production URL rewriting is configured via [vercel.json](file:///f:/Grevya/Grevya---ECommerce/vercel.json) to redirect all routes to `index.html` to prevent Vercel server-side 404s on page refreshes.
+
+State Management
+----------------
+* Zustand: Used for transient, local storage-persisted user state:
+  - [useCartStore.ts](file:///f:/Grevya/Grevya---ECommerce/src/store/useCartStore.ts): Persists user cart items.
+  - [useWishlistStore.ts](file:///f:/Grevya/Grevya---ECommerce/src/store/useWishlistStore.ts): Persists user wishlist items.
+* React Context:
+  - [AuthContext.tsx](file:///f:/Grevya/Grevya---ECommerce/src/context/AuthContext.tsx): Manages auth session state, profile loading, and profile synchronization.
+
+---
+
+2. FILE SYSTEM & RESPONSIBILITIES
+=================================
+
+Directory Structure
+------------------
+* [/src](file:///f:/Grevya/Grevya---ECommerce/src) - Frontend source code
+  * [/components](file:///f:/Grevya/Grevya---ECommerce/src/components) - Reusable UI widgets and layout sections.
+    - [Navbar.tsx](file:///f:/Grevya/Grevya---ECommerce/src/components/Navbar.tsx): Primary desktop and mobile navigation header.
+    - [Footer.tsx](file:///f:/Grevya/Grevya---ECommerce/src/components/Footer.tsx): Main site footer.
+    - [ProductCard.tsx](file:///f:/Grevya/Grevya---ECommerce/src/components/ProductCard.tsx): Displays individual catalog items with hover effects and animations.
+    - [ProtectedRoute.tsx](file:///f:/Grevya/Grevya---ECommerce/src/components/ProtectedRoute.tsx): Route guard checking authentication state.
+    - [SpotlightSearch.tsx](file:///f:/Grevya/Grevya---ECommerce/src/components/SpotlightSearch.tsx): Interactive overlay search catalog finder.
+    - [NotificationBell.tsx](file:///f:/Grevya/Grevya---ECommerce/src/components/NotificationBell.tsx): Renders custom order, account, and info messages.
+  * [/context](file:///f:/Grevya/Grevya---ECommerce/src/context) - React context providers
+    - [AuthContext.tsx](file:///f:/Grevya/Grevya---ECommerce/src/context/AuthContext.tsx): Auth listener, session restoration, and profile loader.
+  * [/hooks](file:///f:/Grevya/Grevya---ECommerce/src/hooks) - Custom utility hooks
+    - [use-toast.ts](file:///f:/Grevya/Grevya---ECommerce/src/hooks/use-toast.ts) / [use-mobile.tsx](file:///f:/Grevya/Grevya---ECommerce/src/hooks/use-mobile.tsx): shadcn UI hooks.
+  * [/lib](file:///f:/Grevya/Grevya---ECommerce/src/lib) - Core business logic integrations
+    - [authService.ts](file:///f:/Grevya/Grevya---ECommerce/src/lib/authService.ts): Handles logins, registration, OAuth, OTP request, password updates, and concurrency locks.
+    - [authValidation.ts](file:///f:/Grevya/Grevya---ECommerce/src/lib/authValidation.ts): Validates credentials and maps database errors to friendly messages.
+    - [profileSync.ts](file:///f:/Grevya/Grevya---ECommerce/src/lib/profileSync.ts): Handles creating/updating public profile records in the DB on authentication changes.
+    - [razorpay.ts](file:///f:/Grevya/Grevya---ECommerce/src/lib/razorpay.ts): Script loader and checkout handler for the Razorpay payment gateway.
+    - [product-images.ts](file:///f:/Grevya/Grevya---ECommerce/src/lib/product-images.ts): Maps local uploads of premium assets to products.
+    - [supabaseClient.ts](file:///f:/Grevya/Grevya---ECommerce/src/lib/supabaseClient.ts): Initializes the Supabase client.
+  * [/pages](file:///f:/Grevya/Grevya---ECommerce/src/pages) - Routed views
+    - [Index.tsx](file:///f:/Grevya/Grevya---ECommerce/src/pages/Index.tsx): High-converting homepage showcasing eco-wellness values.
+    - [Products.tsx](file:///f:/Grevya/Grevya---ECommerce/src/pages/Products.tsx): Catalog search, filter, and sort interface.
+    - [ProductDetail.tsx](file:///f:/Grevya/Grevya---ECommerce/src/pages/ProductDetail.tsx): Renders product details, average ratings, customer reviews, and submission flow.
+    - [Cart.tsx](file:///f:/Grevya/Grevya---ECommerce/src/pages/Cart.tsx): Primary shopping cart summary view.
+    - [Checkout.tsx](file:///f:/Grevya/Grevya---ECommerce/src/pages/Checkout.tsx): Multi-step guest/member checkout form containing address forms, payment integration, and resilient submission logic.
+    - [Account.tsx](file:///f:/Grevya/Grevya---ECommerce/src/pages/Account.tsx): Master user dashboard containing profile, security, saved addresses, wishlist, order list, and order tracking.
+    - [AuthPage.tsx](file:///f:/Grevya/Grevya---ECommerce/src/pages/AuthPage.tsx): Unified signup/signin interface.
+* [/supabase](file:///f:/Grevya/Grevya---ECommerce/supabase) - SQL migration scripts and schema definitions
+  - [schema.sql](file:///f:/Grevya/Grevya---ECommerce/supabase/schema.sql): Initial core schema setup.
+  - [recovery_schema.sql](file:///f:/Grevya/Grevya---ECommerce/supabase/recovery_schema.sql): Database alignment file providing naming sync triggers.
+  - [security_hardening.sql](file:///f:/Grevya/Grevya---ECommerce/supabase/security_hardening.sql): Secure search_paths, function revokes, reviews RLS, and storage listing protections.
+  - [seed_products.sql](file:///f:/Grevya/Grevya---ECommerce/supabase/seed_products.sql): Seeds 48 premium products with reviews.
+
+---
+
+3. AUTHENTICATION & SESSION LIFECYCLE
+=====================================
+
+Anonymous Guest Auth & Promotion
+--------------------------------
+1. Guest Checkout Flow: If an unauthenticated visitor clicks "Checkout", [Checkout.tsx](file:///f:/Grevya/Grevya---ECommerce/src/pages/Checkout.tsx) automatically triggers `supabase.auth.signInAnonymously()` to log them in as an anonymous user.
+2. Order Association: Guest orders and shipping addresses are recorded under this anonymous UUID, eliminating the need for separate unauthenticated tables.
+3. Promotion Flow: If the anonymous user registers an account on [AuthPage.tsx](file:///f:/Grevya/Grevya---ECommerce/src/pages/AuthPage.tsx), `signUpWithEmail` invokes `supabase.auth.updateUser` with the password and new email.
+4. Data Persistence: The user's UUID is preserved during promotion. This seamlessly inherits all past orders, addresses, and notifications onto their newly registered account.
+
+Auth Concurrency & Anti-Spam Protections
+-----------------------------------------
+[authService.ts](file:///f:/Grevya/Grevya---ECommerce/src/lib/authService.ts) enforces:
+* Concurrency Lock: A `locks` map tracks pending promises by action key, preventing concurrent duplicate clicks/requests from firing.
+* Rate Limit Cooldowns: An active `cooldowns` map plus local storage timestamps block spamming endpoints:
+  - Standard sign up: 90 seconds.
+  - Password recovery email: 60 seconds.
+  - Phone OTP request: 60 seconds.
+  - OAuth initiation: 5 seconds.
+
+Session Synchronization
+-----------------------
+* `AuthContext` listens to `onAuthStateChange`. When a user logs in:
+  - Zustand stores (`useCartStore`, `useWishlistStore`) run `syncUserSession(userId)`.
+  - If transitioning from a guest, the store merges guest items into the user's persisted array and flushes the `'guest'` namespace in local storage.
+  - `ensureUserProfile` in [profileSync.ts](file:///f:/Grevya/Grevya---ECommerce/src/lib/profileSync.ts) verifies/upserts the profile row in `public.profiles`.
+
+---
+
+4. DATABASE MODEL & SUPABASE TRIGGERS
+=====================================
+
+The database schema utilizes row-level security (RLS) policies and PostgreSQL sync triggers to handle code discrepancies and schema drift.
+
+Triggers
+--------
+* `on_auth_user_created` (executes `public.handle_new_user()`):
+  Fires when a user registers. Automatically upserts metadata into `public.profiles`.
+* `trg_sync_address_codes` (executes `public.sync_pincode_and_postal_code()`):
+  Fires before insert/update on `public.addresses`. Ensures `pincode`/`postal_code`, `address_line1`/`address_line_1`, and `address_line2`/`address_line_2` are identical, resolving schema name mismatch errors.
+* `trg_sync_order_totals` (executes `public.sync_order_totals()`):
+  Fires before insert/update on `public.orders`. Syncs `total`/`total_amount` and `status`/`order_status`. Generates a tracking number (`TRK-...`) if null.
+* `trg_sync_notification_read` (executes `public.sync_notification_read_flags()`):
+  Fires before insert/update on `public.notifications`. Syncs `read` and `is_read`.
+* `trg_normalize_user_email_change_tokens` (executes `public.normalize_user_email_change_tokens()`):
+  Fires before insert/update on `auth.users` to normalize token fields to empty strings, preventing GoTrue SMTP crashes.
+
+Security Hardening & RLS Models
+--------------------------------
+* RPC Exposure: Executable privileges on all custom definer functions are revoked from `public`, `anon`, and `authenticated` roles. Trigger executions bypass these checks, but API REST RPC queries are blocked.
+* Reviews Table: RLS only permits `authenticated` users to insert reviews under their own `auth.uid()`.
+* Storage Buckets (`profile-images` and `avatars`): SELECT policies are hardened with `NOT storage.allow_only_operation('object.list')`. This blocks listing files via API calls while preserving direct render/downloads via public URLs.
+
+---
+
+5. E-COMMERCE LIFECYCLE
+=======================
+
+Order Submission Resilience
+---------------------------
+To prevent database changes from breaking active checkouts, [Checkout.tsx](file:///f:/Grevya/Grevya---ECommerce/src/pages/Checkout.tsx) wraps order inserts in a retry loop:
+* If a column fails to insert because it does not exist (e.g., column cache drift), `safeInsertOrder` intercepts the error, deletes that field from the payload, prints a warning to console, and retries.
+
+Payment Integration
+-------------------
+Payments are handled in [razorpay.ts](file:///f:/Grevya/Grevya---ECommerce/src/lib/razorpay.ts):
+* Production: Loads the external Razorpay SDK and opens the payment modal.
+* Local Development (`import.meta.env.DEV`): If Razorpay credentials are missing, falls back to a simulated success prompt via `window.confirm`.
+
+---
+
+6. FUTURE DEVELOPMENT GUIDELINES
+================================
+
+To maintain codebase sanity, preserve these patterns:
+
+* Database Syncing: Always write queries to query both sync fields (e.g. `total` and `total_amount`) or let database triggers handle normalization.
+* Guest State Transition: Do not store unauthenticated cart/wishlist items under user UUIDs before login; rely on Zustand's `syncUserSession` to merge them cleanly.
+* Resilient Queries: Use the "safe" DB wrappers (`safeInsertOrder`, `safeInsertOrderItems`) for core checkout operations.
+* File Conventions:
+  - PascalCase for React components and pages.
+  - camelCase for hooks, services, and utility functions.
+  - snake_case for database columns.
+  - CSS tokens in [index.css](file:///f:/Grevya/Grevya---ECommerce/src/index.css) must be used instead of custom ad-hoc Tailwind classes to preserve the premium brand aesthetic.
+====================================================================
