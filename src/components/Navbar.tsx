@@ -1,6 +1,5 @@
-
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LogOut,
   Package,
@@ -11,18 +10,19 @@ import {
   X,
   User,
   LayoutDashboard,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useCartStore } from '@/store/useCartStore';
-import { useAuth } from '@/context/AuthContext';
+  Store,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useCartStore } from "@/store/useCartStore";
+import { useAuth } from "@/context/AuthContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import NotificationBell from './NotificationBell';
-import { motion, AnimatePresence } from 'framer-motion';
+} from "@/components/ui/dropdown-menu";
+import NotificationBell from "./NotificationBell";
+import { motion, AnimatePresence } from "framer-motion";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -35,9 +35,9 @@ const Navbar = () => {
 
   useEffect(() => {
     // Explicitly clean up any residual dark class and localStorage values
-    if (typeof window !== 'undefined') {
-      window.document.documentElement.classList.remove('dark');
-      localStorage.removeItem('grevya-theme');
+    if (typeof window !== "undefined") {
+      window.document.documentElement.classList.remove("dark");
+      localStorage.removeItem("grevya-theme");
     }
   }, []);
 
@@ -51,18 +51,18 @@ const Navbar = () => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const [windowWidth, setWindowWidth] = useState(
-    typeof window !== 'undefined' ? window.innerWidth : 1024,
+    typeof window !== "undefined" ? window.innerWidth : 1024,
   );
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const isMobile = windowWidth < 768;
@@ -72,24 +72,24 @@ const Navbar = () => {
   };
 
   const openRoleDashboard = () => {
-    if (profile?.role === 'admin') {
-      navigate('/admin/dashboard');
+    if (profile?.role === "admin") {
+      navigate("/admin/dashboard");
       return;
     }
 
-    if (profile?.role === 'seller') {
-      navigate('/seller/dashboard');
+    if (profile?.role === "seller") {
+      navigate("/seller/dashboard");
     }
   };
 
   const isAdminOrSeller =
-    profile?.role === 'admin' || profile?.role === 'seller';
+    profile?.role === "admin" || profile?.role === "seller";
 
   const navItems = [
-    { path: '/', name: 'Home' },
-    { path: '/about', name: 'About Us' },
-    { path: '/products', name: 'Products' },
-    { path: '/contact', name: 'Contact' },
+    { path: "/", name: "Home" },
+    { path: "/about", name: "About Us" },
+    { path: "/products", name: "Products" },
+    { path: "/contact", name: "Contact" },
   ];
 
   return (
@@ -100,7 +100,7 @@ const Navbar = () => {
           scale: isScrolled ? (isMobile ? 0.95 : 0.97) : 1,
         }}
         transition={{
-          type: 'spring',
+          type: "spring",
           stiffness: 220,
           damping: 24,
           mass: 0.8,
@@ -111,26 +111,24 @@ const Navbar = () => {
         <motion.div
           animate={{
             backgroundColor: isScrolled
-              ? 'var(--nav-bg-scrolled)'
-              : 'var(--nav-bg-top)',
+              ? "var(--nav-bg-scrolled)"
+              : "var(--nav-bg-top)",
             borderColor: isScrolled
-              ? 'var(--nav-border-scrolled)'
-              : 'var(--nav-border-top)',
-            borderRadius: isScrolled ? (isMobile ? '16px' : '9999px') : '0px',
+              ? "var(--nav-border-scrolled)"
+              : "var(--nav-border-top)",
+            borderRadius: isScrolled ? (isMobile ? "16px" : "9999px") : "0px",
             boxShadow: isScrolled
-              ? 'var(--nav-shadow-scrolled)'
-              : 'var(--nav-shadow-top)',
+              ? "var(--nav-shadow-scrolled)"
+              : "var(--nav-shadow-top)",
           }}
           transition={{
-            type: 'spring',
+            type: "spring",
             stiffness: 220,
             damping: 24,
             mass: 0.8,
           }}
           className={`absolute inset-0 -z-10 backdrop-blur-md transition-all ${
-            isScrolled
-              ? 'border border-[#A68D65]/20'
-              : 'border-b'
+            isScrolled ? "border border-[#A68D65]/20" : "border-b"
           }`}
         />
 
@@ -161,8 +159,8 @@ const Navbar = () => {
           <div className="hidden md:flex space-x-6 lg:space-x-8 items-center relative">
             {navItems.map((item) => {
               const active =
-                item.path === '/'
-                  ? location.pathname === '/'
+                item.path === "/"
+                  ? location.pathname === "/"
                   : location.pathname.startsWith(item.path);
 
               return (
@@ -171,8 +169,8 @@ const Navbar = () => {
                   to={item.path}
                   className={`relative py-1 text-sm font-semibold tracking-wide transition-colors ${
                     active
-                      ? 'text-[#33381C]'
-                      : 'text-[#1D1E19]/60 hover:text-[#33381C]'
+                      ? "text-[#33381C]"
+                      : "text-[#1D1E19]/60 hover:text-[#33381C]"
                   }`}
                 >
                   {item.name}
@@ -181,7 +179,7 @@ const Navbar = () => {
                       layoutId="activeNavbarTab"
                       className="absolute -bottom-1 left-0 right-0 h-[2px] bg-[#33381C] rounded-full"
                       transition={{
-                        type: 'spring',
+                        type: "spring",
                         stiffness: 350,
                         damping: 28,
                       }}
@@ -197,7 +195,7 @@ const Navbar = () => {
             {/* Spotlight Search trigger button */}
             <button
               onClick={() =>
-                window.dispatchEvent(new CustomEvent('open-grevya-search'))
+                window.dispatchEvent(new CustomEvent("open-grevya-search"))
               }
               className="flex items-center space-x-2 w-36 lg:w-48 rounded-full border border-[#A68D65]/20 bg-white/50 hover:bg-white py-1.5 px-3.5 text-sm text-foreground/75 text-left cursor-pointer transition-all hover:border-[#A68D65]/40 shadow-sm"
               aria-label="Open Spotlight Search"
@@ -215,7 +213,7 @@ const Navbar = () => {
                   variant="ghost"
                   size="icon"
                   className="rounded-full hover:bg-[#A68D65]/10 text-gray-750"
-                  title={user ? 'Account' : 'Login'}
+                  title={user ? "Account" : "Login"}
                 >
                   <User className="h-4.5 w-4.5" />
                 </Button>
@@ -240,10 +238,7 @@ const Navbar = () => {
                       asChild
                       className="focus:bg-[#A68D65]/10 cursor-pointer"
                     >
-                      <Link
-                        to="/account"
-                        className="w-full flex items-center"
-                      >
+                      <Link to="/account" className="w-full flex items-center">
                         <Settings className="mr-2 h-4 w-4" />
                         Account Settings
                       </Link>
@@ -263,14 +258,26 @@ const Navbar = () => {
                       asChild
                       className="focus:bg-[#A68D65]/10 cursor-pointer"
                     >
-                      <Link
-                        to="/orders"
-                        className="w-full flex items-center"
-                      >
+                      <Link to="/orders" className="w-full flex items-center">
                         <Package className="mr-2 h-4 w-4" />
                         My Orders
                       </Link>
                     </DropdownMenuItem>
+
+                    {profile?.role === "customer" && (
+                      <DropdownMenuItem
+                        asChild
+                        className="focus:bg-[#A68D65]/10 cursor-pointer"
+                      >
+                        <Link
+                          to="/apply-to-sell"
+                          className="w-full flex items-center"
+                        >
+                          <Store className="mr-2 h-4 w-4" />
+                          Become a Seller
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
 
                     <DropdownMenuItem
                       onClick={signOut}
@@ -361,16 +368,11 @@ const Navbar = () => {
         {isMenuOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{
               duration: 0.35,
-              ease: [0.16, 1, 0.3, 1] as [
-                number,
-                number,
-                number,
-                number,
-              ],
+              ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
             }}
             className="md:hidden bg-[#F7EEE4] border-t border-[#A68D65]/15 py-5 px-4 shadow-xl overflow-hidden"
           >
@@ -381,8 +383,8 @@ const Navbar = () => {
                   to={item.path}
                   className={`text-base font-bold py-1 border-b border-[#A68D65]/5 ${
                     location.pathname === item.path
-                      ? 'text-[#33381C]'
-                      : 'text-[#1D1E19]'
+                      ? "text-[#33381C]"
+                      : "text-[#1D1E19]"
                   }`}
                   onClick={toggleMenu}
                 >
@@ -393,9 +395,7 @@ const Navbar = () => {
               <button
                 onClick={() => {
                   toggleMenu();
-                  window.dispatchEvent(
-                    new CustomEvent('open-grevya-search'),
-                  );
+                  window.dispatchEvent(new CustomEvent("open-grevya-search"));
                 }}
                 className="w-full flex items-center space-x-2 rounded-full border border-[#A68D65]/20 bg-white py-2.5 px-4 text-sm text-foreground/50 text-left shadow-xs cursor-pointer"
               >
@@ -422,11 +422,8 @@ const Navbar = () => {
                 variant="outline"
                 className="w-full rounded-xl border-[#33381C]/35 text-[#33381C] font-bold"
               >
-                <Link
-                  to={user ? '/account' : '/login'}
-                  onClick={toggleMenu}
-                >
-                  {user ? 'My Account' : 'Login / Signup'}
+                <Link to={user ? "/account" : "/login"} onClick={toggleMenu}>
+                  {user ? "My Account" : "Login / Signup"}
                 </Link>
               </Button>
             </div>

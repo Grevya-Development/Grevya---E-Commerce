@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   Eye,
+  MapPin,
   Package,
+  Phone,
   RefreshCw,
   UserRound,
-  AlertCircle,
-  MapPin,
-  Phone,
 } from "lucide-react";
 import SellerLayout from "@/layouts/SellerLayout";
 import { supabase } from "@/lib/supabaseClient";
@@ -21,12 +21,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatOrderDate } from "@/lib/dateFormat";
+import {
+  allOrderStatusOptions,
+  formatOrderStatus,
+  formatPaymentStatus,
+  getSellerNextStatuses,
+  normalizeOrderStatus,
+} from "@/lib/orderStatus";
 
 interface Order {
   id: string;
   user_id?: string | null;
   total_amount?: number | null;
-  status?: string | null;
   order_status?: string | null;
   payment_status?: string | null;
   tracking_number?: string | null;
@@ -60,70 +66,66 @@ interface Profile {
   phone?: string | null;
 }
 
-// Seller status flow. Sellers cannot skip stages or move backward.
-const sellerStatusTransitions: Record<string, string[]> = {
-  pending: ["confirmed", "cancelled"],
-  confirmed: ["processing", "cancelled"],
-  processing: ["shipped", "cancelled"],
-  shipped: [],
-  cancelled: [],
-  out_for_delivery: [],
-  delivered: [],
-  refunded: [],
-  returned: [],
-};
-
-const normalizeStatus = (status?: string | null) =>
-  (status || "pending").toLowerCase().replace(/\s+/g, "_");
-
-const getSellerNextStatuses = (status?: string | null) =>
-  sellerStatusTransitions[normalizeStatus(status)] || [];
-
-const allStatusOptions = [
-  "pending",
-  "confirmed",
-  "processing",
-  "shipped",
-  "out_for_delivery",
-  "delivered",
-  "cancelled",
-  "refunded",
-  "returned",
-];
-
-const formatStatus = (status?: string | null) =>
-  (status || "pending").replace(/_/g, " ");
+interface DeliveryInput {
+  estimated_delivery?: string | null;
+  tracking_number?: string | null;
+  order_status?: string | null;
+}
 
 const formatCurrency = (value?: number | null) =>
   `₹${Number(value || 0).toFixed(2)}`;
 
 const formatDateForInput = (value?: string | null) => {
   if (!value) return "";
+
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) return "";
+
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
+
   return `${year}-${month}-${day}`;
 };
 
 const getOrderStatusBadgeClass = (value?: string | null) => {
-  const status = (value || "pending").toLowerCase();
-  if (["delivered"].includes(status))
+  const status = normalizeOrderStatus(value);
+
+  if (status === "delivered") {
     return "bg-emerald-100 text-emerald-700 hover:bg-emerald-100";
-  if (["shipped", "out for delivery", "processing"].includes(status))
+  }
+
+  if (
+    ["processing", "shipped", "in_transit", "out_for_delivery"].includes(
+      status,
+    )
+  ) {
     return "bg-sky-100 text-sky-700 hover:bg-sky-100";
-  if (["cancelled", "refunded", "returned"].includes(status))
+  }
+
+  if (["cancelled", "returned"].includes(status)) {
     return "bg-rose-100 text-rose-700 hover:bg-rose-100";
+  }
+
   return "bg-amber-100 text-amber-700 hover:bg-amber-100";
 };
 
 const getPaymentStatusBadgeClass = (value?: string | null) => {
-  const status = (value || "pending").toLowerCase();
-  if (["paid"].includes(status))
+  const status = (value || "pending").toLowerCase().replace(/\s+/g, "_");
+
+  if (status === "paid") {
     return "bg-emerald-100 text-emerald-700 hover:bg-emerald-100";
-  if (["failed", "refunded"].includes(status))
+  }
+
+  if (status === "refund_processing") {
+    return "bg-orange-100 text-orange-700 hover:bg-orange-100";
+  }
+
+  if (["failed", "refunded"].includes(status)) {
     return "bg-rose-100 text-rose-700 hover:bg-rose-100";
+  }
+
   return "bg-amber-100 text-amber-700 hover:bg-amber-100";
 };
 
@@ -132,34 +134,90 @@ const getShortOrderId = (id?: string | null) => {
   return `${id.slice(0, 8)}…`;
 };
 
+const parseShipping = (shipping: any) => {
+  if (!shipping) return null;
+
+  return {
+    full_name:
+      shipping.full_name ||
+      shipping.name ||
+      shipping.firstName ||
+      shipping.first_name ||
+      null,
+    phone: shipping.phone || shipping.mobile || null,
+    line1:
+      shipping.address_line1 ||
+      shipping.address_line_1 ||
+      shipping.line1 ||
+      shipping.address ||
+      shipping.address_line ||
+      null,
+    line2:
+      shipping.address_line2 ||
+      shipping.address_line_2 ||
+      shipping.line2 ||
+      shipping.address_extra ||
+      null,
+    city: shipping.city || null,
+    state: shipping.state || null,
+    pincode:
+      shipping.pincode ||
+      shipping.postal_code ||
+      shipping.postcode ||
+      shipping.pin ||
+      null,
+    country: shipping.country || null,
+  };
+};
+
 export default function SellerOrders() {
   const { user } = useAuth();
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [profilesById, setProfilesById] = useState<Record<string, Profile>>({});
+  const [profilesById, setProfilesById] = useState<Record<string, Profile>>(
+    {},
+  );
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState("");
+
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedOrderItems, setSelectedOrderItems] = useState<OrderItem[]>([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
+
   const [deliveryInputs, setDeliveryInputs] = useState<
-    Record<
-      string,
-      {
-        estimated_delivery?: string | null;
-        tracking_number?: string | null;
-        order_status?: string | null;
-      }
-    >
+    Record<string, DeliveryInput>
   >({});
+
   const [savingDetails, setSavingDetails] = useState(false);
+
+  const getCustomer = (order: Order) =>
+    order.user_id ? profilesById[order.user_id] : undefined;
+
+  const getCustomerName = (order: Order) => {
+    const profile = getCustomer(order);
+
+    return (
+      profile?.full_name ||
+      profile?.username ||
+      profile?.email?.split("@")[0] ||
+      "Guest customer"
+    );
+  };
+
+  const getOrderItemsForOrder = (orderId: string) =>
+    orderItems.filter((item) => item.order_id === orderId);
 
   const fetchOrders = async (): Promise<Order[]> => {
     if (!user?.id) {
       setOrders([]);
+      setOrderItems([]);
+      setProfilesById({});
       setLoading(false);
       return [];
     }
@@ -168,50 +226,41 @@ export default function SellerOrders() {
     setError(null);
 
     try {
-      // Fetch orders via RPC for seller-filtered view. Try v2 (includes
-      // user_id + shipping_address) and fall back to the original RPC
-      // if v2 is not available.
       let data: any = null;
       let ordersError: any = null;
-      try {
-        const res = await supabase.rpc("get_seller_order_items_v2");
-        data = res.data;
-        ordersError = res.error;
-        if (ordersError) {
-          // try original name as fallback
-          const res2 = await supabase.rpc("get_seller_order_items");
-          data = res2.data;
-          ordersError = res2.error;
-        }
-      } catch (rpcErr) {
-        // final fallback to original RPC
-        const res2 = await supabase.rpc("get_seller_order_items");
-        data = res2.data;
-        ordersError = res2.error;
+
+      const v2Result = await supabase.rpc("get_seller_order_items_v2");
+
+      if (!v2Result.error) {
+        data = v2Result.data;
+      } else {
+        const fallbackResult = await supabase.rpc("get_seller_order_items");
+        data = fallbackResult.data;
+        ordersError = fallbackResult.error;
       }
 
       if (ordersError) {
-        const msg = ordersError.message.includes("get_seller_order_items")
-          ? "Seller order function is missing in Supabase. Run supabase/fix-seller-orders-rls.sql in the Supabase SQL Editor."
+        const message = ordersError.message.includes("get_seller_order_items")
+          ? "Seller order function is missing in Supabase. Run the seller order access SQL migration first."
           : ordersError.message;
-        setError(msg);
+
+        setError(message);
         setOrders([]);
         setOrderItems([]);
-        setLoading(false);
         return [];
       }
 
       const items = (data as OrderItem[]) || [];
       setOrderItems(items);
 
-      // Extract unique orders from items
       const orderMap = new Map<string, Order>();
+
       items.forEach((item) => {
         if (item.order_id && !orderMap.has(item.order_id)) {
           orderMap.set(item.order_id, {
             id: item.order_id,
-            order_status: item.order_status || null,
-            payment_status: item.payment_status || null,
+            order_status: item.order_status || "pending",
+            payment_status: item.payment_status || "pending",
             tracking_number: item.tracking_number || null,
             estimated_delivery: item.estimated_delivery || null,
             created_at: item.created_at || null,
@@ -220,161 +269,169 @@ export default function SellerOrders() {
       });
 
       const uniqueOrders = Array.from(orderMap.values());
-      setOrders(uniqueOrders);
 
-      // Fetch customer profiles for all unique user_ids
-      const userIds = Array.from(
-        new Set(items.map((item) => item.order_id).filter(Boolean)),
-      ) as string[];
-
-      if (userIds.length > 0) {
-        // Get full order details including user_id and shipping address
-        const { data: orderData } = await supabase
-          .from("orders")
-          .select("id,user_id,shipping_address,payment_status,status")
-          .in("id", userIds);
-
-        const orderLookup = new Map(
-          ((orderData as any[]) || []).map((o) => [o.id, o]),
-        );
-
-        // Merge full order details
-        const enrichedOrders = uniqueOrders.map((o) => {
-          const fullOrder = orderLookup.get(o.id);
-          const normalizedStatus =
-            fullOrder?.status || o.order_status || o.status;
-          return {
-            ...o,
-            user_id: fullOrder?.user_id,
-            shipping_address: fullOrder?.shipping_address,
-            payment_status: fullOrder?.payment_status || o.payment_status,
-            order_status: normalizedStatus,
-            status: normalizedStatus,
-          };
-        });
-        setOrders(enrichedOrders as Order[]);
-
-        // Get unique user IDs
-        const userIdsToFetch = Array.from(
-          new Set(enrichedOrders.map((o) => o.user_id).filter(Boolean)),
-        ) as string[];
-
-        if (userIdsToFetch.length > 0) {
-          const { data: profileRows } = await supabase
-            .from("profiles")
-            .select("id,username,full_name,email,phone")
-            .in("id", userIdsToFetch);
-
-          setProfilesById(
-            ((profileRows as Profile[] | null) || []).reduce<
-              Record<string, Profile>
-            >((acc, profile) => {
-              acc[profile.id] = profile;
-              return acc;
-            }, {}),
-          );
-        }
-
-        return enrichedOrders as Order[];
+      if (uniqueOrders.length === 0) {
+        setOrders([]);
+        setProfilesById({});
+        return [];
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch orders");
+
+      const orderIds = uniqueOrders.map((order) => order.id);
+
+      const { data: fullOrders, error: fullOrdersError } = await supabase
+        .from("orders")
+        .select(
+          "id,user_id,shipping_address,payment_status,order_status,tracking_number,estimated_delivery,created_at,total_amount",
+        )
+        .in("id", orderIds);
+
+      if (fullOrdersError) throw fullOrdersError;
+
+      const fullOrderMap = new Map(
+        ((fullOrders as Order[] | null) || []).map((order) => [
+          order.id,
+          order,
+        ]),
+      );
+
+      const enrichedOrders = uniqueOrders.map((order) => {
+        const fullOrder = fullOrderMap.get(order.id);
+
+        return {
+          ...order,
+          user_id: fullOrder?.user_id || null,
+          total_amount: fullOrder?.total_amount || null,
+          shipping_address: fullOrder?.shipping_address || null,
+          payment_status: fullOrder?.payment_status || order.payment_status,
+          order_status: fullOrder?.order_status || order.order_status || "pending",
+          tracking_number: fullOrder?.tracking_number || order.tracking_number,
+          estimated_delivery:
+            fullOrder?.estimated_delivery || order.estimated_delivery,
+          created_at: fullOrder?.created_at || order.created_at,
+        };
+      });
+
+      setOrders(enrichedOrders);
+
+      const customerIds = Array.from(
+        new Set(
+          enrichedOrders
+            .map((order) => order.user_id)
+            .filter(Boolean) as string[],
+        ),
+      );
+
+      if (customerIds.length > 0) {
+        const { data: profileRows, error: profileError } = await supabase
+          .from("profiles")
+          .select("id,username,full_name,email,phone")
+          .in("id", customerIds);
+
+        if (profileError) throw profileError;
+
+        setProfilesById(
+          ((profileRows as Profile[] | null) || []).reduce<
+            Record<string, Profile>
+          >((result, profile) => {
+            result[profile.id] = profile;
+            return result;
+          }, {}),
+        );
+      } else {
+        setProfilesById({});
+      }
+
+      return enrichedOrders;
+    } catch (fetchError: any) {
+      setError(fetchError.message || "Failed to fetch seller orders");
+      setOrders([]);
+      setOrderItems([]);
       return [];
     } finally {
       setLoading(false);
     }
-    return orders;
   };
 
   const openOrderDetails = async (order: Order) => {
     setSelectedOrder(order);
+    setSelectedOrderItems([]);
     setDetailsLoading(true);
     setDetailsError(null);
 
     try {
-      // Get full order details including shipping address
       const { data: fullOrder, error: orderError } = await supabase
         .from("orders")
         .select(
-          "id,user_id,status,payment_status,estimated_delivery,tracking_number,shipping_address,created_at",
+          "id,user_id,total_amount,order_status,payment_status,estimated_delivery,tracking_number,shipping_address,created_at",
         )
         .eq("id", order.id)
         .maybeSingle();
 
-      if (orderError && !fullOrder) throw orderError;
+      if (orderError) throw orderError;
 
-      const enriched: Order = {
+      const enrichedOrder: Order = {
         ...order,
-        ...((fullOrder as any) || {}),
+        ...(fullOrder || {}),
         order_status:
-          (fullOrder as any)?.status || order.order_status || order.status,
-        status:
-          (fullOrder as any)?.status || order.order_status || order.status,
+          (fullOrder as Order | null)?.order_status ||
+          order.order_status ||
+          "pending",
         payment_status:
-          (fullOrder as any)?.payment_status || order.payment_status,
-        created_at: (fullOrder as any)?.created_at || order.created_at,
-        tracking_number:
-          (fullOrder as any)?.tracking_number || order.tracking_number,
-        estimated_delivery:
-          (fullOrder as any)?.estimated_delivery || order.estimated_delivery,
-        shipping_address:
-          (fullOrder as any)?.shipping_address || order.shipping_address,
+          (fullOrder as Order | null)?.payment_status ||
+          order.payment_status ||
+          "pending",
       };
-      setSelectedOrder(enriched);
 
-      // If shipping payload missing on the order, attempt to fetch the
-      // customer's saved address as a fallback so sellers still see a
-      // name and address when available.
-      if (!enriched.shipping_address && (enriched as any).user_id) {
-        try {
-          const uid = (enriched as any).user_id;
-          const { data: addrRows, error: addrErr } = await supabase
-            .from("addresses")
-            .select(
-              "id,full_name,phone,address_line1,address_line_1,address_line2,address_line_2,landmark,city,state,pincode,postal_code,country,is_default,created_at",
-            )
-            .eq("user_id", uid)
-            .order("is_default", { ascending: false })
-            .order("created_at", { ascending: false })
-            .limit(1);
+      setSelectedOrder(enrichedOrder);
 
-          if (!addrErr && Array.isArray(addrRows) && addrRows.length > 0) {
-            const a: any = addrRows[0];
-            const shippingFromAddr = {
-              full_name: a.full_name || null,
-              phone: a.phone || null,
-              line1: a.address_line1 || a.address_line_1 || null,
-              line2: a.address_line2 || a.address_line_2 || null,
-              city: a.city || null,
-              state: a.state || null,
-              pincode: a.pincode || a.postal_code || null,
-              country: a.country || null,
-            };
+      if (!enrichedOrder.shipping_address && enrichedOrder.user_id) {
+        const { data: addressRows } = await supabase
+          .from("addresses")
+          .select(
+            "full_name,phone,address_line1,address_line_1,address_line2,address_line_2,city,state,pincode,postal_code,country,is_default,created_at",
+          )
+          .eq("user_id", enrichedOrder.user_id)
+          .order("is_default", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(1);
 
-            setSelectedOrder((prev) =>
-              prev ? { ...prev, shipping_address: shippingFromAddr } : prev,
-            );
-          }
-        } catch (err) {
-          console.warn("SellerOrders: fallback address lookup failed", err);
+        if (Array.isArray(addressRows) && addressRows.length > 0) {
+          const address: any = addressRows[0];
+
+          setSelectedOrder((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  shipping_address: {
+                    full_name: address.full_name || null,
+                    phone: address.phone || null,
+                    line1:
+                      address.address_line1 || address.address_line_1 || null,
+                    line2:
+                      address.address_line2 || address.address_line_2 || null,
+                    city: address.city || null,
+                    state: address.state || null,
+                    pincode: address.pincode || address.postal_code || null,
+                    country: address.country || null,
+                  },
+                }
+              : previous,
+          );
         }
       }
 
-      // Get order items
-      const items = orderItems.filter((item) => item.order_id === order.id);
-      setSelectedOrderItems(items);
+      setSelectedOrderItems(getOrderItemsForOrder(order.id));
 
-      // Initialize delivery inputs
-      setDeliveryInputs((s) => ({
-        ...s,
+      setDeliveryInputs((current) => ({
+        ...current,
         [order.id]: {
-          estimated_delivery: enriched.estimated_delivery || null,
-          tracking_number: enriched.tracking_number || null,
-          order_status: enriched.order_status || null,
+          estimated_delivery: enrichedOrder.estimated_delivery || null,
+          tracking_number: enrichedOrder.tracking_number || null,
+          order_status: enrichedOrder.order_status || "pending",
         },
       }));
-    } catch (err: any) {
-      setDetailsError(err.message || "Failed to load order details");
+    } catch (openError: any) {
+      setDetailsError(openError.message || "Failed to load order details");
     } finally {
       setDetailsLoading(false);
     }
@@ -388,121 +445,64 @@ export default function SellerOrders() {
 
     try {
       const inputs = deliveryInputs[selectedOrder.id] || {};
-      const updatePayload: any = {};
 
-      const currentStatus = normalizeStatus(
-        selectedOrder.order_status || selectedOrder.status,
+      const currentStatus = normalizeOrderStatus(selectedOrder.order_status);
+      const requestedStatus = normalizeOrderStatus(
+        inputs.order_status || selectedOrder.order_status,
       );
-      const requestedStatus = normalizeStatus(
-        inputs.order_status ||
-          selectedOrder.order_status ||
-          selectedOrder.status,
-      );
-      const allowedNextStatuses = getSellerNextStatuses(currentStatus);
 
-      if (
-        requestedStatus !== currentStatus &&
-        !allowedNextStatuses.includes(requestedStatus)
-      ) {
-        throw new Error(
-          `Invalid status change. This order can move only from "${formatStatus(
-            currentStatus,
-          )}" to: ${
-            allowedNextStatuses.length
-              ? allowedNextStatuses.map(formatStatus).join(", ")
-              : "no further seller status"
-          }.`,
+      if (requestedStatus !== currentStatus) {
+        const { data, error: statusError } = await supabase.rpc(
+          "update_order_status",
+          {
+            p_order_id: selectedOrder.id,
+            p_new_status: requestedStatus,
+            p_reason: null,
+          },
         );
-      }
 
-      // Update estimated delivery
-      if (inputs.estimated_delivery) {
-        const d = new Date(inputs.estimated_delivery as string);
-        if (!isNaN(d.getTime())) {
-          updatePayload.estimated_delivery = d.toISOString();
+        if (statusError) throw statusError;
+
+        const updatedOrder = Array.isArray(data) ? data[0] : data;
+
+        if (updatedOrder?.order_status) {
+          setSelectedOrder((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  order_status: updatedOrder.order_status,
+                }
+              : previous,
+          );
         }
-      } else {
-        updatePayload.estimated_delivery = null;
       }
 
-      updatePayload.tracking_number = inputs.tracking_number || null;
+      const estimatedDelivery = inputs.estimated_delivery
+        ? new Date(inputs.estimated_delivery)
+        : null;
 
-      // Update status columns in both fields because the DB trigger keeps
-      // `status` and `order_status` synchronized.
-      if (inputs.order_status) {
-        updatePayload.status = inputs.order_status;
-        updatePayload.order_status = inputs.order_status;
+      if (estimatedDelivery && Number.isNaN(estimatedDelivery.getTime())) {
+        throw new Error("Please enter a valid estimated delivery date.");
       }
 
-      console.log("SellerOrders saveOrderDetails", {
-        orderId: selectedOrder.id,
-        updatePayload,
-      });
-
-      const { data: updatedOrder, error: updateError } = await supabase
+      const { error: deliveryError } = await supabase
         .from("orders")
-        .update(updatePayload)
-        .eq("id", selectedOrder.id)
-        .select("id,status,estimated_delivery,tracking_number")
-        .single();
+        .update({
+          estimated_delivery: estimatedDelivery
+            ? estimatedDelivery.toISOString()
+            : null,
+          tracking_number: inputs.tracking_number?.trim() || null,
+        })
+        .eq("id", selectedOrder.id);
 
-      console.log("SellerOrders update response", {
-        updatedOrder,
-        updateError,
-      });
+      if (deliveryError) throw deliveryError;
 
-      if (updateError) {
-        console.error("SellerOrders update failed", {
-          updateError,
-          updatePayload,
-          orderId: selectedOrder.id,
-        });
-        throw updateError;
-      }
-      if (!updatedOrder) {
-        console.error("SellerOrders update returned no data", {
-          updatePayload,
-          orderId: selectedOrder.id,
-        });
-        throw new Error("Order update did not return any data");
-      }
-
-      // Update local state with the values returned from the database.
-      setOrders((current) =>
-        current.map((o) =>
-          o.id === selectedOrder.id
-            ? {
-                ...o,
-                order_status: updatedOrder.status,
-                status: updatedOrder.status,
-                estimated_delivery: updatedOrder.estimated_delivery,
-                tracking_number: updatedOrder.tracking_number,
-              }
-            : o,
-        ),
-      );
+      await fetchOrders();
 
       setSelectedOrder(null);
       setSelectedOrderItems([]);
-      const refreshedOrders = await fetchOrders();
-      console.log("SellerOrders refreshed order", {
-        orderId: selectedOrder.id,
-        refreshedOrder: refreshedOrders.find((o) => o.id === selectedOrder.id),
-      });
-
-      const { data: orderRow, error: orderRowError } = await supabase
-        .from("orders")
-        .select("id,status,estimated_delivery,tracking_number")
-        .eq("id", selectedOrder.id)
-        .single();
-
-      console.log("SellerOrders direct order row", {
-        orderId: selectedOrder.id,
-        orderRow,
-        orderRowError,
-      });
-    } catch (err: any) {
-      setDetailsError(err.message || "Failed to save order details");
+    } catch (saveError: any) {
+      setDetailsError(saveError.message || "Failed to save order details");
     } finally {
       setSavingDetails(false);
     }
@@ -510,37 +510,35 @@ export default function SellerOrders() {
 
   useEffect(() => {
     fetchOrders();
-  }, [user]);
+  }, [user?.id]);
 
   const filteredOrders = useMemo(() => {
     const term = search.trim().toLowerCase();
+
     return orders.filter((order) => {
-      // Filter by search term (Order ID, customer, phone, product)
+      const productNames = getOrderItemsForOrder(order.id)
+        .map((item) => item.product_name || "")
+        .join(" ");
+
       const searchMatch =
         !term ||
         [
           order.id,
           getCustomerName(order),
           getCustomer(order)?.phone || "",
-          selectedOrderItems
-            .filter((item) => item.order_id === order.id)
-            .map((item) => item.product_name)
-            .join(" "),
+          productNames,
         ]
           .join(" ")
           .toLowerCase()
           .includes(term);
 
-      // Filter by status
       const statusMatch =
         !statusFilter ||
-        (order.order_status || order.status || "pending")
-          .toLowerCase()
-          .includes(statusFilter.toLowerCase());
+        normalizeOrderStatus(order.order_status) === statusFilter;
 
       return searchMatch && statusMatch;
     });
-  }, [orders, search, statusFilter, selectedOrderItems, profilesById]);
+  }, [orders, orderItems, profilesById, search, statusFilter]);
 
   const totalRevenue = useMemo(
     () =>
@@ -552,55 +550,17 @@ export default function SellerOrders() {
     [orderItems],
   );
 
-  const getCustomer = (order: Order) =>
-    order.user_id ? profilesById[order.user_id] : undefined;
-
-  const getCustomerName = (order: Order) => {
-    const profile = getCustomer(order);
-    return (
-      profile?.full_name ||
-      profile?.username ||
-      profile?.email?.split("@")[0] ||
-      "Guest customer"
-    );
-  };
-
-  const parseShipping = (s: any) => {
-    if (!s) return null;
-    const full_name =
-      s.full_name || s.name || s.firstName || s.first_name || null;
-    const phone = s.phone || s.mobile || null;
-    const line1 =
-      s.address_line1 ||
-      s.address_line_1 ||
-      s.line1 ||
-      s.address ||
-      s.address_line ||
-      null;
-    const line2 =
-      s.address_line2 || s.address_line_2 || s.line2 || s.address_extra || null;
-    const city = s.city || null;
-    const state = s.state || null;
-    const pincode = s.pincode || s.postal_code || s.postcode || s.pin || null;
-    const country = s.country || null;
-    return { full_name, phone, line1, line2, city, state, pincode, country };
-  };
-
-  // Get all items for an order
-  const getOrderItemsForOrder = (orderId: string) =>
-    orderItems.filter((item) => item.order_id === orderId);
-
   return (
     <SellerLayout>
       <div className="space-y-8 p-8">
-        {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-green-900">Orders</h1>
             <p className="mt-2 text-gray-600">
-              Manage orders for your products, fulfillment status, and shipping
+              Manage orders for your products, fulfillment status, and shipping.
             </p>
           </div>
+
           <Button
             type="button"
             onClick={fetchOrders}
@@ -611,7 +571,6 @@ export default function SellerOrders() {
           </Button>
         </div>
 
-        {/* Stats */}
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-green-100 bg-white p-5 shadow-sm">
             <p className="text-sm font-medium text-gray-500">Total Orders</p>
@@ -619,12 +578,14 @@ export default function SellerOrders() {
               {orders.length}
             </p>
           </div>
+
           <div className="rounded-2xl border border-green-100 bg-white p-5 shadow-sm">
             <p className="text-sm font-medium text-gray-500">Revenue</p>
             <p className="mt-3 text-3xl font-semibold text-green-700">
               {formatCurrency(totalRevenue)}
             </p>
           </div>
+
           <div className="rounded-2xl border border-green-100 bg-white p-5 shadow-sm">
             <p className="text-sm font-medium text-gray-500">Shown</p>
             <p className="mt-3 text-3xl font-semibold text-blue-600">
@@ -633,29 +594,29 @@ export default function SellerOrders() {
           </div>
         </div>
 
-        {/* Filters and Search */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
             placeholder="Search by Order ID, customer, phone, or product..."
             className="flex-1 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-100"
           />
+
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(event) => setStatusFilter(event.target.value)}
             className="rounded-full border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-100"
           >
             <option value="">All statuses</option>
-            {allStatusOptions.map((status) => (
+
+            {allOrderStatusOptions.map((status) => (
               <option key={status} value={status}>
-                {formatStatus(status)}
+                {formatOrderStatus(status)}
               </option>
             ))}
           </select>
         </div>
 
-        {/* Orders Table */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
@@ -692,6 +653,7 @@ export default function SellerOrders() {
                 </th>
               </tr>
             </thead>
+
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
@@ -721,16 +683,17 @@ export default function SellerOrders() {
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((order) =>
-                  getOrderItemsForOrder(order.id).map((item, idx) => (
+                filteredOrders.flatMap((order) => {
+                  const items = getOrderItemsForOrder(order.id);
+
+                  return items.map((item, index) => (
                     <tr
-                      key={`${order.id}-${idx}`}
+                      key={`${order.id}-${item.id}`}
                       className="hover:bg-slate-50"
                     >
-                      {/* Order ID (only on first row per order) */}
-                      {idx === 0 && (
+                      {index === 0 && (
                         <td
-                          rowSpan={getOrderItemsForOrder(order.id).length}
+                          rowSpan={items.length}
                           className="px-5 py-4 text-sm font-medium text-slate-900"
                         >
                           <div className="flex flex-col gap-1">
@@ -744,10 +707,9 @@ export default function SellerOrders() {
                         </td>
                       )}
 
-                      {/* Customer (only on first row per order) */}
-                      {idx === 0 && (
+                      {index === 0 && (
                         <td
-                          rowSpan={getOrderItemsForOrder(order.id).length}
+                          rowSpan={items.length}
                           className="px-5 py-4 text-sm text-slate-700"
                         >
                           <p className="font-medium text-slate-900">
@@ -759,7 +721,6 @@ export default function SellerOrders() {
                         </td>
                       )}
 
-                      {/* Product */}
                       <td className="px-5 py-4 text-sm text-slate-700">
                         <div className="flex items-center gap-3">
                           {item.product_image ? (
@@ -773,72 +734,70 @@ export default function SellerOrders() {
                               <Package className="h-5 w-5" />
                             </div>
                           )}
+
                           <p className="font-medium text-slate-900">
                             {item.product_name || "Unknown product"}
                           </p>
                         </div>
                       </td>
 
-                      {/* Quantity */}
                       <td className="px-5 py-4 text-center text-sm text-slate-700">
-                        {item.quantity}
+                        {item.quantity || 0}
                       </td>
 
-                      {/* Unit Price */}
                       <td className="px-5 py-4 text-right text-sm text-slate-700">
                         {formatCurrency(item.price)}
                       </td>
 
-                      {/* Line Total */}
                       <td className="px-5 py-4 text-right text-sm font-semibold text-green-700">
                         {formatCurrency(
                           Number(item.price || 0) * Number(item.quantity || 0),
                         )}
                       </td>
 
-                      {/* Payment Status (only on first row per order) */}
-                      {idx === 0 && (
+                      {index === 0 && (
                         <td
-                          rowSpan={getOrderItemsForOrder(order.id).length}
+                          rowSpan={items.length}
                           className="px-5 py-4 text-right text-sm"
                         >
                           <Badge
                             variant="outline"
-                            className={`capitalize ${getPaymentStatusBadgeClass(order.payment_status)}`}
+                            className={`capitalize ${getPaymentStatusBadgeClass(
+                              order.payment_status,
+                            )}`}
                           >
-                            {formatStatus(order.payment_status)}
+                            {formatPaymentStatus(order.payment_status)}
                           </Badge>
                         </td>
                       )}
 
-                      {/* Order Status (only on first row per order) */}
-                      {idx === 0 && (
+                      {index === 0 && (
                         <td
-                          rowSpan={getOrderItemsForOrder(order.id).length}
+                          rowSpan={items.length}
                           className="px-5 py-4 text-right text-sm"
                         >
                           <Badge
-                            className={`capitalize ${getOrderStatusBadgeClass(order.order_status || order.status)}`}
+                            className={`capitalize ${getOrderStatusBadgeClass(
+                              order.order_status,
+                            )}`}
                           >
-                            {formatStatus(order.order_status || order.status)}
+                            {formatOrderStatus(order.order_status)}
                           </Badge>
                         </td>
                       )}
 
-                      {/* Date (only on first row per order) */}
-                      {idx === 0 && (
+                      {index === 0 && (
                         <td
-                          rowSpan={getOrderItemsForOrder(order.id).length}
+                          rowSpan={items.length}
                           className="px-5 py-4 text-right text-sm text-slate-600"
                         >
                           {formatOrderDate(order.created_at)}
                         </td>
                       )}
 
-                      {/* View Details Button (only on first row per order) */}
-                      {idx === 0 && (
+                      {index === 0 && (
                         <td
-                          rowSpan={getOrderItemsForOrder(order.id).length}
+                          rowSpan={items.length}
                           className="px-5 py-4 text-right"
                         >
                           <Button
@@ -852,15 +811,14 @@ export default function SellerOrders() {
                         </td>
                       )}
                     </tr>
-                  )),
-                )
+                  ));
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Order Details Modal */}
       <Dialog
         open={Boolean(selectedOrder)}
         onOpenChange={(open) => {
@@ -877,7 +835,7 @@ export default function SellerOrders() {
               <DialogHeader>
                 <DialogTitle className="text-2xl">Order details</DialogTitle>
                 <DialogDescription>
-                  Manage fulfillment, tracking, and shipping information
+                  Manage fulfillment, tracking, and shipping information.
                 </DialogDescription>
               </DialogHeader>
 
@@ -895,18 +853,20 @@ export default function SellerOrders() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Customer & Shipping Info */}
                   <div className="rounded-xl border bg-slate-50 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Shipping Information
                     </p>
+
                     <div className="mt-3 space-y-3">
                       <div className="flex items-start gap-3">
                         <UserRound className="mt-0.5 h-5 w-5 text-green-700" />
+
                         <div>
                           <p className="font-semibold text-slate-900">
                             {getCustomerName(selectedOrder)}
                           </p>
+
                           {getCustomer(selectedOrder)?.phone && (
                             <p className="mt-1 flex items-center gap-2 text-sm text-slate-600">
                               <Phone className="h-4 w-4" />
@@ -918,43 +878,51 @@ export default function SellerOrders() {
 
                       {selectedOrder.shipping_address ? (
                         (() => {
-                          const s = parseShipping(
+                          const shipping = parseShipping(
                             selectedOrder.shipping_address,
                           );
-                          if (!s)
+
+                          if (!shipping) {
                             return (
                               <p className="text-sm text-slate-500">
-                                No shipping address on file
+                                No shipping address on file.
                               </p>
                             );
+                          }
+
                           return (
                             <div className="flex items-start gap-3">
                               <MapPin className="mt-0.5 h-5 w-5 text-green-700" />
+
                               <div>
-                                {s.full_name && (
+                                {shipping.full_name && (
                                   <p className="font-semibold text-slate-900">
-                                    {s.full_name}
+                                    {shipping.full_name}
                                   </p>
                                 )}
+
                                 <p className="text-sm text-slate-900">
-                                  {[s.line1, s.line2]
+                                  {[shipping.line1, shipping.line2]
                                     .filter(Boolean)
                                     .join(", ")}
                                 </p>
+
                                 <p className="mt-1 text-sm text-slate-600">
-                                  {[s.city, s.state, s.pincode]
+                                  {[shipping.city, shipping.state, shipping.pincode]
                                     .filter(Boolean)
                                     .join(", ")}
                                 </p>
-                                {s.country && (
+
+                                {shipping.country && (
                                   <p className="mt-1 text-sm text-slate-600">
-                                    {s.country}
+                                    {shipping.country}
                                   </p>
                                 )}
-                                {s.phone && (
+
+                                {shipping.phone && (
                                   <p className="mt-1 flex items-center gap-2 text-sm text-slate-600">
                                     <Phone className="h-4 w-4" />
-                                    {s.phone}
+                                    {shipping.phone}
                                   </p>
                                 )}
                               </div>
@@ -963,23 +931,25 @@ export default function SellerOrders() {
                         })()
                       ) : (
                         <p className="text-sm text-slate-500">
-                          No shipping address on file
+                          No shipping address on file.
                         </p>
                       )}
                     </div>
                   </div>
 
-                  {/* Order Status & Payment */}
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-xl border bg-slate-50 p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Payment Status
                       </p>
+
                       <Badge
                         variant="outline"
-                        className={`mt-3 capitalize ${getPaymentStatusBadgeClass(selectedOrder.payment_status)}`}
+                        className={`mt-3 capitalize ${getPaymentStatusBadgeClass(
+                          selectedOrder.payment_status,
+                        )}`}
                       >
-                        {formatStatus(selectedOrder.payment_status)}
+                        {formatPaymentStatus(selectedOrder.payment_status)}
                       </Badge>
                     </div>
 
@@ -987,6 +957,7 @@ export default function SellerOrders() {
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Total
                       </p>
+
                       <p className="mt-3 text-2xl font-bold text-green-800">
                         {formatCurrency(
                           selectedOrderItems.reduce(
@@ -1001,8 +972,7 @@ export default function SellerOrders() {
                     </div>
                   </div>
 
-                  {/* Fulfillment Controls */}
-                  <div className="rounded-xl border bg-slate-50 p-4 space-y-3">
+                  <div className="space-y-3 rounded-xl border bg-slate-50 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Fulfillment
                     </p>
@@ -1011,53 +981,56 @@ export default function SellerOrders() {
                       <label className="text-xs font-medium text-slate-600">
                         Order Status
                       </label>
+
                       <select
                         value={
                           deliveryInputs[selectedOrder.id]?.order_status ||
                           selectedOrder.order_status ||
-                          selectedOrder.status ||
                           "pending"
                         }
-                        onChange={(e) =>
-                          setDeliveryInputs((s) => ({
-                            ...s,
+                        onChange={(event) =>
+                          setDeliveryInputs((current) => ({
+                            ...current,
                             [selectedOrder.id]: {
-                              ...(s[selectedOrder.id] || {}),
-                              order_status: e.target.value,
+                              ...(current[selectedOrder.id] || {}),
+                              order_status: event.target.value,
                             },
                           }))
                         }
                         disabled={
-                          getSellerNextStatuses(
-                            selectedOrder.order_status || selectedOrder.status,
-                          ).length === 0
+                          getSellerNextStatuses(selectedOrder.order_status)
+                            .length === 0
                         }
                         className="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm capitalize disabled:cursor-not-allowed disabled:bg-slate-100"
                       >
                         {(() => {
-                          const currentStatus = normalizeStatus(
-                            selectedOrder.order_status || selectedOrder.status,
+                          const currentStatus = normalizeOrderStatus(
+                            selectedOrder.order_status,
                           );
-                          const nextStatuses = getSellerNextStatuses(currentStatus);
+
+                          const nextStatuses =
+                            getSellerNextStatuses(currentStatus);
 
                           return (
                             <>
                               <option value={currentStatus}>
-                                Current: {formatStatus(currentStatus)}
+                                Current: {formatOrderStatus(currentStatus)}
                               </option>
+
                               {nextStatuses.map((status) => (
                                 <option key={status} value={status}>
-                                  Move to: {formatStatus(status)}
+                                  Move to: {formatOrderStatus(status)}
                                 </option>
                               ))}
                             </>
                           );
                         })()}
                       </select>
+
                       <p className="mt-1 text-xs text-slate-500">
-                        Orders must move through the fulfillment stages in
-                        sequence. Delivered and out-for-delivery are managed by
-                        courier/admin.
+                        Sellers can confirm, process, ship, or cancel only where
+                        the workflow permits it. Courier/admin handles later
+                        delivery stages.
                       </p>
                     </div>
 
@@ -1065,6 +1038,7 @@ export default function SellerOrders() {
                       <label className="text-xs font-medium text-slate-600">
                         Estimated Delivery
                       </label>
+
                       <input
                         type="date"
                         value={formatDateForInput(
@@ -1072,12 +1046,12 @@ export default function SellerOrders() {
                             ?.estimated_delivery ||
                             selectedOrder.estimated_delivery,
                         )}
-                        onChange={(e) =>
-                          setDeliveryInputs((s) => ({
-                            ...s,
+                        onChange={(event) =>
+                          setDeliveryInputs((current) => ({
+                            ...current,
                             [selectedOrder.id]: {
-                              ...(s[selectedOrder.id] || {}),
-                              estimated_delivery: e.target.value,
+                              ...(current[selectedOrder.id] || {}),
+                              estimated_delivery: event.target.value,
                             },
                           }))
                         }
@@ -1089,6 +1063,7 @@ export default function SellerOrders() {
                       <label className="text-xs font-medium text-slate-600">
                         Tracking Number
                       </label>
+
                       <input
                         type="text"
                         placeholder="Enter tracking number"
@@ -1096,12 +1071,12 @@ export default function SellerOrders() {
                           deliveryInputs[selectedOrder.id]?.tracking_number ||
                           ""
                         }
-                        onChange={(e) =>
-                          setDeliveryInputs((s) => ({
-                            ...s,
+                        onChange={(event) =>
+                          setDeliveryInputs((current) => ({
+                            ...current,
                             [selectedOrder.id]: {
-                              ...(s[selectedOrder.id] || {}),
-                              tracking_number: e.target.value,
+                              ...(current[selectedOrder.id] || {}),
+                              tracking_number: event.target.value,
                             },
                           }))
                         }
@@ -1117,6 +1092,7 @@ export default function SellerOrders() {
                       >
                         {savingDetails ? "Saving..." : "Save Changes"}
                       </Button>
+
                       <Button
                         variant="outline"
                         onClick={() => setSelectedOrder(null)}
@@ -1127,13 +1103,13 @@ export default function SellerOrders() {
                     </div>
                   </div>
 
-                  {/* Order Items */}
                   <div className="rounded-xl border">
                     <div className="border-b bg-slate-50 px-4 py-3">
                       <p className="font-semibold text-slate-900">
                         Products ({selectedOrderItems.length})
                       </p>
                     </div>
+
                     <div className="divide-y">
                       {selectedOrderItems.map((item) => (
                         <div
@@ -1152,15 +1128,18 @@ export default function SellerOrders() {
                                 <Package className="h-5 w-5" />
                               </div>
                             )}
+
                             <div>
                               <p className="font-medium text-slate-900">
                                 {item.product_name || "Product"}
                               </p>
+
                               <p className="text-sm text-slate-500">
-                                Qty {item.quantity}
+                                Qty {item.quantity || 0}
                               </p>
                             </div>
                           </div>
+
                           <div className="text-left sm:text-right">
                             <p className="font-semibold text-green-800">
                               {formatCurrency(
@@ -1168,6 +1147,7 @@ export default function SellerOrders() {
                                   Number(item.quantity || 0),
                               )}
                             </p>
+
                             <p className="text-xs text-slate-500">
                               {formatCurrency(item.price)} × {item.quantity}
                             </p>

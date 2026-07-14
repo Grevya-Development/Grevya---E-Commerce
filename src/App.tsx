@@ -13,6 +13,7 @@ import MemberBenefitsBar from "@/components/MemberBenefitsBar";
 import SpotlightSearch from "@/components/SpotlightSearch";
 import QuickViewModal from "@/components/QuickViewModal";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import SellerApplications from "@/pages/admin/SellerApplications";
 
 // Lazy-loaded pages
 const Index = lazy(() => import("./pages/Index"));
@@ -50,13 +51,16 @@ const AdminOrders = lazy(() => import("./pages/admin/AdminOrders"));
 const AdminNotifications = lazy(
   () => import("./pages/admin/AdminNotifications"),
 );
-
+const SellerApplicationReview = lazy(
+  () => import("./pages/admin/SellerApplicationReview")
+);
 // Seller Pages
 const SellerDashboard = lazy(() => import("./pages/seller/SellerDashboard"));
 const AddProduct = lazy(() => import("./pages/seller/AddProduct"));
 const MyProducts = lazy(() => import("./pages/seller/MyProducts"));
 const SellerOrders = lazy(() => import("./pages/seller/SellerOrders"));
 const PendingProducts = lazy(() => import("./pages/seller/PendingProducts"));
+const ApplyToSell = lazy(() => import("./pages/seller/ApplyToSell"));
 
 const AppContent = () => {
   const location = useLocation();
@@ -220,6 +224,28 @@ const AppContent = () => {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/admin/seller-applications"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["admin"]}
+                    loginPath="/admin/login"
+                  >
+                    <SellerApplications />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/seller-applications/:id"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["admin"]}
+                    loginPath="/admin/login"
+                  >
+                    <SellerApplicationReview />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Seller Routes */}
 
@@ -279,6 +305,18 @@ const AppContent = () => {
                     loginPath="/seller/login"
                   >
                     <PendingProducts />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/apply-to-sell"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["customer"]}
+                    loginPath="/login"
+                  >
+                    <ApplyToSell />
                   </ProtectedRoute>
                 }
               />

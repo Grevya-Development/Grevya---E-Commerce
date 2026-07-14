@@ -35,7 +35,7 @@ interface Product {
   image_url?: string;
   created_at?: string;
   profiles?: {
-    username: string;
+    full_name: string;
   };
 }
 
@@ -58,9 +58,11 @@ export default function AdminProductRequests() {
     setLoading(true);
     const { data, error } = await supabase
       .from("products")
-      .select(`
+      .select(
+        `
         *,
-        profiles (username)`)
+        profiles (full_name)`,
+      )
       .eq("product_status", "pending");
 
     if (error || !data) {
@@ -389,7 +391,7 @@ export default function AdminProductRequests() {
                         Seller:
                       </span>{" "}
                       <span className="text-gray-600">
-                      {product.profiles?.username || "Unknown"}
+                        {product.profiles?.full_name || "Unknown"}
                       </span>
                     </p>
                   </div>
