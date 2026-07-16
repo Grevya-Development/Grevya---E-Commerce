@@ -362,11 +362,12 @@ const Checkout = () => {
 
   useEffect(() => {
     const handleAnonymousAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
+      if (!user) {
         setSigningInAnonymously(true);
         try {
-          await supabase.auth.signInAnonymously();
+          if (window.Clerk) {
+            await window.Clerk.signInAnonymously();
+          }
         } catch (err) {
           console.error('Anonymous sign-in failed:', err);
         } finally {
@@ -378,7 +379,7 @@ const Checkout = () => {
     if (!authLoading) {
       handleAnonymousAuth();
     }
-  }, [authLoading]);
+  }, [authLoading, user]);
 
   const applySavedAddress = (addr: Address) => {
     let cleanLine2 = addr.address_line2 || '';

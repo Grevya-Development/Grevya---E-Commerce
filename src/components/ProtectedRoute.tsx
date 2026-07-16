@@ -1,14 +1,22 @@
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
+import React from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading, profileLoading } = useAuth();
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  allowedRoles?: string[];
+  loginPath?: string;
+}
+
+const ProtectedRoute = ({
+  children,
+  allowedRoles,
+  loginPath,
+}: ProtectedRouteProps) => {
+  const { user, loading, profileLoading, profile } = useAuth();
   const location = useLocation();
 
-  console.log('[ProtectedRoute] Decision - Path:', location.pathname, 'Loading:', loading || profileLoading, 'User:', user?.id, 'IsAnonymous:', user?.is_anonymous);
-
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-cream/30 text-green-800">
         <div className="text-center">
@@ -20,11 +28,23 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!user || user.is_anonymous) {
-    console.log('[ProtectedRoute] Access Denied. Redirecting to /login.');
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    const redirectTo = loginPath || "/login";
+    return <Navigate to={redirectTo} replace state={{ from: location }} />;
   }
 
-  console.log('[ProtectedRoute] Access Granted.');
+  if (allowedRoles && allowedRoles.length > 0) {
+    const userRole = profile?.role || "customer";
+    if (!allowedRoles.includes(userRole)) {
+      const redirectTo = loginPath || "/login";
+      return <Navigate to={redirectTo} replace state={{ from: location }} />;
+    }
+  }
+
+  // Force pending sellers to onboarding page
+  if (profile?.role === "seller" && profile?.status === "pending" && location.pathname !== "/seller/onboarding") {
+    return <Navigate to="/seller/onboarding" replace />;
+  }
+
   return <>{children}</>;
 };
 

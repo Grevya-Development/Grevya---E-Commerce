@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCartStore } from '@/store/useCartStore';
 import { Bell, Heart, Home, Loader2, LogOut, MapPin, Package, Shield, UserRound, Sparkles, Check, CheckCircle2, Clock, CreditCard, Lock, Plus, Trash2, Download, UserX, ChevronRight, AlertCircle, Eye, EyeOff, Activity, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -37,7 +37,16 @@ const Account = () => {
   const navigate = useNavigate();
   const wishlistItems = useWishlistStore((state) => state.items);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'overview');
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
   const [orders, setOrders] = useState<any[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
@@ -295,18 +304,11 @@ const Account = () => {
         authUpdates.email = form.email.trim();
       }
 
-      const { error: authError } = await supabase.auth.updateUser(
-        authUpdates,
-        { emailRedirectTo: getAuthRedirectUrl('/account') }
-      );
-      if (authError) {
-        const errorMsg = authError.message.toLowerCase();
-        if (errorMsg.includes('rate limit') || errorMsg.includes('rate exceeded')) {
-          const cooldownTime = Date.now() + 60 * 1000;
-          setEmailCooldownUntil(cooldownTime);
-          localStorage.setItem('grevya-email-cooldown', String(cooldownTime));
-        }
-        throw authError;
+      if (window.Clerk && window.Clerk.user) {
+        await window.Clerk.user.update({
+          firstName: form.full_name.trim().split(' ')[0] || '',
+          lastName: form.full_name.trim().split(' ').slice(1).join(' ') || '',
+        });
       }
 
       if (emailChanged) {
@@ -346,24 +348,18 @@ const Account = () => {
 
     setSaving(true);
     try {
-      const { error } = await supabase.auth.resend({
-        type: resendType,
-        email: targetEmail,
-        options: {
-          emailRedirectTo: getAuthRedirectUrl('/account'),
-        },
-      });
-
-      if (error) {
-        const errorMsg = error.message.toLowerCase();
-        if (errorMsg.includes('rate limit') || errorMsg.includes('rate exceeded')) {
-          const cooldownTime = Date.now() + 60 * 1000;
-          setEmailCooldownUntil(cooldownTime);
-          localStorage.setItem('grevya-email-cooldown', String(cooldownTime));
+      if (window.Clerk && window.Clerk.user) {
+        const unverified = window.Clerk.user.emailAddresses.find(
+          (e: any) => e.verification.status !== "verified"
+        );
+        if (unverified) {
+          await unverified.prepareVerification({ strategy: "email_code" });
+          toast({
+            title: 'Verification email sent',
+            description: `We sent a new confirmation code to your email.`,
+          });
         }
-        throw error;
       }
-
       const cooldownTime = Date.now() + 60 * 1000;
       setEmailCooldownUntil(cooldownTime);
       localStorage.setItem('grevya-email-cooldown', String(cooldownTime));
@@ -794,40 +790,11 @@ const Account = () => {
     setUpdatingPass(true);
 
     try {
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email: user.email!,
-        password: currentPassword,
-      });
-
-      if (verifyError) {
-        const attempts = failedAttempts + 1;
-        setFailedAttempts(attempts);
-        if (attempts >= 3) {
-          const blockTime = Date.now() + 5 * 60 * 1000;
-          setBlockUntil(blockTime);
-          setFailedAttempts(0);
-          toast({
-            title: 'Account locked temporarily',
-            description: 'Too many incorrect attempts. Password updating blocked for 5 minutes.',
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Verification failed',
-            description: 'Incorrect current password. Please try again.',
-            variant: 'destructive',
-          });
-        }
-        return;
-      }
-
-      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-      if (updateError) throw updateError;
-
-      try {
-        await supabase.auth.refreshSession();
-      } catch (refreshErr) {
-        console.warn('Failed to force refresh session:', refreshErr);
+      if (window.Clerk && window.Clerk.user) {
+        await window.Clerk.user.update({
+          password: newPassword,
+          currentPassword: currentPassword,
+        });
       }
 
       await refreshProfile();
@@ -877,8 +844,7 @@ const Account = () => {
   const handleLogoutAllDevices = async () => {
     if (!user) return;
     try {
-      const { error } = await supabase.auth.signOut({ scope: 'global' });
-      if (error) throw error;
+      await signOut();
       toast({ title: 'Logged out from all devices' });
       navigate('/auth');
     } catch (err: any) {

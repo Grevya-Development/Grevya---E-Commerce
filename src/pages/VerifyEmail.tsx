@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Mail, ArrowRight, CheckCircle2, Loader2, RefreshCw, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabaseClient';
 import { toast } from '@/components/ui/use-toast';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { motion } from 'framer-motion';
-import { friendlyAuthError, getAuthRedirectUrl } from '@/lib/authValidation';
+import { verifyEmailVerificationCode } from '@/lib/authService';
 
 const VerifyEmail = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const email = (location.state as any)?.email || localStorage.getItem('grevya-signup-email') || '';
+  const clerkUserId = (location.state as any)?.clerkUserId || '';
+  
+  const [code, setCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
@@ -40,11 +44,41 @@ const VerifyEmail = () => {
     return () => clearInterval(interval);
   }, [cooldownSeconds]);
 
-  const handleResend = async () => {
-    if (!email) {
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code || code.trim().length !== 6) {
       toast({
-        title: 'Email address missing',
-        description: 'Please go back and sign up again or enter your email.',
+        title: 'Invalid verification code',
+        description: 'Please enter a valid 6-digit OTP code sent to your email.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setVerifying(true);
+    try {
+      await verifyEmailVerificationCode(clerkUserId, code.trim());
+      toast({
+        title: 'Email confirmed',
+        description: 'Your account has been verified successfully.',
+      });
+      navigate('/account', { replace: true });
+    } catch (error: any) {
+      toast({
+        title: 'Verification failed',
+        description: error.message || 'The verification code is incorrect or expired.',
+        variant: 'destructive',
+      });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (!window.Clerk) {
+      toast({
+        title: 'Provider loading',
+        description: 'Auth provider is still loading, please wait.',
         variant: 'destructive',
       });
       return;
@@ -53,7 +87,7 @@ const VerifyEmail = () => {
     if (cooldownSeconds > 0) {
       toast({
         title: 'Please wait',
-        description: `You can request another verification link in ${cooldownSeconds} seconds.`,
+        description: `You can request another code in ${cooldownSeconds} seconds.`,
         variant: 'destructive',
       });
       return;
@@ -61,34 +95,23 @@ const VerifyEmail = () => {
 
     setResending(true);
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email,
-        options: {
-          emailRedirectTo: getAuthRedirectUrl('/account'),
-        },
+      const signUpAttempt = window.Clerk.client.signUp;
+      await signUpAttempt.prepareEmailAddressVerification({
+        strategy: "email_code",
       });
-
-      if (error) throw error;
 
       const cooldownTime = Date.now() + 60 * 1000;
       setCooldownSeconds(60);
       localStorage.setItem('grevya-resend-cooldown', String(cooldownTime));
 
       toast({
-        title: 'Verification email sent',
-        description: `We've sent a new confirmation link to ${email}.`,
+        title: 'Verification code sent',
+        description: `We've sent a new 6-digit code to ${email}.`,
       });
     } catch (error: any) {
-      const errorMsg = error.message.toLowerCase();
-      if (errorMsg.includes('rate limit') || errorMsg.includes('rate exceeded')) {
-        const cooldownTime = Date.now() + 60 * 1000;
-        setCooldownSeconds(60);
-        localStorage.setItem('grevya-resend-cooldown', String(cooldownTime));
-      }
       toast({
-        title: 'Could not resend email',
-        description: friendlyAuthError(error.message),
+        title: 'Could not resend code',
+        description: error.message || 'Something went wrong while requesting a new code.',
         variant: 'destructive',
       });
     } finally {
@@ -112,43 +135,61 @@ const VerifyEmail = () => {
 
           <h1 className="text-3xl font-extrabold text-neutral-900 mb-3">Confirm your email</h1>
           <p className="text-neutral-500 mb-6">
-            We sent a secure validation link to {email ? <strong className="text-neutral-800">{email}</strong> : 'your email inbox'}. Click the link inside to activate your account.
+            We sent a 6-digit confirmation code to {email ? <strong className="text-neutral-800">{email}</strong> : 'your email inbox'}. Enter it below to activate your account.
           </p>
 
-          <div className="space-y-4 mb-8 text-left rounded-2xl bg-green-50/50 p-5 border border-green-50">
-            <h3 className="font-semibold text-green-900 text-sm uppercase tracking-wider mb-2">Next Steps</h3>
-            <div className="flex items-start gap-3 text-sm text-neutral-600">
-              <CheckCircle2 className="w-4 h-4 text-green-700 mt-0.5 flex-shrink-0" />
-              <span>Open your email client and find our verification message.</span>
+          <form onSubmit={handleVerify} className="space-y-6 mb-6">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400">
+                <KeyRound className="w-5 h-5" />
+              </div>
+              <input
+                type="text"
+                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="Enter 6-digit OTP"
+                className="block w-full h-12 pl-11 pr-4 rounded-xl border border-neutral-200 focus:border-green-600 focus:ring-1 focus:ring-green-600 text-neutral-900 text-center font-mono text-xl tracking-[0.3em] font-bold outline-none transition-all placeholder:text-neutral-300 placeholder:text-base placeholder:tracking-normal placeholder:font-normal"
+                required
+              />
             </div>
-            <div className="flex items-start gap-3 text-sm text-neutral-600">
-              <CheckCircle2 className="w-4 h-4 text-green-700 mt-0.5 flex-shrink-0" />
-              <span>Click the verification link to activate your account.</span>
-            </div>
-            <div className="flex items-start gap-3 text-sm text-neutral-600">
-              <CheckCircle2 className="w-4 h-4 text-green-700 mt-0.5 flex-shrink-0" />
-              <span>Return to the app and log in to your dashboard.</span>
-            </div>
-          </div>
 
-          <div className="flex flex-col gap-3">
-            <Button asChild className="h-12 rounded-xl bg-green-800 hover:bg-green-900 text-base font-bold w-full">
-              <Link to="/login">
-                Back to Sign In
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </Link>
+            <Button
+              type="submit"
+              disabled={verifying}
+              className="h-12 rounded-xl bg-green-800 hover:bg-green-900 text-base font-bold w-full flex items-center justify-center gap-2"
+            >
+              {verifying ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                <>
+                  Verify Code
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
             </Button>
+          </form>
 
+          <div className="space-y-3">
             {email && (
               <button
                 onClick={handleResend}
                 disabled={resending || cooldownSeconds > 0}
-                className="mt-3 text-sm font-semibold text-green-700 hover:text-green-800 flex items-center justify-center gap-2 disabled:opacity-50 mx-auto"
+                className="text-sm font-semibold text-green-700 hover:text-green-800 flex items-center justify-center gap-2 disabled:opacity-50 mx-auto"
               >
                 {resending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                {cooldownSeconds > 0 ? `Resend Link (retry in ${cooldownSeconds}s)` : 'Resend Verification Link'}
+                {cooldownSeconds > 0 ? `Resend Code (retry in ${cooldownSeconds}s)` : 'Resend Verification Code'}
               </button>
             )}
+
+            <Button asChild variant="ghost" className="text-neutral-500 hover:text-neutral-800 text-sm font-semibold h-10 w-full rounded-xl">
+              <Link to="/login">
+                Back to Sign In
+              </Link>
+            </Button>
           </div>
         </motion.div>
       </main>

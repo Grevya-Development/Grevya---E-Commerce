@@ -8,6 +8,7 @@ create table if not exists public.profiles (
   full_name text,
   avatar_url text,
   phone text,
+  role text default 'customer',
   email text,
   preferences jsonb default '{"marketing":true,"order_updates":true}'::jsonb,
   created_at timestamptz default now(),
@@ -95,8 +96,13 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email, full_name)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name')
+  insert into public.profiles (id, email, full_name, role)
+  values (
+    new.id,
+    new.email,
+    new.raw_user_meta_data->>'full_name',
+    coalesce(new.raw_user_meta_data->>'role', 'customer')
+  )
   on conflict (id) do update set email = excluded.email;
   return new;
 end;
