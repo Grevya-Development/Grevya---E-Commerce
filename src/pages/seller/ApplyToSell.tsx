@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, FileText, Loader2, Store } from "lucide-react";
+import {
+  BadgeCheck,
+  CheckCircle2,
+  FileText,
+  Loader2,
+  ShieldCheck,
+  Store,
+} from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -100,6 +107,8 @@ export default function ApplyToSell() {
   const [uploadedDocuments, setUploadedDocuments] = useState<
     Record<string, boolean>
   >({});
+  const [documentError, setDocumentError] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isReapplying, setIsReapplying] = useState(false);
 
   const isEditable =
@@ -233,6 +242,69 @@ export default function ApplyToSell() {
       supabase.removeChannel(channel);
     };
   }, [user]);
+  const validateApplicationFields = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!storeName.trim()) newErrors.storeName = "Store name is required.";
+    if (!ownerFullName.trim())
+      newErrors.ownerFullName = "Owner full name is required.";
+
+    if (!email.trim()) {
+      newErrors.email = "Email is required.";
+    } else if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      newErrors.email = "Enter a valid email address.";
+    }
+
+    if (!phone.trim()) {
+      newErrors.phone = "Phone number is required.";
+    } else if (!/^\d{10,15}$/.test(phone.trim().replace(/\D/g, ""))) {
+      newErrors.phone = "Enter a valid phone number.";
+    }
+
+    if (!panNumber.trim()) {
+      newErrors.panNumber = "PAN number is required.";
+    } else if (panNumber.trim().length !== 10) {
+      newErrors.panNumber = "PAN number must be 10 characters.";
+    }
+
+    if (!gstin.trim()) {
+      newErrors.gstin = "GSTIN is required.";
+    } else if (gstin.trim().length !== 15) {
+      newErrors.gstin = "GSTIN must be 15 characters.";
+    }
+
+    if (!bankHolderName.trim())
+      newErrors.bankHolderName = "Account holder name is required.";
+    if (!bankName.trim()) newErrors.bankName = "Bank name is required.";
+    if (!accountNumber.trim())
+      newErrors.accountNumber = "Account number is required.";
+    if (!ifscCode.trim()) {
+      newErrors.ifscCode = "IFSC code is required.";
+    } else if (ifscCode.trim().length !== 11) {
+      newErrors.ifscCode = "IFSC code must be 11 characters.";
+    }
+
+    const docErrors = requiredDocuments
+      .filter((document) => document.required)
+      .filter((document) => !uploadedDocuments[document.type]);
+
+    if (docErrors.length > 0) {
+      newErrors.documents = `Upload ${docErrors
+        .map((document) => document.label)
+        .join(", ")} before submitting.`;
+    }
+
+    if (!agreementAccepted) {
+      newErrors.agreementAccepted =
+        "You must agree to the Seller Agreement before submitting.";
+    }
+
+    setErrors(newErrors);
+    setDocumentError(newErrors.documents || "");
+
+    return newErrors;
+  };
+
   const createOrSaveDraft = async () => {
     if (!user) return null;
 
@@ -385,6 +457,8 @@ export default function ApplyToSell() {
         ...current,
         [documentType]: true,
       }));
+      setDocumentError("");
+      setErrors((current) => ({ ...current, documents: "" }));
 
       toast({
         title: "Document uploaded",
@@ -401,6 +475,17 @@ export default function ApplyToSell() {
 
   const submitApplication = async () => {
     if (!user) return;
+
+    const validationErrors = validateApplicationFields();
+    if (Object.keys(validationErrors).length > 0) {
+      toast({
+        title: "Complete required fields",
+        description:
+          "Please fix the highlighted fields and upload required documents.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const applicationId = await createOrSaveDraft();
 
@@ -458,9 +543,9 @@ export default function ApplyToSell() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F7EEE4] px-4 py-16">
-        <div className="mx-auto flex max-w-3xl justify-center">
-          <Loader2 className="h-7 w-7 animate-spin text-green-700" />
+      <div className="min-h-screen bg-[linear-gradient(135deg,#fdf8f1_0%,#f5ebde_60%,#eef7ec_100%)] px-4 py-16">
+        <div className="mx-auto flex max-w-3xl justify-center rounded-[30px] border border-[#A68D65]/20 bg-white/80 p-10 shadow-[0_25px_70px_-30px_rgba(58,72,34,0.35)] backdrop-blur">
+          <Loader2 className="h-8 w-8 animate-spin text-green-700" />
         </div>
       </div>
     );
@@ -474,12 +559,14 @@ export default function ApplyToSell() {
     const statusText = application.status.replace(/_/g, " ");
 
     return (
-      <div className="min-h-screen bg-[#F7EEE4] px-4 py-16">
-        <div className="mx-auto max-w-2xl rounded-3xl border border-[#A68D65]/20 bg-white p-8 shadow-sm">
+      <div className="min-h-screen bg-[linear-gradient(135deg,#fdf8f1_0%,#f5ebde_60%,#eef7ec_100%)] px-4 py-10 md:py-16">
+        <div className="mx-auto max-w-2xl rounded-[32px] border border-[#A68D65]/20 bg-white/90 p-8 shadow-[0_25px_70px_-30px_rgba(58,72,34,0.35)] backdrop-blur md:p-10">
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="h-8 w-8 text-green-700" />
+            <div className="rounded-2xl bg-[#F7EEE4] p-3 text-green-700">
+              <CheckCircle2 className="h-8 w-8" />
+            </div>
             <div>
-              <h1 className="text-2xl font-bold text-[#33381C]">
+              <h1 className="text-2xl font-semibold text-[#33381C]">
                 Seller application status
               </h1>
               <p className="mt-1 capitalize text-slate-600">{statusText}</p>
@@ -515,7 +602,7 @@ export default function ApplyToSell() {
           )}
 
           {application.status === "rejected" && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-6 mt-6">
+            <div className="mt-6 rounded-[24px] border border-red-200 bg-red-50 p-6">
               <h2 className="text-xl font-semibold text-red-700">
                 Seller Application Rejected
               </h2>
@@ -524,15 +611,15 @@ export default function ApplyToSell() {
                 Unfortunately, your seller application was rejected.
               </p>
 
-              <div className="mt-4 rounded-lg bg-white border p-4">
-                <p className="font-semibold">Reason</p>
+              <div className="mt-4 rounded-2xl border border-red-100 bg-white p-4">
+                <p className="font-semibold text-slate-900">Reason</p>
 
                 <p className="mt-2 text-gray-700">
                   {application.rejection_reason || "No reason provided."}
                 </p>
               </div>
 
-              <div className="flex justify-end mt-6">
+              <div className="mt-6 flex justify-end">
                 <Button
                   className="bg-green-700 hover:bg-green-800"
                   onClick={handleReapply}
@@ -554,28 +641,87 @@ export default function ApplyToSell() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7EEE4] px-4 py-10 md:py-16">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-8">
-          <div className="flex items-center gap-3">
-            <Store className="h-8 w-8 text-green-700" />
+    <div className="min-h-screen bg-[linear-gradient(135deg,#fdf8f1_0%,#f5ebde_60%,#eef7ec_100%)] px-4 py-8 md:py-14">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-8 overflow-hidden rounded-[32px] border border-[#A68D65]/20 bg-white/85 p-6 shadow-[0_30px_80px_-30px_rgba(58,72,34,0.35)] backdrop-blur md:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <div className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-3 py-1 text-sm font-medium text-green-700">
+                <ShieldCheck className="mr-2 h-4 w-4" />
+                Trusted seller onboarding
+              </div>
 
-            <h1 className="text-3xl font-bold text-[#33381C]">
-              Apply to Become a Seller
-            </h1>
+              <div className="mt-4 flex items-center gap-3">
+                <div className="rounded-2xl bg-[#33381C] p-3 text-white shadow-lg">
+                  <Store className="h-7 w-7" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-semibold tracking-tight text-[#33381C]">
+                    Apply to Become a Seller
+                  </h1>
+                  <p className="mt-2 text-base leading-7 text-slate-600">
+                    Complete your business profile, upload compliance documents,
+                    and submit your application for a smooth review.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[#A68D65]/20 bg-[#FAF3E8] p-4 text-sm text-slate-700">
+              <p className="font-semibold text-[#33381C]">
+                Verification checklist
+              </p>
+              <ul className="mt-2 space-y-2">
+                <li>• Business and owner details</li>
+                <li>• PAN, GST and bank proof</li>
+                <li>• Agreement acceptance</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-[24px] border border-stone-200/80 bg-white/90 p-5 shadow-[0_16px_45px_-24px_rgba(25,34,19,0.35)] backdrop-blur">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-[#F7EEE4] p-2.5 text-green-700">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-[#33381C]">
+                  Prepare your documents
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Keep your PAN, GST certificate, bank proof, and address
+                  details ready before you submit.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <p className="mt-3 text-slate-600">
-            Submit your business details, compliance documents, and payout
-            information for verification.
-          </p>
+          <div className="rounded-[24px] border border-stone-200/80 bg-white/90 p-5 shadow-[0_16px_45px_-24px_rgba(25,34,19,0.35)] backdrop-blur">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-[#F7EEE4] p-2.5 text-green-700">
+                <BadgeCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-[#33381C]">
+                  Quick review steps
+                </h2>
+                <ol className="mt-2 space-y-1 text-sm text-slate-600">
+                  <li>1. Complete your profile</li>
+                  <li>2. Upload required documents</li>
+                  <li>3. Review and submit</li>
+                </ol>
+              </div>
+            </div>
+          </div>
         </div>
 
         {application?.status === "changes_requested" &&
           application?.admin_remarks && (
-            <div className="mb-6 rounded-xl border border-yellow-300 bg-yellow-50 p-5 shadow-sm">
+            <div className="mb-6 rounded-[24px] border border-yellow-300 bg-yellow-50 p-5 shadow-sm">
               <h2 className="text-lg font-semibold text-yellow-800">
-                ⚠ Changes Requested
+                ⚠ Changes requested
               </h2>
 
               <p className="mt-2 text-sm text-gray-700">
@@ -583,7 +729,7 @@ export default function ApplyToSell() {
                 following changes:
               </p>
 
-              <div className="mt-3 rounded-lg border bg-white p-4 text-gray-800">
+              <div className="mt-3 rounded-2xl border border-yellow-200 bg-white p-4 text-gray-800">
                 {application.admin_remarks}
               </div>
 
@@ -595,48 +741,94 @@ export default function ApplyToSell() {
           )}
 
         <div className="space-y-6">
-          <section className="rounded-3xl border border-[#A68D65]/20 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-[#33381C]">
-              Store and owner details
-            </h2>
+          <section className="rounded-[28px] border border-stone-200/80 bg-white/90 p-6 shadow-[0_20px_60px_-26px_rgba(25,34,19,0.35)] backdrop-blur md:p-8">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-[#F7EEE4] p-2.5 text-green-700">
+                <Store className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-[#33381C]">
+                  Store and owner details
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Share your brand identity and primary contact details.
+                </p>
+              </div>
+            </div>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
               <Input
                 label="Store name *"
                 value={storeName}
-                onChange={setStoreName}
+                onChange={(value) => {
+                  setStoreName(value);
+                  if (errors.storeName) {
+                    setErrors((curr) => ({ ...curr, storeName: "" }));
+                  }
+                }}
                 disabled={!isEditable}
+                error={errors.storeName}
               />
               <Input
                 label="Owner full name *"
                 value={ownerFullName}
-                onChange={setOwnerFullName}
+                onChange={(value) => {
+                  setOwnerFullName(value);
+                  if (errors.ownerFullName) {
+                    setErrors((curr) => ({ ...curr, ownerFullName: "" }));
+                  }
+                }}
                 disabled={!isEditable}
+                error={errors.ownerFullName}
               />
               <Input
                 label="Email *"
                 type="email"
                 value={email}
-                onChange={setEmail}
+                onChange={(value) => {
+                  setEmail(value);
+                  if (errors.email) {
+                    setErrors((curr) => ({ ...curr, email: "" }));
+                  }
+                }}
                 disabled={!isEditable}
+                error={errors.email}
               />
               <Input
                 label="Phone number *"
                 value={phone}
-                onChange={setPhone}
+                onChange={(value) => {
+                  setPhone(value);
+                  if (errors.phone) {
+                    setErrors((curr) => ({ ...curr, phone: "" }));
+                  }
+                }}
                 disabled={!isEditable}
+                error={errors.phone}
               />
               <Input
                 label="PAN number *"
                 value={panNumber}
-                onChange={setPanNumber}
+                onChange={(value) => {
+                  setPanNumber(value);
+                  if (errors.panNumber) {
+                    setErrors((curr) => ({ ...curr, panNumber: "" }));
+                  }
+                }}
                 disabled={!isEditable}
+                error={errors.panNumber}
               />
               <Input
                 label="GSTIN *"
                 value={gstin}
-                onChange={setGstin}
+                onChange={(value) => {
+                  setGstin(value);
+                  if (errors.gstin) {
+                    setErrors((curr) => ({ ...curr, gstin: "" }));
+                  }
+                }}
                 disabled={!isEditable}
+                error={errors.gstin}
               />
               <Input
                 label="Product categories (comma separated)"
@@ -692,59 +884,96 @@ export default function ApplyToSell() {
             }
           />
 
-          <section className="rounded-3xl border border-[#A68D65]/20 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-[#33381C]">
-              Payout account
-            </h2>
+          <section className="rounded-[28px] border border-stone-200/80 bg-white/90 p-6 shadow-[0_20px_60px_-26px_rgba(25,34,19,0.35)] backdrop-blur md:p-8">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-[#F7EEE4] p-2.5 text-green-700">
+                <BadgeCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-[#33381C]">
+                  Payout account
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Add your payout details to receive payments securely.
+                </p>
+              </div>
+            </div>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
               <Input
                 label="Account holder name *"
                 value={bankHolderName}
-                onChange={setBankHolderName}
+                onChange={(value) => {
+                  setBankHolderName(value);
+                  if (errors.bankHolderName) {
+                    setErrors((curr) => ({ ...curr, bankHolderName: "" }));
+                  }
+                }}
                 disabled={!isEditable}
+                error={errors.bankHolderName}
               />
               <Input
                 label="Bank name *"
                 value={bankName}
-                onChange={setBankName}
+                onChange={(value) => {
+                  setBankName(value);
+                  if (errors.bankName) {
+                    setErrors((curr) => ({ ...curr, bankName: "" }));
+                  }
+                }}
                 disabled={!isEditable}
+                error={errors.bankName}
               />
               <Input
                 label="Account number *"
                 value={accountNumber}
-                onChange={setAccountNumber}
+                onChange={(value) => {
+                  setAccountNumber(value);
+                  if (errors.accountNumber) {
+                    setErrors((curr) => ({ ...curr, accountNumber: "" }));
+                  }
+                }}
                 disabled={!isEditable}
+                error={errors.accountNumber}
               />
               <Input
                 label="IFSC code *"
                 value={ifscCode}
-                onChange={setIfscCode}
+                onChange={(value) => {
+                  setIfscCode(value);
+                  if (errors.ifscCode) {
+                    setErrors((curr) => ({ ...curr, ifscCode: "" }));
+                  }
+                }}
                 disabled={!isEditable}
+                error={errors.ifscCode}
               />
             </div>
           </section>
 
-          <section className="rounded-3xl border border-[#A68D65]/20 bg-white p-6 shadow-sm">
+          <section className="rounded-[28px] border border-stone-200/80 bg-white/90 p-6 shadow-[0_20px_60px_-26px_rgba(25,34,19,0.35)] backdrop-blur md:p-8">
             <div className="flex items-center gap-3">
-              <FileText className="h-6 w-6 text-green-700" />
-              <h2 className="text-xl font-semibold text-[#33381C]">
-                Compliance documents
-              </h2>
+              <div className="rounded-2xl bg-[#F7EEE4] p-2.5 text-green-700">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-[#33381C]">
+                  Compliance documents
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Required: PAN card, GST certificate, and bank proof. Upload
+                  PDF, JPG, or PNG files.
+                </p>
+              </div>
             </div>
 
-            <p className="mt-2 text-sm text-slate-600">
-              Required: PAN card, GST certificate, and bank proof. Upload PDF,
-              JPG, or PNG files.
-            </p>
-
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
               {requiredDocuments.map((document) => (
                 <div
                   key={document.type}
-                  className="rounded-xl border border-slate-200 p-4"
+                  className="rounded-[20px] border border-stone-200 bg-[#FCFBF8] p-4 shadow-sm"
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-medium text-slate-900">
                         {document.label}
@@ -758,9 +987,9 @@ export default function ApplyToSell() {
                     </div>
 
                     <label
-                      className={`cursor-pointer rounded-lg px-3 py-2 text-sm font-semibold ${
+                      className={`cursor-pointer rounded-xl px-3 py-2 text-sm font-semibold transition ${
                         isEditable
-                          ? "bg-green-700 text-white hover:bg-green-800"
+                          ? "bg-[#33381C] text-white hover:bg-[#243017]"
                           : "cursor-not-allowed bg-slate-200 text-slate-500"
                       }`}
                     >
@@ -783,7 +1012,7 @@ export default function ApplyToSell() {
             </div>
           </section>
 
-          <section className="rounded-3xl border border-[#A68D65]/20 bg-white p-6 shadow-sm">
+          <section className="rounded-[28px] border border-stone-200/80 bg-white/90 p-6 shadow-[0_20px_60px_-26px_rgba(25,34,19,0.35)] backdrop-blur md:p-8">
             <h2 className="text-xl font-semibold text-[#33381C]">
               Seller agreement
             </h2>
@@ -795,18 +1024,28 @@ export default function ApplyToSell() {
               only for order fulfilment.
             </p>
 
-            <label className="mt-5 flex cursor-pointer items-start gap-3 text-sm text-slate-700">
+            <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-[20px] border border-stone-200 bg-[#FCFBF8] p-4 text-sm text-slate-700">
               <input
                 type="checkbox"
                 checked={agreementAccepted}
                 disabled={!isEditable}
-                onChange={(event) => setAgreementAccepted(event.target.checked)}
-                className="mt-1 h-4 w-4"
+                onChange={(event) => {
+                  setAgreementAccepted(event.target.checked);
+                  if (errors.agreementAccepted) {
+                    setErrors((curr) => ({ ...curr, agreementAccepted: "" }));
+                  }
+                }}
+                className="mt-1 h-4 w-4 rounded border-stone-300 text-green-700 focus:ring-green-600"
               />
               <span>
                 I agree to the Seller Agreement and platform policies.
               </span>
             </label>
+            {errors.agreementAccepted ? (
+              <p className="mt-2 text-[10px] text-red-500 font-bold ml-1">
+                {errors.agreementAccepted}
+              </p>
+            ) : null}
           </section>
 
           <div className="flex flex-wrap gap-3 pb-10">
@@ -815,6 +1054,7 @@ export default function ApplyToSell() {
               variant="outline"
               disabled={!isEditable || saving || submitting}
               onClick={createOrSaveDraft}
+              className="border-stone-300 px-5 py-2.5"
             >
               {saving ? "Saving..." : "Save Draft"}
             </Button>
@@ -823,7 +1063,7 @@ export default function ApplyToSell() {
               type="button"
               disabled={!isEditable || saving || submitting}
               onClick={submitApplication}
-              className="bg-green-700 hover:bg-green-800"
+              className="bg-green-700 px-5 py-2.5 hover:bg-green-800"
             >
               {submitting ? "Submitting..." : "Submit for Verification"}
             </Button>
@@ -840,12 +1080,14 @@ function Input({
   onChange,
   disabled,
   type = "text",
+  error,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   type?: string;
+  error?: string;
 }) {
   return (
     <label className="block">
@@ -855,8 +1097,15 @@ function Input({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:bg-slate-100"
+        className={`mt-2 w-full rounded-2xl border px-3 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:bg-white focus:ring-4 disabled:bg-stone-100 ${
+          error
+            ? "border-red-500 focus:border-red-500 focus:ring-red-100"
+            : "border-stone-200 bg-[#FCFBF8] focus:border-green-600 focus:ring-green-100"
+        }`}
       />
+      {error ? (
+        <p className="text-[10px] text-red-500 font-bold mt-1 ml-1">{error}</p>
+      ) : null}
     </label>
   );
 }
@@ -873,10 +1122,20 @@ function AddressSection({
   disabled?: boolean;
 }) {
   return (
-    <section className="rounded-3xl border border-[#A68D65]/20 bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-semibold text-[#33381C]">{title}</h2>
+    <section className="rounded-[28px] border border-stone-200/80 bg-white/90 p-6 shadow-[0_20px_60px_-26px_rgba(25,34,19,0.35)] backdrop-blur md:p-8">
+      <div className="flex items-center gap-3">
+        <div className="rounded-2xl bg-[#F7EEE4] p-2.5 text-green-700">
+          <FileText className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold text-[#33381C]">{title}</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Add the relevant shipping and business address details.
+          </p>
+        </div>
+      </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
         <Input
           label="Address line 1"
           value={address.line1}

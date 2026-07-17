@@ -24,24 +24,18 @@ export default function ActionButtons({
   const [loading, setLoading] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogType, setDialogType] = useState<
-    "changes" | "reject" | null
-  >(null);
+  const [dialogType, setDialogType] = useState<"changes" | "reject" | null>(
+    null,
+  );
   const [reason, setReason] = useState("");
 
-  const canApprove =
-    status === "submitted" || status === "under_review";
+  const canApprove = status === "submitted" || status === "under_review";
 
-  const canRequestChanges =
-    status === "submitted" || status === "under_review";
+  const canRequestChanges = status === "submitted" || status === "under_review";
 
-  const canReject =
-    status === "submitted" || status === "under_review";
+  const canReject = status === "submitted" || status === "under_review";
 
-  const runAction = async (
-    rpc: string,
-    reason?: string
-  ) => {
+  const runAction = async (rpc: string, reason?: string) => {
     setLoading(true);
 
     try {
@@ -70,52 +64,56 @@ export default function ActionButtons({
   };
 
   return (
-    <div className="rounded-xl bg-white shadow p-6 mt-6">
-      <h2 className="text-xl font-semibold mb-4">
-        Admin Actions
-      </h2>
+    <div className="rounded-[32px] border border-stone-200 bg-white/95 p-6 shadow-[0_24px_70px_-32px_rgba(15,23,42,0.15)] mt-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">
+            Admin actions
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-slate-600">
+            Review this application and select the appropriate path for
+            onboarding.
+          </p>
+        </div>
 
-      <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <Button
+            disabled={loading || !canApprove}
+            onClick={() => runAction("approve_seller_application")}
+            className="px-5 py-2.5"
+          >
+            Approve
+          </Button>
 
-        <Button
-          disabled={loading || !canApprove}
-          onClick={() =>
-            runAction("approve_seller_application")
-          }
-        >
-          Approve
-        </Button>
+          <Button
+            variant="secondary"
+            disabled={loading || !canRequestChanges}
+            onClick={() => {
+              setDialogType("changes");
+              setReason("");
+              setDialogOpen(true);
+            }}
+            className="px-5 py-2.5"
+          >
+            Request Changes
+          </Button>
 
-        <Button
-          variant="secondary"
-          disabled={loading || !canRequestChanges}
-          onClick={() => {
-            setDialogType("changes");
-            setReason("");
-            setDialogOpen(true);
-          }}
-        >
-          Request Changes
-        </Button>
-
-        <Button
-          variant="destructive"
-          disabled={loading || !canReject}
-          onClick={() => {
-            setDialogType("reject");
-            setReason("");
-            setDialogOpen(true);
-          }}
-        >
-          Reject
-        </Button>
-
+          <Button
+            variant="destructive"
+            disabled={loading || !canReject}
+            onClick={() => {
+              setDialogType("reject");
+              setReason("");
+              setDialogOpen(true);
+            }}
+            className="px-5 py-2.5"
+          >
+            Reject
+          </Button>
+        </div>
       </div>
 
-      <Dialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-      >
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
@@ -137,7 +135,6 @@ export default function ActionButtons({
           />
 
           <DialogFooter>
-
             <Button
               variant="outline"
               onClick={() => {
@@ -149,33 +146,22 @@ export default function ActionButtons({
             </Button>
 
             <Button
-              variant={
-                dialogType === "reject"
-                  ? "destructive"
-                  : "default"
-              }
+              variant={dialogType === "reject" ? "destructive" : "default"}
               disabled={!reason.trim() || loading}
               onClick={async () => {
                 if (dialogType === "changes") {
-                  await runAction(
-                    "request_seller_changes",
-                    reason.trim()
-                  );
+                  await runAction("request_seller_changes", reason.trim());
                 } else {
-                  await runAction(
-                    "reject_seller_application",
-                    reason.trim()
-                  );
+                  await runAction("reject_seller_application", reason.trim());
                 }
               }}
             >
               {loading
                 ? "Processing..."
                 : dialogType === "changes"
-                ? "Request Changes"
-                : "Reject"}
+                  ? "Request Changes"
+                  : "Reject"}
             </Button>
-
           </DialogFooter>
         </DialogContent>
       </Dialog>
