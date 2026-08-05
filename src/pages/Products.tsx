@@ -404,6 +404,8 @@ const Products = () => {
                       <motion.div key={product.id} variants={itemVariants} className="gpu-accelerated">
                         <ProductCard
                           id={product.id}
+                          variant_id={product.variant_id}
+                          sku={product.sku}
                           name={product.name}
                           price={product.price}
                           image={product.image}

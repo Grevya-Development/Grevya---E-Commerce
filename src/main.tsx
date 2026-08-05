@@ -1,15 +1,8 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { ClerkProvider } from '@clerk/clerk-react'
 import App from './App.tsx'
 import { AuthProvider } from '@/context/AuthContext'
 import './index.css'
-
-const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
-
-if (!CLERK_PUBLISHABLE_KEY) {
-  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY')
-}
 
 interface Props {
   children: ReactNode;
@@ -75,11 +68,9 @@ class ErrorBoundary extends Component<Props, State> {
 
 createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </ClerkProvider>
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </ErrorBoundary>
 );
 

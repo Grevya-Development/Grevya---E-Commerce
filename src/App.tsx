@@ -4,7 +4,6 @@ import { Toaster as ToasterSonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AnimatePresence, motion } from "framer-motion";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 import { supabase } from "@/lib/supabaseClient";
@@ -47,6 +46,9 @@ const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
 const AdminProductRequests = lazy(
   () => import("./pages/admin/AdminProductRequests"),
 );
+const AdminSellerApplications = lazy(
+  () => import("./pages/admin/AdminSellerApplications"),
+);
 const AdminProducts = lazy(() => import("./pages/admin/AdminProducts"));
 const AdminOrders = lazy(() => import("./pages/admin/AdminOrders"));
 const AdminNotifications = lazy(
@@ -62,6 +64,7 @@ const SellerOrders = lazy(() => import("./pages/seller/SellerOrders"));
 const PendingProducts = lazy(() => import("./pages/seller/PendingProducts"));
 const SellerSettings = lazy(() => import("./pages/seller/SellerSettings"));
 const SellerOnboarding = lazy(() => import("./pages/seller/SellerOnboarding"));
+const SellerApplicationForm = lazy(() => import("./pages/seller/SellerApplicationForm"));
 
 const AppContent = () => {
   const location = useLocation();
@@ -107,7 +110,6 @@ const AppContent = () => {
               <Route path="/account/register" element={<Signup />} />
               <Route path="/seller/register" element={<Signup />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
-              <Route path="/sso-callback" element={<AuthenticateWithRedirectCallback />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route
@@ -239,6 +241,18 @@ const AppContent = () => {
               />
 
               <Route
+                path="/admin/seller-applications"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["admin"]}
+                    loginPath="/admin/login"
+                  >
+                    <AdminSellerApplications />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/admin/settings"
                 element={
                   <ProtectedRoute
@@ -251,6 +265,18 @@ const AppContent = () => {
               />
 
               {/* Seller Routes */}
+
+              <Route
+                path="/seller/application"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["seller"]}
+                    loginPath="/seller/login"
+                  >
+                    <SellerApplicationForm />
+                  </ProtectedRoute>
+                }
+              />
 
               <Route
                 path="/seller/onboarding"

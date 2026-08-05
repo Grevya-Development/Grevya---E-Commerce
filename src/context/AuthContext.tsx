@@ -1,13 +1,20 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useRef, useCallback } from 'react';
-import { useAuth as useClerkAuth, useUser as useClerkUser } from '@clerk/clerk-react';
-import { setSupabaseToken } from '@/lib/supabaseClient';
-import { ensureUserProfile } from '@/lib/profileSync';
-import { useCartStore } from '@/store/useCartStore';
-import { useWishlistStore } from '@/store/useWishlistStore';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+} from "react";
+import type { Session, User } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
+import { ensureUserProfile } from "@/lib/profileSync";
+import { useCartStore } from "@/store/useCartStore";
+import { useWishlistStore } from "@/store/useWishlistStore";
 
 export interface UserProfile {
   id: string;
-  clerk_user_id: string;
   username: string | null;
   full_name: string | null;
   avatar_url: string | null;
@@ -15,14 +22,14 @@ export interface UserProfile {
   email: string | null;
   preferences: Record<string, any> | null;
   role?: string | null;
-  status: string;
+  status?: string | null;
   created_at?: string;
   last_login_at?: string | null;
 }
 
 interface AuthContextValue {
-  session: any | null;
-  user: any | null;
+  session: Session | null;
+  user: User | null;
   profile: UserProfile | null;
   loading: boolean;
   profileLoading: boolean;
@@ -33,110 +40,135 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const { isLoaded: authLoaded, userId, sessionId, getToken, signOut: clerkSignOut } = useClerkAuth();
-  const { isLoaded: userLoaded, user: clerkUser } = useClerkUser();
-
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
-  const loadedClerkIdRef = useRef<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const loadedUserIdRef = useRef<string | null>(null);
 
-  const loading = !authLoaded || !userLoaded;
+  const loading = authLoading || profileLoading;
 
-  const loadProfile = useCallback(async (currUser: any) => {
-    if (loadedClerkIdRef.current === currUser.id && profile) return;
-    loadedClerkIdRef.current = currUser.id;
-    setProfileLoading(true);
-    try {
-      // 1. Get the Supabase JWT token from Clerk
-      const token = await getToken({ template: 'supabase' });
-      // 2. Set the token on the Supabase client
-      await setSupabaseToken(token);
+  const loadProfile = useCallback(
+    async (currUser: User) => {
+      if (loadedUserIdRef.current === currUser.id && profile) return;
+      loadedUserIdRef.current = currUser.id;
+      setProfileLoading(true);
 
-      // 3. Ensure user profile exists in public.profiles
-      const syncedProfile = await ensureUserProfile(currUser);
-      setProfile(syncedProfile as UserProfile);
+      try {
+        const syncedProfile = await ensureUserProfile(currUser);
+        setProfile(syncedProfile as UserProfile);
 
-      // 4. Sync local state stores with the database profile UUID
-      if (syncedProfile) {
-        useCartStore.getState().syncUserSession(syncedProfile.id);
-        useWishlistStore.getState().syncUserSession(syncedProfile.id);
+        if (syncedProfile) {
+          useCartStore.getState().syncUserSession(syncedProfile.id);
+          useWishlistStore.getState().syncUserSession(syncedProfile.id);
+        }
+      } catch (error) {
+        console.error("[AuthContext] Profile sync error:", error);
+        setProfile({
+          id: currUser.id,
+          username: null,
+          full_name: currUser.user_metadata?.full_name || null,
+          avatar_url:
+            currUser.user_metadata?.avatar_url ||
+            currUser.user_metadata?.picture ||
+            null,
+          phone: currUser.user_metadata?.phone || null,
+          email: currUser.email || null,
+          preferences: null,
+          role: "customer",
+          status: "active",
+        });
+      } finally {
+        setProfileLoading(false);
       }
-    } catch (error) {
-      console.error('[AuthContext] Profile sync error:', error);
-      // Fallback profile if DB call fails
-      setProfile({
-        id: currUser.id,
-        clerk_user_id: currUser.id,
-        username: null,
-        full_name: currUser.fullName || null,
-        avatar_url: currUser.imageUrl || null,
-        phone: currUser.primaryPhoneNumber?.phoneNumber || null,
-        email: currUser.primaryEmailAddress?.emailAddress || null,
-        preferences: null,
-        role: 'customer',
-        status: 'active',
-      });
-    } finally {
-      setProfileLoading(false);
-    }
-  }, [getToken, profile]);
+    },
+    [profile],
+  );
 
   const refreshProfile = useCallback(async () => {
-    if (!clerkUser) {
+    if (!user) {
       setProfile(null);
       setProfileLoading(false);
-      loadedClerkIdRef.current = null;
+      loadedUserIdRef.current = null;
       return;
     }
-    loadedClerkIdRef.current = null;
-    await loadProfile(clerkUser);
-  }, [clerkUser, loadProfile]);
 
-  // Sync auth token and profiles when Clerk state updates
+    loadedUserIdRef.current = null;
+    await loadProfile(user);
+  }, [loadProfile, user]);
+
   useEffect(() => {
-    const syncAuth = async () => {
-      if (loading) return;
+    let mounted = true;
+    let authSubscription: { unsubscribe: () => void } | null = null;
 
-      if (userId && clerkUser) {
-        await loadProfile(clerkUser);
+    const initialize = async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      const nextSession = sessionData.session;
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+      setAuthLoading(false);
+
+      if (nextSession?.user) {
+        await loadProfile(nextSession.user);
       } else {
-        // Clear Supabase session and states on logout
-        loadedClerkIdRef.current = null;
         setProfile(null);
-        await setSupabaseToken(null);
-        useCartStore.getState().syncUserSession(null);
-        useWishlistStore.getState().syncUserSession(null);
+        setProfileLoading(false);
       }
+
+      const { data: authData } = supabase.auth.onAuthStateChange(
+        (_event, nextSession) => {
+          if (!mounted) return;
+
+          const nextUser = nextSession?.user ?? null;
+          setSession(nextSession);
+          setUser(nextUser);
+          setAuthLoading(false);
+
+          if (nextUser) {
+            void loadProfile(nextUser);
+          } else {
+            loadedUserIdRef.current = null;
+            setProfile(null);
+            useCartStore.getState().syncUserSession(null);
+            useWishlistStore.getState().syncUserSession(null);
+          }
+        },
+      );
+
+      authSubscription = authData.subscription;
     };
 
-    syncAuth();
-  }, [loading, userId, clerkUser, loadProfile]);
+    void initialize();
+
+    return () => {
+      mounted = false;
+      authSubscription?.unsubscribe();
+    };
+  }, [loadProfile]);
 
   const signOut = useCallback(async () => {
-    await clerkSignOut();
+    await supabase.auth.signOut();
     setProfile(null);
-    loadedClerkIdRef.current = null;
-    await setSupabaseToken(null);
+    loadedUserIdRef.current = null;
     useCartStore.getState().syncUserSession(null);
     useWishlistStore.getState().syncUserSession(null);
-  }, [clerkSignOut]);
+  }, []);
 
-  const value = useMemo<AuthContextValue>(() => ({
-    session: sessionId ? { id: sessionId } : null,
-    user: clerkUser ? {
-      id: clerkUser.id,
-      email: clerkUser.primaryEmailAddress?.emailAddress || null,
-      user_metadata: {
-        full_name: clerkUser.fullName || null,
-        phone: clerkUser.primaryPhoneNumber?.phoneNumber || null,
-      }
-    } : null,
-    profile,
-    loading,
-    profileLoading,
-    refreshProfile,
-    signOut,
-  }), [sessionId, clerkUser, profile, loading, profileLoading, refreshProfile, signOut]);
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      session,
+      user,
+      profile,
+      loading,
+      profileLoading,
+      refreshProfile,
+      signOut,
+    }),
+    [session, user, profile, loading, profileLoading, refreshProfile, signOut],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
@@ -144,7 +176,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used inside AuthProvider');
+    throw new Error("useAuth must be used inside AuthProvider");
   }
   return context;
 };

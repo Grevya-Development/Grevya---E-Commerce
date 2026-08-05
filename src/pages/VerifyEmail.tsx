@@ -6,14 +6,13 @@ import { toast } from '@/components/ui/use-toast';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { motion } from 'framer-motion';
-import { verifyEmailVerificationCode } from '@/lib/authService';
+import { requestPasswordReset, verifyEmailVerificationCode } from '@/lib/authService';
 
 const VerifyEmail = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const email = (location.state as any)?.email || localStorage.getItem('grevya-signup-email') || '';
-  const clerkUserId = (location.state as any)?.clerkUserId || '';
-  
+
   const [code, setCode] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
@@ -57,7 +56,7 @@ const VerifyEmail = () => {
 
     setVerifying(true);
     try {
-      await verifyEmailVerificationCode(clerkUserId, code.trim());
+      await verifyEmailVerificationCode(email, code.trim());
       toast({
         title: 'Email confirmed',
         description: 'Your account has been verified successfully.',
@@ -75,10 +74,10 @@ const VerifyEmail = () => {
   };
 
   const handleResend = async () => {
-    if (!window.Clerk) {
+    if (!email) {
       toast({
-        title: 'Provider loading',
-        description: 'Auth provider is still loading, please wait.',
+        title: 'Email missing',
+        description: 'Please sign up again to receive a fresh confirmation code.',
         variant: 'destructive',
       });
       return;
@@ -95,10 +94,7 @@ const VerifyEmail = () => {
 
     setResending(true);
     try {
-      const signUpAttempt = window.Clerk.client.signUp;
-      await signUpAttempt.prepareEmailAddressVerification({
-        strategy: "email_code",
-      });
+      await requestPasswordReset(email);
 
       const cooldownTime = Date.now() + 60 * 1000;
       setCooldownSeconds(60);

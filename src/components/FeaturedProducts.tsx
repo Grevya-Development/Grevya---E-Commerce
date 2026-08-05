@@ -109,6 +109,8 @@ const FeaturedProducts = () => {
                 <ProductCard
                   key={product.id}
                   id={product.id}
+                  variant_id={product.variant_id}
+                  sku={product.sku}
                   name={product.name}
                   price={product.price}
                   image={product.image} // ✅ FIXED

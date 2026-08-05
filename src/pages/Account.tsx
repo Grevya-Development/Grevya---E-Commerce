@@ -15,6 +15,7 @@ import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { friendlyAuthError, getAuthRedirectUrl } from '@/lib/authValidation';
+import { updateAuthPassword } from '@/lib/authService';
 import { useWishlistStore } from '@/store/useWishlistStore';
 import ProductCard from '@/components/ProductCard';
 
@@ -31,6 +32,54 @@ interface Address {
   is_default: boolean;
   landmark?: string;
 }
+
+interface FloatingInputProps {
+  label: string;
+  type?: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  id?: string;
+  autoComplete?: string;
+}
+
+const FloatingInput = ({
+  label,
+  type = 'text',
+  value,
+  onChange,
+  placeholder,
+  required = false,
+  disabled = false,
+  id,
+  autoComplete,
+}: FloatingInputProps) => {
+  const inputId = id || label;
+  return (
+    <div className="relative z-0 w-full group">
+      <input
+        type={type}
+        name={label}
+        id={inputId}
+        className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-[#33381C] peer"
+        placeholder=" "
+        value={value}
+        onChange={onChange}
+        required={required}
+        disabled={disabled}
+        autoComplete={autoComplete}
+      />
+      <label
+        htmlFor={inputId}
+        className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10 origin-[0] peer-focus:left-0 peer-focus:text-[#33381C] peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75"
+      >
+        {label}
+      </label>
+    </div>
+  );
+};
 
 const Account = () => {
   const { user, profile, refreshProfile, signOut } = useAuth();
@@ -304,11 +353,14 @@ const Account = () => {
         authUpdates.email = form.email.trim();
       }
 
-      if (window.Clerk && window.Clerk.user) {
-        await window.Clerk.user.update({
-          firstName: form.full_name.trim().split(' ')[0] || '',
-          lastName: form.full_name.trim().split(' ').slice(1).join(' ') || '',
+      if (emailChanged) {
+        const { error: emailUpdateError } = await supabase.auth.updateUser({
+          email: form.email.trim(),
         });
+
+        if (emailUpdateError) {
+          throw emailUpdateError;
+        }
       }
 
       if (emailChanged) {
@@ -348,18 +400,14 @@ const Account = () => {
 
     setSaving(true);
     try {
-      if (window.Clerk && window.Clerk.user) {
-        const unverified = window.Clerk.user.emailAddresses.find(
-          (e: any) => e.verification.status !== "verified"
-        );
-        if (unverified) {
-          await unverified.prepareVerification({ strategy: "email_code" });
-          toast({
-            title: 'Verification email sent',
-            description: `We sent a new confirmation code to your email.`,
-          });
-        }
+      const { error: emailResendError } = await supabase.auth.updateUser({
+        email: targetEmail,
+      });
+
+      if (emailResendError) {
+        throw emailResendError;
       }
+
       const cooldownTime = Date.now() + 60 * 1000;
       setEmailCooldownUntil(cooldownTime);
       localStorage.setItem('grevya-email-cooldown', String(cooldownTime));
@@ -790,12 +838,7 @@ const Account = () => {
     setUpdatingPass(true);
 
     try {
-      if (window.Clerk && window.Clerk.user) {
-        await window.Clerk.user.update({
-          password: newPassword,
-          currentPassword: currentPassword,
-        });
-      }
+      await updateAuthPassword(newPassword);
 
       await refreshProfile();
       setCurrentPassword('');
@@ -879,53 +922,6 @@ const Account = () => {
     } catch (err: any) {
       toast({ title: 'Download failed', description: err.message, variant: 'destructive' });
     }
-  };
-
-  // Floating input component reused across pages
-  const FloatingInput = ({
-    label,
-    type = 'text',
-    value,
-    onChange,
-    placeholder,
-    required = false,
-    disabled = false,
-    id,
-    autoComplete,
-  }: {
-    label: string;
-    type?: string;
-    value: string;
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    placeholder?: string;
-    required?: boolean;
-    disabled?: boolean;
-    id?: string;
-    autoComplete?: string;
-  }) => {
-    const inputId = id || label;
-    return (
-      <div className="relative z-0 w-full group">
-        <input
-          type={type}
-          name={label}
-          id={inputId}
-          className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-[#33381C] peer"
-          placeholder=" "
-          value={value}
-          onChange={onChange}
-          required={required}
-          disabled={disabled}
-          autoComplete={autoComplete}
-        />
-        <label
-          htmlFor={inputId}
-          className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10 origin-[0] peer-focus:left-0 peer-focus:text-[#33381C] peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75"
-        >
-          {label}
-        </label>
-      </div>
-    );
   };
 
   return (

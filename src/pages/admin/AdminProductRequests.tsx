@@ -98,6 +98,7 @@ export default function AdminProductRequests() {
     const { error } = await supabase
       .from("products")
       .update({
+        status: "approved",
         product_status: "approved",
         is_hidden: false,
       })

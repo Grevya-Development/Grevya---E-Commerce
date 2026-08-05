@@ -4,13 +4,7 @@ import {
   normalizeEmail,
   normalizePhone,
 } from "@/lib/authValidation";
-import { ensureUserProfile, rememberPendingProfile } from "@/lib/profileSync";
-
-declare global {
-  interface Window {
-    Clerk?: any;
-  }
-}
+import { rememberPendingProfile } from "@/lib/profileSync";
 
 const locks = new Map<string, Promise<any>>();
 
@@ -24,33 +18,29 @@ const withLock = async <T>(key: string, action: () => Promise<T>) => {
 };
 
 /**
- * Standard Sign In using Clerk JS SDK window interface
+ * Standard Sign In using Supabase Auth
  */
 export const signInWithEmail = (email: string, password: string) => {
   const normalizedEmail = normalizeEmail(email);
   return withLock(`login:${normalizedEmail}`, async () => {
     authDebug("login.start");
-    if (!window.Clerk) {
-      throw new Error("Authentication provider is still loading. Please try again.");
-    }
 
-    const signInAttempt = await window.Clerk.client.signIn.create({
-      identifier: normalizedEmail,
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
       password,
     });
 
-    if (signInAttempt.status === "complete") {
-      await window.Clerk.setActive({ session: signInAttempt.createdSessionId });
-      authDebug("login.success");
-      return signInAttempt;
+    if (error) {
+      throw error;
     }
 
-    throw new Error(`Authentication status: ${signInAttempt.status}. Please check details.`);
+    authDebug("login.success");
+    return data;
   });
 };
 
 /**
- * Standard Sign Up using Clerk JS SDK window interface
+ * Standard Sign Up using Supabase Auth and role metadata
  */
 export const signUpWithEmail = (input: {
   email: string;
@@ -64,140 +54,131 @@ export const signUpWithEmail = (input: {
 
   return withLock(`signup:${normalizedEmail}`, async () => {
     authDebug("signup.start");
-    if (!window.Clerk) {
-      throw new Error("Authentication provider is still loading. Please try again.");
-    }
 
-    const signUpAttempt = await window.Clerk.client.signUp.create({
-      emailAddress: normalizedEmail,
-      password: input.password,
-      firstName: input.fullName.split(" ")[0] || "",
-      lastName: input.fullName.split(" ").slice(1).join(" ") || "",
-    });
-
-    // Store pending metadata (role, phone) locally to sync once the email is verified
-    rememberPendingProfile(signUpAttempt.id, {
+    rememberPendingProfile(normalizedEmail, {
       full_name: input.fullName.trim(),
       phone: normalizedPhone || null,
       role: input.role || "customer",
     });
 
-    // Send verification email code
-    await signUpAttempt.prepareEmailAddressVerification({
-      strategy: "email_code",
-    });
+    // const { data, error } = await supabase.auth.signUp({
+    //   email: normalizedEmail,
+    //   password: input.password,
+    //   options: {
+    //     data: {
+    //       full_name: input.fullName.trim(),
+    //       phone: normalizedPhone || null,
+    //       role: input.role || "customer",
+    //     },
+    //   },
+    // });
 
-    authDebug("signup.prepared_verification");
-    return signUpAttempt;
+    // if (error) {
+    //   throw error;
+    // }
+
+    // authDebug("signup.complete", {
+    //   hasSession: Boolean(data.session),
+    //   hasUser: Boolean(data.user),
+    // });
+    const { data, error } = await supabase.auth.signUp({
+  email: normalizedEmail,
+  password: input.password,
+  options: {
+    data: {
+      full_name: input.fullName.trim(),
+      phone: normalizedPhone || null,
+      role: input.role || "customer",
+    },
+  },
+});
+
+if (error) throw error;
+
+if (data.user) {
+  rememberPendingProfile(data.user.id, {
+    full_name: input.fullName.trim(),
+    phone: normalizedPhone || null,
+    role: input.role || "customer",
+  });
+}
+
+    return data;
   });
 };
 
 /**
- * Verifies email verification code during Clerk signup
+ * Verify an email confirmation code through Supabase Auth OTP flow.
  */
-export const verifyEmailVerificationCode = async (clerkUserId: string, code: string) => {
-  if (!window.Clerk) {
-    throw new Error("Authentication provider is still loading. Please try again.");
+export const verifyEmailVerificationCode = async (email: string, code: string) => {
+  const normalizedEmail = normalizeEmail(email);
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: normalizedEmail,
+    token: code,
+    type: "email",
+  });
+
+  if (error) {
+    throw error;
   }
 
-  const signUpAttempt = window.Clerk.client.signUp;
-  const verification = await signUpAttempt.attemptEmailAddressVerification({
-    code,
-  });
-
-  if (verification.status === "complete") {
-    await window.Clerk.setActive({ session: verification.createdSessionId });
-    
-    // Sync profile to database immediately
-    if (window.Clerk.user) {
-      try {
-        await ensureUserProfile(window.Clerk.user);
-      } catch (err) {
-        console.warn("Failed to ensure user profile during signup verification:", err);
-      }
-    }
-    return verification;
-  }
-
-  throw new Error(`Verification status: ${verification.status}`);
+  return data;
 };
 
 /**
- * Start OAuth flow using Clerk SDK redirect strategy
+ * Start OAuth flow by redirecting to an external provider.
+ * This project currently uses email/password auth; OAuth is not enabled in the Supabase client.
  */
-export const startOAuthSignIn = (provider: "google" | "apple") => {
-  return withLock(`oauth:${provider}`, async () => {
-    authDebug("oauth.start", { provider });
-    if (!window.Clerk) {
-      throw new Error("Authentication provider is still loading.");
-    }
-
-    return window.Clerk.client.signIn.authenticateWithRedirect({
-      strategy: `oauth_${provider}`,
-      redirectUrl: "/sso-callback",
-      redirectUrlComplete: "/account",
-    });
-  });
+export const startOAuthSignIn = async (_provider: "google" | "apple") => {
+  throw new Error("OAuth sign-in is not enabled for the Supabase auth setup.");
 };
 
 /**
- * Request Clerk password reset
+ * Request password reset using Supabase Auth
  */
 export const requestPasswordReset = (email: string) => {
   const normalizedEmail = normalizeEmail(email);
   return withLock(`forgot:${normalizedEmail}`, async () => {
-    if (!window.Clerk) {
-      throw new Error("Authentication provider is still loading.");
+    const { data, error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+
+    if (error) {
+      throw error;
     }
 
-    const signInAttempt = await window.Clerk.client.signIn.create({
-      strategy: "reset_password_email_code",
-      identifier: normalizedEmail,
-    });
-    
-    return signInAttempt;
+    return data;
   });
 };
 
 /**
- * Update active Clerk password
+ * Update active Supabase password
  */
-export const updateAuthPassword = (password: string) => {
-  return withLock("reset-password", async () => {
-    if (!window.Clerk || !window.Clerk.user) {
-      throw new Error("No active session found.");
-    }
+export const updateAuthPassword = async (password: string) => {
+  const { data, error } = await supabase.auth.updateUser({ password });
 
-    const updatedUser = await window.Clerk.user.update({ password });
-    
-    // Send a security notification via Supabase
-    try {
-      const activeProfile = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("clerk_user_id", window.Clerk.user.id)
-        .maybeSingle();
+  if (error) {
+    throw error;
+  }
 
-      if (activeProfile?.data?.id) {
-        await supabase.from("notifications").insert({
-          user_id: activeProfile.data.id,
-          message: "Your account password has been updated successfully.",
-          type: "security",
-        });
-      }
-    } catch (err) {
-      console.warn("Security notification insertion failed:", err);
-    }
+  const activeProfile = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", data.user?.id || "")
+    .maybeSingle();
 
-    return updatedUser;
-  });
+  if (activeProfile?.data?.id) {
+    await supabase.from("notifications").insert({
+      user_id: activeProfile.data.id,
+      message: "Your account password has been updated successfully.",
+      type: "security",
+    });
+  }
+
+  return data;
 };
 
 /**
- * Sign out helper linking to Clerk
+ * Sign out helper linked to Supabase Auth
  */
 export const signOutUser = async () => {
-  if (window.Clerk) {
-    await window.Clerk.signOut();
-  }
+  await supabase.auth.signOut();
 };

@@ -8,6 +8,10 @@ import { motion, useMotionValue, useTransform } from 'framer-motion';
 
 export interface ProductProps {
   id: number;
+  /** The sellable variant selected for this listing, when the catalog provides it. */
+  variant_id?: string;
+  /** Snapshot of the sellable variant's SKU, required when an order is created. */
+  sku?: string;
   name: string;
   price: number;
   rating: number;
