@@ -100,6 +100,8 @@ const ProductDetail = () => {
       const slugValue = (product.name || '').toLowerCase().replace(/\s+/g, '-');
       addItem({
         id: product.id,
+        variant_id: product.variant_id,
+        sku: product.sku,
         name: product.name,
         price: product.price,
         rating: averageRating || product.rating || 4,

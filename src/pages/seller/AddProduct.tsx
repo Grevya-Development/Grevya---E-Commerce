@@ -39,6 +39,17 @@ const initialForm: ProductForm = {
   image_url: "",
 };
 
+const createDefaultSku = (productName: string) => {
+  const namePrefix = productName
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24) || "PRODUCT";
+
+  return `${namePrefix}-${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
+};
+
 const categoryOptions = [
   "Areca Tableware",
   "Natural Personal Care",
@@ -120,30 +131,77 @@ export default function AddProduct() {
     setError(null);
     setMessage(null);
 
-    const { error: insertError } = await supabase.from("products").insert({
-      seller_id: user.id,
-      name: form.name.trim(),
-      description: form.description.trim(),
-      price: previewPrice,
-      stock: previewStock,
-      category: form.category.trim(),
-      image_url: form.image_url.trim(),
-      is_featured: false,
-      is_hidden: false,
-      product_status: "pending",
-      created_at: new Date().toISOString(),
-    });
+    try {
+      const { data: store, error: storeError } = await supabase
+        .from("stores")
+        .select("id")
+        .eq("seller_id", user.id)
+        .limit(1)
+        .maybeSingle();
 
-    if (insertError) {
-      setError(insertError.message);
+      if (storeError) throw storeError;
+      if (!store) {
+        setError(
+          "Your seller account is active but no store has been created yet. Please contact an administrator.",
+        );
+        return;
+      }
+
+      const { data: product, error: productError } = await supabase
+        .from("products")
+        .insert({
+          seller_id: user.id,
+          store_id: store.id,
+          name: form.name.trim(),
+          description: form.description.trim(),
+          price: previewPrice,
+          stock: previewStock,
+          category: form.category.trim(),
+          image_url: form.image_url.trim(),
+          is_featured: false,
+          is_hidden: false,
+          product_status: "pending",
+          created_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+
+      if (productError) throw productError;
+      if (!product) throw new Error("Product was created without an ID.");
+
+      const { error: variantError } = await supabase
+        .from("product_variants")
+        .insert({
+          product_id: product.id,
+          sku: createDefaultSku(form.name),
+          price: previewPrice,
+          attributes: {},
+          is_active: true,
+        });
+
+      if (variantError) {
+        const { error: cleanupError } = await supabase
+          .from("products")
+          .delete()
+          .eq("id", product.id);
+
+        if (cleanupError) {
+          throw new Error(
+            `Could not create the product variant: ${variantError.message}. Product cleanup also failed: ${cleanupError.message}`,
+          );
+        }
+
+        throw new Error(`Could not create the product variant: ${variantError.message}`);
+      }
+
+      setMessage("Product submitted for review. Admin approval is now pending.");
+      setForm(initialForm);
+      setImageBroken(false);
+    } catch (err: any) {
+      setError(err.message || "Unable to create product.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setMessage("Product submitted for review. Admin approval is now pending.");
-    setForm(initialForm);
-    setImageBroken(false);
-    setLoading(false);
   };
 
   return (

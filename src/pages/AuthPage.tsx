@@ -195,20 +195,18 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   }, [user, authLoading]);
 
   const validateActiveUserSession = async () => {
-    if (!window.Clerk?.user) return;
+    if (!user?.id) return;
     setLoading(true);
     try {
-      const clerkUserId = window.Clerk.user.id;
       const { data: profileRow } = await supabase
         .from("profiles")
         .select("*")
-        .eq("clerk_user_id", clerkUserId)
+        .eq("id", user.id)
         .maybeSingle();
 
       if (profileRow) {
         const actualRole = profileRow.role || "customer";
-        
-        // Define hierarchy / multiple roles support
+
         const availableRoles = [actualRole];
         if (actualRole === "admin") {
           availableRoles.push("seller", "customer");
@@ -220,14 +218,26 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
         const target = selectedRole || expectedRole || "customer";
 
         if (availableRoles.includes(target)) {
-          // If approved seller, or other active role, redirect
-          if (target === "seller" && profileRow.status === "pending") {
-            navigate("/seller/onboarding", { replace: true });
+          if (target === "seller") {
+            const { data: sellerApplication, error: sellerApplicationError } = await supabase
+              .from("seller_applications")
+              .select("status")
+              .eq("user_id", user.id)
+              .maybeSingle();
+
+            if (sellerApplicationError) throw sellerApplicationError;
+
+            if (!sellerApplication || sellerApplication.status === "rejected") {
+              navigate("/seller/application", { replace: true });
+            } else if (sellerApplication.status === "approved") {
+              navigate("/seller/dashboard", { replace: true });
+            } else {
+              navigate("/seller/onboarding", { replace: true });
+            }
           } else {
             navigate(defaultRedirect(target), { replace: true });
           }
         } else {
-          // Trigger validation mismatch state
           if (availableRoles.length > 1) {
             setMultipleRolesChooser(true);
           } else {
@@ -330,16 +340,16 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
 
         toast({
           title: "Account Created",
-          description: data.status === "complete"
-            ? "Your account has been activated."
+          description: data.user
+            ? "Your account has been created. Please check your inbox to confirm the email."
             : "Verification code sent to your email inbox.",
         });
 
-        if (data.status === "complete") {
+        if (data.session) {
           await validateActiveUserSession();
         } else {
           localStorage.setItem("grevya-signup-email", normalizedEmail);
-          navigate("/verify-email", { state: { email: normalizedEmail, clerkUserId: data.id } });
+          navigate("/verify-email", { state: { email: normalizedEmail } });
         }
       }
 
@@ -380,9 +390,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   };
 
   const handleSignOut = async () => {
-    if (window.Clerk) {
-      await window.Clerk.signOut();
-    }
+    await supabase.auth.signOut();
     setValidationError(null);
     setMultipleRolesChooser(false);
     setUserRoles([]);
@@ -707,7 +715,6 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         error={errors.phone}
-                        placeholder="9876543210"
                         required
                       />
                     )}

@@ -77,7 +77,9 @@ SELECT r.id, p.id FROM public.roles r, public.permissions p
 WHERE r.name = 'seller' AND p.name IN ('product:write', 'order:write_status')
 ON CONFLICT DO NOTHING;
 
--- Helper check function for RLS and operations
+-- Helper check function for RLS and operations.
+-- Uses the authenticated JWT role metadata rather than querying public.profiles,
+-- which avoids recursive policy evaluation inside profiles RLS.
 CREATE OR REPLACE FUNCTION public.has_permission(user_id UUID, perm_name TEXT)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -85,14 +87,23 @@ SECURITY DEFINER
 STABLE
 SET search_path = public
 AS $$
-    SELECT EXISTS (
-        SELECT 1 
-        FROM public.profiles p
-        JOIN public.roles r ON p.role_id = r.id
-        JOIN public.role_permissions rp ON rp.role_id = r.id
-        JOIN public.permissions perm ON rp.permission_id = perm.id
-        WHERE p.id = user_id AND perm.name = perm_name AND COALESCE(p.is_active, true) = true
-    );
+    WITH active_role AS (
+      SELECT COALESCE(
+        NULLIF(auth.jwt() -> 'user_metadata' ->> 'role', ''),
+        NULLIF(auth.jwt() -> 'app_metadata' ->> 'role', '')
+      ) AS role_name
+    )
+    SELECT CASE
+      WHEN (SELECT role_name FROM active_role) IN ('admin', 'super_admin') THEN TRUE
+      WHEN perm_name = 'product:write' AND (SELECT role_name FROM active_role) = 'seller' THEN TRUE
+      WHEN perm_name = 'product:moderation' AND (SELECT role_name FROM active_role) IN ('admin', 'super_admin') THEN TRUE
+      WHEN perm_name = 'order:write_status' AND (SELECT role_name FROM active_role) IN ('seller', 'admin', 'super_admin') THEN TRUE
+      WHEN perm_name = 'order:read_all' AND (SELECT role_name FROM active_role) IN ('admin', 'super_admin') THEN TRUE
+      WHEN perm_name = 'user:manage' AND (SELECT role_name FROM active_role) IN ('admin', 'super_admin') THEN TRUE
+      WHEN perm_name = 'system:settings' AND (SELECT role_name FROM active_role) = 'super_admin' THEN TRUE
+      WHEN perm_name = 'audit:read' AND (SELECT role_name FROM active_role) IN ('admin', 'super_admin') THEN TRUE
+      ELSE FALSE
+    END;
 $$;
 
 -- --------------------------------------------------------------------

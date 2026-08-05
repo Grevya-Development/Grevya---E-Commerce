@@ -5,6 +5,7 @@ import {
   ShoppingCart,
   Bell,
   ClipboardCheck,
+  Building2,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -41,6 +42,11 @@ const managementLinks = [
     label: "Product Requests",
     icon: ClipboardCheck,
     path: "/admin/product-requests",
+  },
+  {
+    label: "Seller Applications",
+    icon: Building2,
+    path: "/admin/seller-applications",
   },
 ];
 

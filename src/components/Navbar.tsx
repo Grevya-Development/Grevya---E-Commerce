@@ -1,6 +1,5 @@
-
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LogOut,
   Package,
@@ -15,18 +14,18 @@ import {
   HelpCircle,
   Shield,
   Heart,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useCartStore } from '@/store/useCartStore';
-import { useAuth } from '@/context/AuthContext';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useCartStore } from "@/store/useCartStore";
+import { useAuth } from "@/context/AuthContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import NotificationBell from './NotificationBell';
-import { motion, AnimatePresence } from 'framer-motion';
+} from "@/components/ui/dropdown-menu";
+import NotificationBell from "./NotificationBell";
+import { motion, AnimatePresence } from "framer-motion";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -39,9 +38,9 @@ const Navbar = () => {
 
   useEffect(() => {
     // Explicitly clean up any residual dark class and localStorage values
-    if (typeof window !== 'undefined') {
-      window.document.documentElement.classList.remove('dark');
-      localStorage.removeItem('grevya-theme');
+    if (typeof window !== "undefined") {
+      window.document.documentElement.classList.remove("dark");
+      localStorage.removeItem("grevya-theme");
     }
   }, []);
 
@@ -55,18 +54,18 @@ const Navbar = () => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const [windowWidth, setWindowWidth] = useState(
-    typeof window !== 'undefined' ? window.innerWidth : 1024,
+    typeof window !== "undefined" ? window.innerWidth : 1024,
   );
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const isMobile = windowWidth < 768;
@@ -76,44 +75,44 @@ const Navbar = () => {
   };
 
   const openRoleDashboard = () => {
-    if (profile?.role === 'admin') {
-      navigate('/admin/dashboard');
+    if (profile?.role === "admin") {
+      navigate("/admin/dashboard");
       return;
     }
 
-    if (profile?.role === 'seller') {
-      navigate('/seller/dashboard');
+    if (profile?.role === "seller") {
+      navigate("/seller/dashboard");
     }
   };
 
   const isAdminOrSeller =
-    profile?.role === 'admin' || profile?.role === 'seller';
+    profile?.role === "admin" || profile?.role === "seller";
 
   const getNavItems = () => {
-    if (profile?.role === 'admin') {
+    if (profile?.role === "admin") {
       return [
-        { path: '/admin/dashboard', name: 'Dashboard' },
-        { path: '/admin/users', name: 'Users' },
-        { path: '/admin/products', name: 'Products' },
-        { path: '/admin/product-requests', name: 'Requests' },
-        { path: '/admin/orders', name: 'Orders' },
-        { path: '/admin/notifications', name: 'Notifications' },
+        { path: "/admin/dashboard", name: "Dashboard" },
+        { path: "/admin/users", name: "Users" },
+        { path: "/admin/products", name: "Products" },
+        { path: "/admin/product-requests", name: "Requests" },
+        { path: "/admin/orders", name: "Orders" },
+        { path: "/admin/notifications", name: "Notifications" },
       ];
     }
-    if (profile?.role === 'seller') {
+    if (profile?.role === "seller") {
       return [
-        { path: '/seller/dashboard', name: 'Dashboard' },
-        { path: '/seller/products', name: 'My Products' },
-        { path: '/seller/add-product', name: 'Add Product' },
-        { path: '/seller/pending-products', name: 'Pending' },
-        { path: '/seller/orders', name: 'Orders' },
+        { path: "/seller/dashboard", name: "Dashboard" },
+        { path: "/seller/products", name: "My Products" },
+        { path: "/seller/add-product", name: "Add Product" },
+        { path: "/seller/pending-products", name: "Pending" },
+        { path: "/seller/orders", name: "Orders" },
       ];
     }
     return [
-      { path: '/', name: 'Home' },
-      { path: '/about', name: 'About Us' },
-      { path: '/products', name: 'Products' },
-      { path: '/contact', name: 'Contact' },
+      { path: "/", name: "Home" },
+      { path: "/about", name: "About Us" },
+      { path: "/products", name: "Products" },
+      { path: "/contact", name: "Contact" },
     ];
   };
 
@@ -127,7 +126,7 @@ const Navbar = () => {
           scale: isScrolled ? (isMobile ? 0.95 : 0.97) : 1,
         }}
         transition={{
-          type: 'spring',
+          type: "spring",
           stiffness: 220,
           damping: 24,
           mass: 0.8,
@@ -138,26 +137,24 @@ const Navbar = () => {
         <motion.div
           animate={{
             backgroundColor: isScrolled
-              ? 'var(--nav-bg-scrolled)'
-              : 'var(--nav-bg-top)',
+              ? "var(--nav-bg-scrolled)"
+              : "var(--nav-bg-top)",
             borderColor: isScrolled
-              ? 'var(--nav-border-scrolled)'
-              : 'var(--nav-border-top)',
-            borderRadius: isScrolled ? (isMobile ? '16px' : '9999px') : '0px',
+              ? "var(--nav-border-scrolled)"
+              : "var(--nav-border-top)",
+            borderRadius: isScrolled ? (isMobile ? "16px" : "9999px") : "0px",
             boxShadow: isScrolled
-              ? 'var(--nav-shadow-scrolled)'
-              : 'var(--nav-shadow-top)',
+              ? "var(--nav-shadow-scrolled)"
+              : "var(--nav-shadow-top)",
           }}
           transition={{
-            type: 'spring',
+            type: "spring",
             stiffness: 220,
             damping: 24,
             mass: 0.8,
           }}
           className={`absolute inset-0 -z-10 backdrop-blur-md transition-all ${
-            isScrolled
-              ? 'border border-[#A68D65]/20'
-              : 'border-b'
+            isScrolled ? "border border-[#A68D65]/20" : "border-b"
           }`}
         />
 
@@ -167,7 +164,13 @@ const Navbar = () => {
           <div className="flex items-center gap-2 md:gap-3.5 shrink-0">
             {/* Logo */}
             <Link
-              to={profile?.role === 'admin' ? '/admin/dashboard' : profile?.role === 'seller' ? '/seller/dashboard' : '/'}
+              to={
+                profile?.role === "admin"
+                  ? "/admin/dashboard"
+                  : profile?.role === "seller"
+                    ? "/seller/dashboard"
+                    : "/"
+              }
               className="flex items-center gap-2 md:gap-2.5 shrink-0"
               aria-label="Grevya Naturals home"
             >
@@ -201,8 +204,8 @@ const Navbar = () => {
             <div className="hidden md:flex space-x-6 lg:space-x-8 items-center relative">
               {navItems.map((item) => {
                 const active =
-                  item.path === '/'
-                    ? location.pathname === '/'
+                  item.path === "/"
+                    ? location.pathname === "/"
                     : location.pathname.startsWith(item.path);
 
                 return (
@@ -211,8 +214,8 @@ const Navbar = () => {
                     to={item.path}
                     className={`relative py-1 text-sm font-semibold tracking-wide transition-colors ${
                       active
-                        ? 'text-[#33381C]'
-                        : 'text-[#1D1E19]/60 hover:text-[#33381C]'
+                        ? "text-[#33381C]"
+                        : "text-[#1D1E19]/60 hover:text-[#33381C]"
                     }`}
                   >
                     {item.name}
@@ -221,7 +224,7 @@ const Navbar = () => {
                         layoutId="activeNavbarTab"
                         className="absolute -bottom-1 left-0 right-0 h-[2px] bg-[#33381C] rounded-full"
                         transition={{
-                          type: 'spring',
+                          type: "spring",
                           stiffness: 350,
                           damping: 28,
                         }}
@@ -241,9 +244,9 @@ const Navbar = () => {
                 <input
                   type="text"
                   placeholder={
-                    profile?.role === 'admin'
-                      ? 'Search users, products, reports...'
-                      : 'Search products, orders, inventory...'
+                    profile?.role === "admin"
+                      ? "Search users, products, reports..."
+                      : "Search products, orders, inventory..."
                   }
                   className="w-full rounded-full border border-[#A68D65]/20 bg-[#F7EEE4]/30 py-2 pl-11 pr-5 text-xs text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#33381C]/15 focus:border-[#33381C] focus:bg-white transition-all duration-300 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] focus:shadow-[0_4px_16px_rgba(51,56,28,0.06)]"
                 />
@@ -257,15 +260,17 @@ const Navbar = () => {
             {!isAdminOrSeller && (
               <button
                 onClick={() =>
-                  window.dispatchEvent(new CustomEvent('open-grevya-search'))
+                  window.dispatchEvent(new CustomEvent("open-grevya-search"))
                 }
-                className="group flex items-center space-x-2.5 w-40 lg:w-48 rounded-full border border-[#A68D65]/20 bg-[#F7EEE4]/20 hover:bg-white py-1.5 px-4.5 text-sm text-foreground/75 text-left cursor-pointer transition-all duration-300 hover:border-[#A68D65]/50 shadow-[inset_0_2px_4px_rgba(0,0,0,0.01)] hover:shadow-[0_4px_12px_rgba(51,56,28,0.04)]"
+                className="group flex items-center space-x-2.5 w-40 lg:w-48 rounded-full border border-[#A68D65]/20 bg-[#F7EEE4]/20 hover:bg-white py-1.5 pl-5 pr-5 text-sm text-foreground/75 text-left cursor-pointer transition-all duration-300 hover:border-[#A68D65]/50 shadow-[inset_0_2px_4px_rgba(0,0,0,0.01)] hover:shadow-[0_4px_12px_rgba(51,56,28,0.04)]"
                 aria-label="Open Spotlight Search"
               >
-                <Search className="h-4 w-4 text-neutral-400 shrink-0 group-hover:scale-105 transition-transform" />
-                <span className="text-neutral-400 text-xs flex-grow">Search...</span>
-                <kbd className="hidden lg:inline-flex h-5 select-none items-center gap-0.5 rounded border border-[#A68D65]/20 bg-white px-1.5 font-mono text-[9px] font-bold text-neutral-400 shadow-2xs">
-                  ⌘K
+                <Search className="mr-2 h-4 w-4 text-neutral-400 shrink-0 group-hover:scale-105 transition-transform" />
+                <span className="text-neutral-400 text-xs flex-grow">
+                  Search...
+                </span>
+                <kbd className="hidden lg:inline-flex h-5 select-none items-center justify-center rounded-full bg-[#A68D65]/12 px-2.5 font-mono text-[9px] font-semibold text-neutral-400">
+                  /
                 </kbd>
               </button>
             )}
@@ -276,7 +281,7 @@ const Navbar = () => {
                   variant="ghost"
                   size="icon"
                   className="rounded-full hover:bg-[#A68D65]/10 text-gray-750"
-                  title={user ? 'Account' : 'Login'}
+                  title={user ? "Account" : "Login"}
                 >
                   <User className="h-4.5 w-4.5" />
                 </Button>
@@ -305,28 +310,52 @@ const Navbar = () => {
                     </div>
 
                     {/* Customer Dropdown */}
-                    {(!profile || profile.role === 'customer') && (
+                    {(!profile || profile.role === "customer") && (
                       <>
-                        <DropdownMenuItem asChild className="focus:bg-[#A68D65]/10 cursor-pointer">
-                          <Link to="/account" className="w-full flex items-center">
+                        <DropdownMenuItem
+                          asChild
+                          className="focus:bg-[#A68D65]/10 cursor-pointer"
+                        >
+                          <Link
+                            to="/account"
+                            className="w-full flex items-center"
+                          >
                             <User className="mr-2 h-4 w-4 text-neutral-500" />
                             Profile
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild className="focus:bg-[#A68D65]/10 cursor-pointer">
-                          <Link to="/orders" className="w-full flex items-center">
+                        <DropdownMenuItem
+                          asChild
+                          className="focus:bg-[#A68D65]/10 cursor-pointer"
+                        >
+                          <Link
+                            to="/orders"
+                            className="w-full flex items-center"
+                          >
                             <Package className="mr-2 h-4 w-4 text-neutral-500" />
                             Orders
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild className="focus:bg-[#A68D65]/10 cursor-pointer">
-                          <Link to="/account?tab=wishlist" className="w-full flex items-center">
+                        <DropdownMenuItem
+                          asChild
+                          className="focus:bg-[#A68D65]/10 cursor-pointer"
+                        >
+                          <Link
+                            to="/account?tab=wishlist"
+                            className="w-full flex items-center"
+                          >
                             <Heart className="mr-2 h-4 w-4 text-neutral-500" />
                             Wishlist
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild className="focus:bg-[#A68D65]/10 cursor-pointer">
-                          <Link to="/notifications" className="w-full flex items-center">
+                        <DropdownMenuItem
+                          asChild
+                          className="focus:bg-[#A68D65]/10 cursor-pointer"
+                        >
+                          <Link
+                            to="/notifications"
+                            className="w-full flex items-center"
+                          >
                             <Bell className="mr-2 h-4 w-4 text-neutral-500" />
                             Notifications
                           </Link>
@@ -335,22 +364,40 @@ const Navbar = () => {
                     )}
 
                     {/* Seller Dropdown */}
-                    {profile?.role === 'seller' && (
+                    {profile?.role === "seller" && (
                       <>
-                        <DropdownMenuItem asChild className="focus:bg-[#A68D65]/10 cursor-pointer">
-                          <Link to="/seller/settings?tab=store" className="w-full flex items-center">
+                        <DropdownMenuItem
+                          asChild
+                          className="focus:bg-[#A68D65]/10 cursor-pointer"
+                        >
+                          <Link
+                            to="/seller/settings?tab=store"
+                            className="w-full flex items-center"
+                          >
                             <User className="mr-2 h-4 w-4 text-neutral-500" />
                             Store Profile
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild className="focus:bg-[#A68D65]/10 cursor-pointer">
-                          <Link to="/seller/settings?tab=profile" className="w-full flex items-center">
+                        <DropdownMenuItem
+                          asChild
+                          className="focus:bg-[#A68D65]/10 cursor-pointer"
+                        >
+                          <Link
+                            to="/seller/settings?tab=profile"
+                            className="w-full flex items-center"
+                          >
                             <Settings className="mr-2 h-4 w-4 text-neutral-500" />
                             Seller Settings
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild className="focus:bg-[#A68D65]/10 cursor-pointer">
-                          <Link to="/notifications" className="w-full flex items-center">
+                        <DropdownMenuItem
+                          asChild
+                          className="focus:bg-[#A68D65]/10 cursor-pointer"
+                        >
+                          <Link
+                            to="/notifications"
+                            className="w-full flex items-center"
+                          >
                             <Bell className="mr-2 h-4 w-4 text-neutral-500" />
                             Notifications
                           </Link>
@@ -359,22 +406,40 @@ const Navbar = () => {
                     )}
 
                     {/* Admin Dropdown */}
-                    {profile?.role === 'admin' && (
+                    {profile?.role === "admin" && (
                       <>
-                        <DropdownMenuItem asChild className="focus:bg-[#A68D65]/10 cursor-pointer">
-                          <Link to="/admin/settings?tab=profile" className="w-full flex items-center">
+                        <DropdownMenuItem
+                          asChild
+                          className="focus:bg-[#A68D65]/10 cursor-pointer"
+                        >
+                          <Link
+                            to="/admin/settings?tab=profile"
+                            className="w-full flex items-center"
+                          >
                             <User className="mr-2 h-4 w-4 text-neutral-500" />
                             Admin Profile
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild className="focus:bg-[#A68D65]/10 cursor-pointer">
-                          <Link to="/admin/settings?tab=preferences" className="w-full flex items-center">
+                        <DropdownMenuItem
+                          asChild
+                          className="focus:bg-[#A68D65]/10 cursor-pointer"
+                        >
+                          <Link
+                            to="/admin/settings?tab=preferences"
+                            className="w-full flex items-center"
+                          >
                             <Settings className="mr-2 h-4 w-4 text-neutral-500" />
                             Platform Settings
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild className="focus:bg-[#A68D65]/10 cursor-pointer">
-                          <Link to="/admin/notifications" className="w-full flex items-center">
+                        <DropdownMenuItem
+                          asChild
+                          className="focus:bg-[#A68D65]/10 cursor-pointer"
+                        >
+                          <Link
+                            to="/admin/notifications"
+                            className="w-full flex items-center"
+                          >
                             <Bell className="mr-2 h-4 w-4 text-neutral-500" />
                             Notifications
                           </Link>
@@ -382,7 +447,10 @@ const Navbar = () => {
                       </>
                     )}
 
-                    <DropdownMenuItem asChild className="focus:bg-[#A68D65]/10 cursor-pointer">
+                    <DropdownMenuItem
+                      asChild
+                      className="focus:bg-[#A68D65]/10 cursor-pointer"
+                    >
                       <Link to="/contact" className="w-full flex items-center">
                         <HelpCircle className="mr-2 h-4 w-4 text-neutral-500" />
                         Help
@@ -482,16 +550,11 @@ const Navbar = () => {
         {isMenuOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{
               duration: 0.35,
-              ease: [0.16, 1, 0.3, 1] as [
-                number,
-                number,
-                number,
-                number,
-              ],
+              ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
             }}
             className="md:hidden bg-[#F7EEE4] border-t border-[#A68D65]/15 py-5 px-4 shadow-xl overflow-hidden"
           >
@@ -502,8 +565,8 @@ const Navbar = () => {
                   to={item.path}
                   className={`text-base font-bold py-1 border-b border-[#A68D65]/5 ${
                     location.pathname === item.path
-                      ? 'text-[#33381C]'
-                      : 'text-[#1D1E19]'
+                      ? "text-[#33381C]"
+                      : "text-[#1D1E19]"
                   }`}
                   onClick={toggleMenu}
                 >
@@ -515,9 +578,7 @@ const Navbar = () => {
                 <button
                   onClick={() => {
                     toggleMenu();
-                    window.dispatchEvent(
-                      new CustomEvent('open-grevya-search'),
-                    );
+                    window.dispatchEvent(new CustomEvent("open-grevya-search"));
                   }}
                   className="w-full flex items-center space-x-2 rounded-full border border-[#A68D65]/20 bg-white py-2.5 px-4 text-sm text-foreground/50 text-left shadow-xs cursor-pointer"
                 >
@@ -526,7 +587,7 @@ const Navbar = () => {
                 </button>
               )}
 
-              {user && profile?.role === 'admin' && (
+              {user && profile?.role === "admin" && (
                 <>
                   <Button
                     asChild
@@ -551,7 +612,7 @@ const Navbar = () => {
                 </>
               )}
 
-              {user && profile?.role === 'seller' && (
+              {user && profile?.role === "seller" && (
                 <>
                   <Button
                     asChild
@@ -568,7 +629,10 @@ const Navbar = () => {
                     variant="outline"
                     className="w-full rounded-xl border-[#33381C]/35 text-[#33381C] font-bold"
                   >
-                    <Link to="/seller/settings?tab=profile" onClick={toggleMenu}>
+                    <Link
+                      to="/seller/settings?tab=profile"
+                      onClick={toggleMenu}
+                    >
                       <User className="mr-2 h-4 w-4 inline" />
                       My Profile
                     </Link>
@@ -576,17 +640,14 @@ const Navbar = () => {
                 </>
               )}
 
-              {(!user || profile?.role === 'customer') && (
+              {(!user || profile?.role === "customer") && (
                 <Button
                   asChild
                   variant="outline"
                   className="w-full rounded-xl border-[#33381C]/35 text-[#33381C] font-bold"
                 >
-                  <Link
-                    to={user ? '/account' : '/login'}
-                    onClick={toggleMenu}
-                  >
-                    {user ? 'My Account' : 'Login / Signup'}
+                  <Link to={user ? "/account" : "/login"} onClick={toggleMenu}>
+                    {user ? "My Account" : "Login / Signup"}
                   </Link>
                 </Button>
               )}
