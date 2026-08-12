@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Filter, SlidersHorizontal, ChevronRight, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { productImages } from '@/lib/product-images';
+import { getReviewStatsByProductId, type ReviewRatingRow } from '@/lib/reviewStats';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -128,10 +129,25 @@ const Products = () => {
 
         if (fetchError) throw fetchError;
 
+        const productIds = (data || []).map((product) => product.id);
+        const { data: reviewRows, error: reviewsError } = productIds.length === 0
+          ? { data: [], error: null }
+          : await supabase
+              .from('reviews')
+              .select('product_id, rating')
+              .in('product_id', productIds);
+
+        if (reviewsError) throw reviewsError;
+
+        const reviewStatsByProductId = getReviewStatsByProductId(
+          (reviewRows || []) as ReviewRatingRow[],
+        );
+
         const formatted = (data || []).map((item) => ({
           ...item,
           image: item.image_url,
-          rating: item.rating || 4,
+          rating: reviewStatsByProductId.get(item.id)?.averageRating ?? 0,
+          reviewCount: reviewStatsByProductId.get(item.id)?.reviewCount ?? 0,
         }));
 
         setProducts(formatted);
@@ -411,6 +427,7 @@ const Products = () => {
                           image={product.image}
                           category={product.category}
                           rating={product.rating}
+                          reviewCount={product.reviewCount}
                           slug={slug}
                         />
                       </motion.div>

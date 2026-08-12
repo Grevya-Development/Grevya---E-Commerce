@@ -75,7 +75,7 @@ const ProductCard = (props: ProductProps) => {
     window.dispatchEvent(new CustomEvent('open-grevya-quickview', { detail: props }));
   };
 
-  const displayReviewCount = reviewCount !== undefined ? reviewCount : ((id * 17) % 45 + 5);
+  const hasRatings = (reviewCount ?? 0) > 0 && typeof rating === 'number';
 
   return (
     <motion.div
@@ -197,14 +197,31 @@ const ProductCard = (props: ProductProps) => {
 
           {/* Rating & Price row */}
           <div className="flex items-center justify-between mt-1.5 md:mt-2.5 pt-0.5">
-            <div className="flex items-center">
-              <Star size={10} fill="currentColor" className="text-[#A68D65] mr-0.5" />
-              <span className="text-[9px] md:text-[10px] font-bold text-[#1D1E19]/70">
-                {rating.toFixed(1)}
-              </span>
-              <span className="text-[8px] text-[#1D1E19]/45 ml-1 hidden sm:inline">
-                ({displayReviewCount})
-              </span>
+            <div className="flex items-center min-w-0">
+              <div className="flex mr-0.5" aria-label={hasRatings ? `${rating.toFixed(1)} out of 5 stars` : 'No ratings'}>
+                {Array.from({ length: 5 }, (_, index) => (
+                  <Star
+                    key={index}
+                    size={10}
+                    fill={hasRatings && index < Math.floor(rating) ? 'currentColor' : 'none'}
+                    className={hasRatings && index < Math.floor(rating) ? 'text-[#A68D65]' : 'text-[#A68D65]/45'}
+                  />
+                ))}
+              </div>
+              {hasRatings ? (
+                <>
+                  <span className="text-[9px] md:text-[10px] font-bold text-[#1D1E19]/70">
+                    {rating.toFixed(1)}
+                  </span>
+                  <span className="text-[8px] text-[#1D1E19]/45 ml-1 hidden sm:inline">
+                    ({reviewCount})
+                  </span>
+                </>
+              ) : (
+                <span className="text-[8px] md:text-[9px] font-bold text-[#1D1E19]/45 whitespace-nowrap">
+                  No ratings
+                </span>
+              )}
             </div>
             <p className="text-xs md:text-base font-extrabold text-[#33381C] tracking-tight">
               ₹{price.toFixed(0)}
