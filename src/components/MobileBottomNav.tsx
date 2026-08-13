@@ -8,17 +8,11 @@ import { motion } from 'framer-motion';
 export default function MobileBottomNav() {
   const location = useLocation();
   const { user } = useAuth();
-  const getTotalItems = useCartStore((state) => state.getTotalItems);
-  const [cartCount, setCartCount] = useState(0);
+  const cartCount = useCartStore((state) => state.items.length);
   
   // Scroll visibility states
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
-
-  // Sync cart count
-  useEffect(() => {
-    setCartCount(getTotalItems());
-  }, [getTotalItems]);
 
   // Scroll listener to hide dock on scroll down
   useEffect(() => {
