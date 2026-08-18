@@ -10,6 +10,7 @@ import { useCartStore } from '@/store/useCartStore';
 import { supabase } from '@/lib/supabaseClient';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
+import { getProductStockDetails, SellableVariant } from '@/lib/stock';
 
 interface Review {
   id: string;
@@ -17,7 +18,15 @@ interface Review {
   rating: number;
   comment: string;
   created_at: string;
+  user_id: string | null;
+  profiles: {
+    username: string | null;
+    full_name: string | null;
+  } | null;
 }
+
+const getReviewerName = (review: Review) =>
+  review.profiles?.username || review.profiles?.full_name || 'Anonymous';
 
 const ProductDetail = () => {
   const { slug } = useParams();
@@ -25,10 +34,13 @@ const ProductDetail = () => {
   const { user } = useAuth();
   const [quantity, setQuantity] = useState(1);
   const addItem = useCartStore((state) => state.addItem);
+  const cartItems = useCartStore((state) => state.items);
 
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [variants, setVariants] = useState<SellableVariant[]>([]);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>();
 
   // Reviews State
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -42,14 +54,14 @@ const ProductDetail = () => {
     try {
       const { data: revData, error: revError } = await supabase
         .from('reviews')
-        .select('*')
+        .select('id, product_id, rating, comment, created_at, user_id, profiles(username, full_name)')
         .eq('product_id', productId)
         .order('created_at', { ascending: false });
 
       if (revError && !(revError.message || '').includes('relation')) {
         console.error("Reviews fetch error:", revError);
       } else if (revData) {
-        setReviews(revData);
+        setReviews(revData as Review[]);
         if (revData.length > 0) {
           const sum = revData.reduce((acc, curr) => acc + curr.rating, 0);
           setAverageRating(Math.round((sum / revData.length) * 10) / 10);
@@ -81,6 +93,9 @@ const ProductDetail = () => {
         setProduct(matchedProduct);
 
         if (matchedProduct) {
+          const stockDetails = await getProductStockDetails(matchedProduct.id);
+          setVariants(stockDetails.variants);
+          setSelectedVariantId(stockDetails.variants[0]?.id);
           await fetchReviews(matchedProduct.id);
         }
 
@@ -95,13 +110,30 @@ const ProductDetail = () => {
     if (slug) fetchProduct();
   }, [slug]);
 
-  const addToCart = () => {
+  const selectedVariant = variants.find((variant) => variant.id === selectedVariantId);
+  const availableStock = selectedVariant ? selectedVariant.stock : Math.max(0, Number(product?.stock) || 0);
+  const existingCartQuantity = product
+    ? cartItems.find((item) => item.id === product.id && item.variant_id === selectedVariant?.id)?.quantity || 0
+    : 0;
+  const availableToAdd = Math.max(0, availableStock - existingCartQuantity);
+  const isOutOfStock = availableStock < 1;
+  const canAddToCart = !isOutOfStock && availableToAdd > 0;
+
+  useEffect(() => {
+    setQuantity((current) => Math.max(1, Math.min(current, availableToAdd || 1)));
+  }, [availableToAdd]);
+
+  const addToCart = async () => {
     if (product) {
+      if (quantity < 1 || quantity > availableToAdd) {
+        toast({ title: 'Stock limit reached', description: availableToAdd ? `Only ${availableToAdd} more units can be added to your cart.` : (availableStock ? `All ${availableStock} available units are already in your cart.` : 'This product is out of stock.'), variant: 'destructive' });
+        return;
+      }
       const slugValue = (product.name || '').toLowerCase().replace(/\s+/g, '-');
-      addItem({
+      const result = await addItem({
         id: product.id,
-        variant_id: product.variant_id,
-        sku: product.sku,
+        variant_id: selectedVariant?.id,
+        sku: selectedVariant?.sku,
         name: product.name,
         price: product.price,
         rating: averageRating || product.rating || 4,
@@ -109,6 +141,10 @@ const ProductDetail = () => {
         category: product.category || 'general',
         slug: slugValue,
       }, quantity);
+      if (!result.ok) {
+        toast({ title: 'Stock limit reached', description: result.availableStock ? `Only ${result.availableStock} units are available.` : 'This product is out of stock.', variant: 'destructive' });
+        return;
+      }
       toast({
         title: "Added to cart",
         description: `${quantity} × ${product.name} added to your cart`,
@@ -275,7 +311,7 @@ const ProductDetail = () => {
               <div className="grid grid-cols-2 gap-4 mb-10">
                 <div className="flex items-center text-neutral-700 bg-neutral-50 px-4 py-3 rounded-2xl border border-neutral-100">
                   <Package className="h-6 w-6 mr-3 text-green-700" />
-                  <span className="font-medium text-sm">In stock ({product.stock})</span>
+                  <span className="font-medium text-sm">{isOutOfStock ? 'Out of stock' : `In stock (${availableStock})`}</span>
                 </div>
                 <div className="flex items-center text-neutral-700 bg-neutral-50 px-4 py-3 rounded-2xl border border-neutral-100">
                   <Leaf className="h-6 w-6 mr-3 text-green-700" />
@@ -292,24 +328,34 @@ const ProductDetail = () => {
               </div>
 
               {/* CTA Section */}
+              {variants.length > 1 && (
+                <div className="mb-4">
+                  <label className="block text-sm font-bold text-neutral-700 mb-2">Variant</label>
+                  <select value={selectedVariantId} onChange={(event) => setSelectedVariantId(event.target.value)} className="w-full h-12 rounded-xl border border-neutral-200 bg-white px-3 font-medium">
+                    {variants.map((variant, index) => <option key={variant.id} value={variant.id}>{Object.values(variant.attributes || {}).filter(Boolean).join(' / ') || `Variant ${index + 1}`} — {variant.stock} available</option>)}
+                  </select>
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row gap-4 mb-4 mt-12 bg-white p-2 rounded-2xl border border-neutral-200 shadow-sm">
                 <div className="flex items-center bg-neutral-50 rounded-xl px-2 w-full sm:w-auto overflow-hidden">
                   <button
                     className="h-12 w-12 flex justify-center items-center text-neutral-500 hover:text-neutral-900 transition-colors"
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    onClick={() => setQuantity((current) => Math.max(1, current - 1))}
+                    disabled={isOutOfStock}
                   >
                     <span className="text-2xl font-light">-</span>
                   </button>
                   <span className="w-12 text-center text-lg font-bold text-neutral-900">{quantity}</span>
                   <button
                     className="h-12 w-12 flex justify-center items-center text-neutral-500 hover:text-neutral-900 transition-colors"
-                    onClick={() => setQuantity(quantity + 1)}
+                    onClick={() => setQuantity((current) => Math.min(current + 1, availableToAdd))}
+                    disabled={!canAddToCart || quantity >= availableToAdd}
                   >
                     <span className="text-2xl font-light">+</span>
                   </button>
                 </div>
 
-                <Button className="flex-1 h-16 text-lg font-bold w-full rounded-xl flex items-center justify-center shadow-lg shadow-green-900/20 bg-green-800 hover:bg-green-900 text-white transition-all hover:scale-[1.02] active:scale-[0.98]" onClick={addToCart}>
+                <Button disabled={!canAddToCart} className="flex-1 h-16 text-lg font-bold w-full rounded-xl flex items-center justify-center shadow-lg shadow-green-900/20 bg-green-800 hover:bg-green-900 text-white transition-all hover:scale-[1.02] active:scale-[0.98]" onClick={addToCart}>
                   <ShoppingCart className="mr-3 h-6 w-6" />
                   Add to Cart
                 </Button>
@@ -408,22 +454,27 @@ const ProductDetail = () => {
                        key={review.id} 
                        className="bg-white p-8 rounded-3xl shadow-sm border border-neutral-100 hover:shadow-md transition-shadow"
                     >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex">
-                            {[...Array(5)].map((_, i) => (
-                              <Star
-                                key={i}
-                                size={18}
-                                fill={i < review.rating ? "currentColor" : "none"}
-                                stroke="currentColor"
-                                className={i < review.rating ? "text-clay" : "text-neutral-200"}
-                              />
-                            ))}
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <p className="text-sm font-extrabold text-neutral-800 mb-1.5">
+                            {getReviewerName(review)}
+                          </p>
+                          <div className="flex items-center gap-3">
+                            <div className="flex">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  size={18}
+                                  fill={i < review.rating ? "currentColor" : "none"}
+                                  stroke="currentColor"
+                                  className={i < review.rating ? "text-clay" : "text-neutral-200"}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-sm font-extrabold text-neutral-800">
+                              {review.rating}.0
+                            </span>
                           </div>
-                          <span className="text-sm font-extrabold text-neutral-800">
-                            {review.rating}.0
-                          </span>
                         </div>
                         <p className="text-sm font-medium text-neutral-400">
                           {new Date(review.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric'})}

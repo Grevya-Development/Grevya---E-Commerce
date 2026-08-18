@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { useCartStore } from "@/store/useCartStore";
+import { formatOrderPlacedMessage } from "@/lib/orderItemContext";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import { openRazorpayCheckout, RazorpayResponse } from "@/lib/razorpay";
@@ -549,6 +550,10 @@ const Checkout = () => {
     paymentReference?: RazorpayResponse,
   ) => {
     if (!user) throw new Error("Please sign in before checkout.");
+    const cartStockIsValid = await useCartStore.getState().validateCartStock();
+    if (!cartStockIsValid) {
+      throw new Error("Cart quantities were adjusted to match current stock. Please review your cart and try again.");
+    }
 
     // Older persisted carts contain only a product id. The production schema
     // owns SKU on product_variants, so resolve the single active variant before
@@ -684,7 +689,7 @@ console.log(matchingVariants);
 
     const notifPayload = {
       user_id: user.id,
-      message: `Order ${orderReference} has been placed successfully!`,
+      message: formatOrderPlacedMessage(orderReference, orderItems),
       type: "order",
       title: "Order Placed",
       is_read: false,

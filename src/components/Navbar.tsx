@@ -29,8 +29,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const getTotalItems = useCartStore((state) => state.getTotalItems);
-  const [cartCount, setCartCount] = useState(0);
+  const cartCount = useCartStore((state) => state.items.length);
   const { user, profile, signOut } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
@@ -43,11 +42,6 @@ const Navbar = () => {
       localStorage.removeItem("grevya-theme");
     }
   }, []);
-
-  // Hydration fix for client-only state vs SSR output mismatch
-  useEffect(() => {
-    setCartCount(getTotalItems());
-  }, [getTotalItems]);
 
   // Scroll listener to activate shrinking floating panel
   useEffect(() => {

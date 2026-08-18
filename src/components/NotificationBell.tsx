@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatOrderPlacedMessage } from '@/lib/orderItemContext';
 
 interface Notification {
   id: string;
@@ -18,6 +19,15 @@ interface Notification {
   created_at: string;
   read: boolean;
 }
+
+interface OrderWithItems {
+  id: string;
+  order_number: string;
+  order_items?: Array<{ product_name?: string | null }>;
+}
+
+const orderReferenceFromGenericMessage = (message: string) =>
+  message.match(/^Order (.+?) has been placed successfully!?$/)?.[1];
 
 const NotificationBell = () => {
   const { user } = useAuth();
@@ -49,8 +59,35 @@ const NotificationBell = () => {
       }
       
       const notifs = data ? (data as Notification[]) : [];
-      setNotifications(notifs);
-      setUnreadCount(notifs.filter((n) => !n.read).length);
+      const orderReferences = Array.from(new Set(
+        notifs
+          .filter((notification) => notification.type === 'order')
+          .map((notification) => orderReferenceFromGenericMessage(notification.message))
+          .filter((reference): reference is string => Boolean(reference)),
+      ));
+
+      let enrichedNotifications = notifs;
+      if (orderReferences.length > 0) {
+        const { data: orderRows, error: ordersError } = await supabase
+          .from('orders')
+          .select('id, order_number, order_items(product_name)')
+          .eq('user_id', user.id)
+          .in('order_number', orderReferences);
+        if (ordersError) throw ordersError;
+
+        const ordersByReference = new Map(
+          ((orderRows || []) as OrderWithItems[]).map((order) => [order.order_number, order]),
+        );
+        enrichedNotifications = notifs.map((notification) => {
+          const reference = orderReferenceFromGenericMessage(notification.message);
+          const order = reference ? ordersByReference.get(reference) : undefined;
+          return order
+            ? { ...notification, message: formatOrderPlacedMessage(reference!, order.order_items) }
+            : notification;
+        });
+      }
+      setNotifications(enrichedNotifications);
+      setUnreadCount(enrichedNotifications.filter((n) => !n.read).length);
     } catch (err) {
       console.error("Failed to load notifications:", err);
       setNotifications([]);
@@ -218,7 +255,7 @@ const NotificationBell = () => {
                 initial={{ opacity: 0, scale: 0.4 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.4 }}
-                className="absolute -top-1 -right-1 bg-red-650 text-white text-[9px] rounded-full w-4.5 h-4.5 flex items-center justify-center font-bold"
+                className="absolute -top-0.5 -right-0.5 bg-[#33381C] text-[#F7EEE4] text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold"
               >
                 {unreadCount}
               </motion.span>

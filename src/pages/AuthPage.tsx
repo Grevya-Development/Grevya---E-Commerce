@@ -16,7 +16,7 @@ import {
   UserCheck,
   Building,
   User,
-  AlertCircle
+  AlertCircle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/lib/supabaseClient";
@@ -30,14 +30,14 @@ import {
   normalizePhone,
   validateEmail,
   validatePassword,
-  validatePhone
+  validatePhone,
 } from "@/lib/authValidation";
 import {
   requestPasswordReset,
   signInWithEmail,
   signUpWithEmail,
   startOAuthSignIn,
-  updateAuthPassword
+  updateAuthPassword,
 } from "@/lib/authService";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -145,8 +145,14 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   const getExpectedRole = () => {
     if (path.startsWith("/seller/")) return "seller";
     if (path.startsWith("/admin/")) return "admin";
-    if (path.startsWith("/account/register") || path.startsWith("/signup")) return "customer";
-    if (path.startsWith("/account/login") || path.startsWith("/login") || path.startsWith("/auth")) return "customer";
+    if (path.startsWith("/account/register") || path.startsWith("/signup"))
+      return "customer";
+    if (
+      path.startsWith("/account/login") ||
+      path.startsWith("/login") ||
+      path.startsWith("/auth")
+    )
+      return "customer";
     return undefined;
   };
 
@@ -161,7 +167,9 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   const from = (location.state as any)?.from?.pathname || defaultRedirect();
 
   // Multi-role experience routing support
-  const [selectedRole, setSelectedRole] = useState<"customer" | "seller" | "admin" | undefined>(() => {
+  const [selectedRole, setSelectedRole] = useState<
+    "customer" | "seller" | "admin" | undefined
+  >(() => {
     if (path.startsWith("/seller/")) return "seller";
     if (path.startsWith("/admin/")) return "admin";
     return undefined;
@@ -178,7 +186,10 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   const inFlightRef = useRef(false);
 
   // Role validation conflict state
-  const [validationError, setValidationError] = useState<{ expected: string; actual: string } | null>(null);
+  const [validationError, setValidationError] = useState<{
+    expected: string;
+    actual: string;
+  } | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [multipleRolesChooser, setMultipleRolesChooser] = useState(false);
 
@@ -219,11 +230,12 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
 
         if (availableRoles.includes(target)) {
           if (target === "seller") {
-            const { data: sellerApplication, error: sellerApplicationError } = await supabase
-              .from("seller_applications")
-              .select("status")
-              .eq("user_id", user.id)
-              .maybeSingle();
+            const { data: sellerApplication, error: sellerApplicationError } =
+              await supabase
+                .from("seller_applications")
+                .select("status")
+                .eq("user_id", user.id)
+                .maybeSingle();
 
             if (sellerApplicationError) throw sellerApplicationError;
 
@@ -255,6 +267,14 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   const handleRoleSelection = (role: "customer" | "seller") => {
     setSelectedRole(role);
     setErrors({});
+    // Navigate to the role-scoped route so the URL matches the selected experience
+    if (role === "seller") {
+      navigate(mode === "signup" ? "/seller/signup" : "/seller/login", {
+        replace: false,
+      });
+    } else {
+      navigate(mode === "signup" ? "/signup" : "/login", { replace: false });
+    }
   };
 
   const validateForm = () => {
@@ -403,7 +423,6 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
 
       <main className="flex-grow flex items-center justify-center px-4 py-8 md:py-16">
         <div className="w-full max-w-5xl overflow-hidden rounded-[2.5rem] border border-[#A68D65]/20 bg-white shadow-2xl grid md:grid-cols-[1.1fr_1fr] min-h-[640px] relative">
-          
           {/* Left panel cinematic decorative sidebar */}
           <section className="relative hidden p-12 text-[#F7EEE4] md:flex md:flex-col md:justify-between overflow-hidden md:order-1 border-r border-[#A68D65]/10">
             {/* Dark Forest background layer */}
@@ -430,7 +449,8 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                 Traceable Sourcing, Zero Waste.
               </h1>
               <p className="text-white/70 text-sm leading-relaxed max-w-sm font-medium">
-                Access your partner account or shopping profile. Verified organic materials cataloging and eco-sustainability guarantees.
+                Access your partner account or shopping profile. Verified
+                organic materials cataloging and eco-sustainability guarantees.
               </p>
             </div>
 
@@ -477,7 +497,6 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
 
           {/* Form panel container */}
           <section className="relative p-8 sm:p-12 flex flex-col justify-center md:order-2">
-            
             {/* Loading overlays */}
             {loading && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/85 backdrop-blur-xs rounded-[2rem]">
@@ -501,13 +520,22 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                     Access Denied
                   </h2>
                   <p className="text-neutral-500 text-xs max-w-sm mx-auto leading-relaxed">
-                    This account is registered as a <span className="font-bold text-[#33381C] capitalize">{validationError.actual}</span>.
-                    You cannot access the <span className="capitalize">{validationError.expected}</span> portal with these credentials.
+                    This account is registered as a{" "}
+                    <span className="font-bold text-[#33381C] capitalize">
+                      {validationError.actual}
+                    </span>
+                    . You cannot access the{" "}
+                    <span className="capitalize">
+                      {validationError.expected}
+                    </span>{" "}
+                    portal with these credentials.
                   </p>
                 </div>
                 <div className="flex flex-col gap-3 max-w-xs mx-auto pt-4">
                   <Button
-                    onClick={() => handleResolveMismatch(validationError.actual)}
+                    onClick={() =>
+                      handleResolveMismatch(validationError.actual)
+                    }
                     className="h-11 rounded-xl bg-[#33381C] hover:bg-[#262A14] text-xs font-bold w-full"
                   >
                     Continue as {validationError.actual.toUpperCase()}
@@ -584,7 +612,8 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                         Customer Portal
                       </h3>
                       <p className="text-[11px] text-neutral-500 mt-1 leading-normal font-medium">
-                        Continue shopping, browse verified organic materials, and track purchases.
+                        Continue shopping, browse verified organic materials,
+                        and track purchases.
                       </p>
                     </div>
                   </button>
@@ -602,7 +631,8 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                         Seller Dashboard
                       </h3>
                       <p className="text-[11px] text-neutral-500 mt-1 leading-normal font-medium">
-                        Configure store inventories, check catalogs, and monitor analytics.
+                        Configure store inventories, check catalogs, and monitor
+                        analytics.
                       </p>
                     </div>
                   </button>
@@ -627,7 +657,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                           if (expectedRole) return; // If direct link, block going back to selection
                           setSelectedRole(undefined);
                         }}
-                        className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-neutral-100 hover:bg-[#33381C]/5 text-[#33381C] ${expectedRole ? 'opacity-70 pointer-events-none' : ''}`}
+                        className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-neutral-100 hover:bg-[#33381C]/5 text-[#33381C] ${expectedRole ? "opacity-70 pointer-events-none" : ""}`}
                       >
                         {selectedRole} portal
                       </button>
@@ -649,11 +679,26 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                           onClick={() => handleSocialSignIn("google")}
                           className="h-11 rounded-xl border-[#A68D65]/25 hover:bg-neutral-50 flex items-center justify-center gap-2 text-xs font-bold text-neutral-700"
                         >
-                          <svg className="h-4 w-4 mr-1 shrink-0" viewBox="0 0 24 24">
-                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" />
-                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 12-4.53z" />
+                          <svg
+                            className="h-4 w-4 mr-1 shrink-0"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              fill="#4285F4"
+                              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                            />
+                            <path
+                              fill="#34A853"
+                              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                            />
+                            <path
+                              fill="#FBBC05"
+                              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z"
+                            />
+                            <path
+                              fill="#EA4335"
+                              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 12-4.53z"
+                            />
                           </svg>
                           Google
                         </Button>
@@ -663,7 +708,11 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                           onClick={() => handleSocialSignIn("apple")}
                           className="h-11 rounded-xl border-[#A68D65]/25 hover:bg-neutral-50 flex items-center justify-center gap-2 text-xs font-bold text-neutral-700"
                         >
-                          <svg className="h-4 w-4 mr-1 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                          <svg
+                            className="h-4 w-4 mr-1 shrink-0"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
                             <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.22.67-2.94 1.5-.64.74-1.2 1.88-1.05 3 .9.07 2.05-.59 2.76-1.34" />
                           </svg>
                           Apple
@@ -781,10 +830,17 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                       <span className="text-neutral-500">
                         New to Grevya?{" "}
                         <button
-                          onClick={() => navigate(selectedRole === "seller" ? "/seller/register" : "/signup")}
+                          onClick={() =>
+                            navigate(
+                              selectedRole === "seller"
+                                ? "/seller/signup"
+                                : "/signup",
+                            )
+                          }
                           className="font-bold text-[#33381C] hover:underline"
                         >
-                          Create {selectedRole === "seller" ? "Seller" : "an"} Account
+                          Create {selectedRole === "seller" ? "Seller" : "an"}{" "}
+                          Account
                         </button>
                       </span>
                     )}
@@ -792,7 +848,13 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                       <span className="text-neutral-500">
                         Already have an account?{" "}
                         <button
-                          onClick={() => navigate(selectedRole === "seller" ? "/seller/login" : "/login")}
+                          onClick={() =>
+                            navigate(
+                              selectedRole === "seller"
+                                ? "/seller/login"
+                                : "/login",
+                            )
+                          }
                           className="font-bold text-[#33381C] hover:underline"
                         >
                           Sign In
@@ -802,7 +864,13 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                     {(mode === "forgot" || mode === "reset") && (
                       <Link
                         className="font-bold text-[#33381C] hover:underline mx-auto"
-                        to={selectedRole === "admin" ? "/admin/login" : selectedRole === "seller" ? "/seller/login" : "/login"}
+                        to={
+                          selectedRole === "admin"
+                            ? "/admin/login"
+                            : selectedRole === "seller"
+                              ? "/seller/login"
+                              : "/login"
+                        }
                       >
                         Back to Login
                       </Link>
@@ -811,7 +879,6 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                 </motion.div>
               </AnimatePresence>
             )}
-
           </section>
         </div>
       </main>

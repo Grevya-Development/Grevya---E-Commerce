@@ -46,9 +46,13 @@ export default function QuickViewModal() {
     return () => window.removeEventListener('open-grevya-quickview', handleOpenQuickView as EventListener);
   }, []);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return;
-    addItem(product, quantity);
+    const result = await addItem(product, quantity);
+    if (!result.ok) {
+      toast({ title: 'Stock limit reached', description: result.availableStock ? `Only ${result.availableStock} units are available.` : 'This product is out of stock.', variant: 'destructive' });
+      return;
+    }
     toast({
       title: "Added to cart",
       description: `${quantity} × ${product.name} added to your cart`,

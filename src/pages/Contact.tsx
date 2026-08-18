@@ -52,6 +52,45 @@ const FAQItem = ({ question, answer }: { question: string; answer: string }) => 
   );
 };
 
+const FloatingInput = ({
+  label,
+  type = 'text',
+  value,
+  onChange,
+  required = false,
+  disabled = false,
+}: {
+  label: string;
+  type?: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  required?: boolean;
+  disabled?: boolean;
+}) => {
+  const inputId = `contact-${label.toLowerCase().replace(/\s+/g, '-')}`;
+  return (
+    <div className="relative z-0 w-full group">
+      <input
+        type={type}
+        id={inputId}
+        name={inputId}
+        className="block py-2.5 px-0 w-full text-sm text-[#1D1E19] bg-transparent border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-[#33381C] peer"
+        placeholder=" "
+        value={value}
+        onChange={onChange}
+        required={required}
+        disabled={disabled}
+      />
+      <label
+        htmlFor={inputId}
+        className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10 origin-[0] peer-focus:left-0 peer-focus:text-[#33381C] peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75"
+      >
+        {label}
+      </label>
+    </div>
+  );
+};
+
 const Contact = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -158,46 +197,6 @@ const Contact = () => {
       answer: 'Absolutely. Our molded areca palm leaf plates are highly heat-resistant, microwave-safe for up to 2 minutes, and freezer-safe. They hold both hot liquids and cold foods perfectly.',
     },
   ];
-
-  // Reusable FloatingInput inside Contact page
-  const FloatingInput = ({
-    label,
-    type = 'text',
-    value,
-    onChange,
-    required = false,
-    disabled = false,
-  }: {
-    label: string;
-    type?: string;
-    value: string;
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    required?: boolean;
-    disabled?: boolean;
-  }) => {
-    const inputId = `contact-${label.toLowerCase().replace(/\s+/g, '-')}`;
-    return (
-      <div className="relative z-0 w-full group">
-        <input
-          type={type}
-          id={inputId}
-          name={inputId}
-          className="block py-2.5 px-0 w-full text-sm text-[#1D1E19] bg-transparent border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-[#33381C] peer"
-          placeholder=" "
-          value={value}
-          onChange={onChange}
-          required={required}
-          disabled={disabled}
-        />
-        <label
-          htmlFor={inputId}
-          className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10 origin-[0] peer-focus:left-0 peer-focus:text-[#33381C] peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75"
-        >
-          {label}
-        </label>
-      </div>
-    );
-  };
 
   return (
     <div className="flex flex-col min-h-screen bg-[#FBF9F6] text-[#1D1E19]">

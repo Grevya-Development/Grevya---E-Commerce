@@ -13,6 +13,7 @@ import MemberBenefitsBar from "@/components/MemberBenefitsBar";
 import SpotlightSearch from "@/components/SpotlightSearch";
 import QuickViewModal from "@/components/QuickViewModal";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import ScrollToTop from "@/components/ScrollToTop";
 
 // Lazy-loaded pages
 const Index = lazy(() => import("./pages/Index"));
@@ -64,12 +65,15 @@ const SellerOrders = lazy(() => import("./pages/seller/SellerOrders"));
 const PendingProducts = lazy(() => import("./pages/seller/PendingProducts"));
 const SellerSettings = lazy(() => import("./pages/seller/SellerSettings"));
 const SellerOnboarding = lazy(() => import("./pages/seller/SellerOnboarding"));
-const SellerApplicationForm = lazy(() => import("./pages/seller/SellerApplicationForm"));
+const SellerApplicationForm = lazy(
+  () => import("./pages/seller/SellerApplicationForm"),
+);
 
 const AppContent = () => {
   const location = useLocation();
   return (
     <>
+      <ScrollToTop />
       <MemberBenefitsBar />
       <SpotlightSearch />
       <QuickViewModal />
@@ -109,6 +113,7 @@ const AppContent = () => {
               <Route path="/signup" element={<Signup />} />
               <Route path="/account/register" element={<Signup />} />
               <Route path="/seller/register" element={<Signup />} />
+              <Route path="/seller/signup" element={<Signup />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
@@ -145,7 +150,7 @@ const AppContent = () => {
                   </ProtectedRoute>
                 }
               />
-               <Route
+              <Route
                 path="/notifications"
                 element={
                   <ProtectedRoute

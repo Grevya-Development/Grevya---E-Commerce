@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Filter, SlidersHorizontal, ChevronRight, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { productImages } from '@/lib/product-images';
+import { getReviewStatsByProductId, type ReviewRatingRow } from '@/lib/reviewStats';
+import { searchProducts } from '@/lib/productSearch';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -98,6 +100,13 @@ const Products = () => {
       desc: 'Curcumin turmeric, forest honey & spices'
     },
     {
+      id: 'Organic Pantry',
+      name: 'Organic Pantry',
+      image: 'https://pureandsure.in/cdn/shop/files/WhatsAppImage2025-08-06at1.37.26PM_1200x1200.jpg?v=1754468550',
+      tag: 'Kitchen Pantry',
+      desc: 'Curcumin turmeric, forest honey & spices'
+    },
+    {
       id: 'Kitchen & Dining',
       name: 'Kitchen & Dining',
       image: 'https://images.unsplash.com/photo-1531234799389-d8793a28f317?q=80&w=600&auto=format&fit=crop',
@@ -128,10 +137,25 @@ const Products = () => {
 
         if (fetchError) throw fetchError;
 
+        const productIds = (data || []).map((product) => product.id);
+        const { data: reviewRows, error: reviewsError } = productIds.length === 0
+          ? { data: [], error: null }
+          : await supabase
+              .from('reviews')
+              .select('product_id, rating')
+              .in('product_id', productIds);
+
+        if (reviewsError) throw reviewsError;
+
+        const reviewStatsByProductId = getReviewStatsByProductId(
+          (reviewRows || []) as ReviewRatingRow[],
+        );
+
         const formatted = (data || []).map((item) => ({
           ...item,
           image: item.image_url,
-          rating: item.rating || 4,
+          rating: reviewStatsByProductId.get(item.id)?.averageRating ?? 0,
+          reviewCount: reviewStatsByProductId.get(item.id)?.reviewCount ?? 0,
         }));
 
         setProducts(formatted);
@@ -157,14 +181,9 @@ const Products = () => {
       );
     }
 
-    // 1b. Search Filter (by name or description)
+    // 1b. Search Filter (shared relevance rules)
     if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      result = result.filter(
-        (p) =>
-          (p.name || '').toLowerCase().includes(q) ||
-          (p.description || '').toLowerCase().includes(q)
-      );
+      result = searchProducts(result, searchQuery);
     }
 
     // 2. Sorting
@@ -173,7 +192,15 @@ const Products = () => {
     } else if (sortBy === 'price-desc') {
       result.sort((a, b) => b.price - a.price);
     } else if (sortBy === 'rating') {
-      result.sort((a, b) => b.rating - a.rating);
+      result.sort((a, b) => {
+        const ratingDifference = b.rating - a.rating;
+
+        if (ratingDifference !== 0) return ratingDifference;
+
+        const reviewCountDifference = b.reviewCount - a.reviewCount;
+
+        return reviewCountDifference !== 0 ? reviewCountDifference : a.id - b.id;
+      });
     }
 
     setFilteredProducts(result);
@@ -411,6 +438,7 @@ const Products = () => {
                           image={product.image}
                           category={product.category}
                           rating={product.rating}
+                          reviewCount={product.reviewCount}
                           slug={slug}
                         />
                       </motion.div>

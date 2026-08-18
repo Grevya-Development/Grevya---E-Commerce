@@ -4,14 +4,22 @@ import { Search, X, TrendingUp, History, CornerDownLeft, Sparkles } from 'lucide
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import { ProductProps } from './ProductCard';
+import { searchProducts } from '@/lib/productSearch';
+
+type SpotlightProduct = ProductProps & {
+  description?: string | null;
+  subcategory?: string | null;
+  tags?: string[] | string | null;
+  keywords?: string[] | string | null;
+};
 
 export default function SpotlightSearch() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [products, setProducts] = useState<ProductProps[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<ProductProps[]>([]);
+  const [products, setProducts] = useState<SpotlightProduct[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<SpotlightProduct[]>([]);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -79,7 +87,7 @@ export default function SpotlightSearch() {
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 80);
-      setSelectedIndex(0);
+      setSelectedIndex(-1);
     } else {
       setQuery('');
     }
@@ -92,31 +100,33 @@ export default function SpotlightSearch() {
       return;
     }
 
-    const lowercaseQuery = query.toLowerCase();
-    const matches = products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(lowercaseQuery) ||
-        p.category.toLowerCase().includes(lowercaseQuery)
-    );
-    setFilteredProducts(matches.slice(0, 5)); // Limit to top 5 hits
-    setSelectedIndex(0);
+    const matches = searchProducts(products, query).slice(0, 5);
+
+    setFilteredProducts(matches); // Limit to top 5 relevant hits
+    setSelectedIndex(-1);
   }, [query, products]);
 
   // Handle keyboard navigation inside search overlay
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
-    if (filteredProducts.length === 0) return;
-
     if (e.key === 'ArrowDown') {
+      if (filteredProducts.length === 0) return;
       e.preventDefault();
       setSelectedIndex((prev) => (prev + 1) % filteredProducts.length);
     } else if (e.key === 'ArrowUp') {
+      if (filteredProducts.length === 0) return;
       e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + filteredProducts.length) % filteredProducts.length);
+      setSelectedIndex((prev) =>
+        prev === -1
+          ? filteredProducts.length - 1
+          : (prev - 1 + filteredProducts.length) % filteredProducts.length,
+      );
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const selected = filteredProducts[selectedIndex];
       if (selected) {
         handleProductSelect(selected);
+      } else if (query.trim()) {
+        handleQuerySearchSubmit(query);
       }
     }
   };
