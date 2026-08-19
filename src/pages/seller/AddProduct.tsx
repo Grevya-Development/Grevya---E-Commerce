@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import {
   BadgeCheck,
@@ -62,6 +62,15 @@ const categoryOptions = [
 const placeholderImage =
   "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=900&q=80";
 
+const productImagesBucket = "product-images";
+const maxImageSizeBytes = 5 * 1024 * 1024;
+const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const imageExtensions: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
 const inputClass =
   "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-[#A68D65] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#E7E9DD]";
 
@@ -72,6 +81,23 @@ export default function AddProduct() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [imageBroken, setImageBroken] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(
+    null,
+  );
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!selectedImage) {
+      setSelectedImagePreview(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(selectedImage);
+    setSelectedImagePreview(previewUrl);
+
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [selectedImage]);
 
   const readiness = useMemo(() => {
     const checks = [
@@ -80,11 +106,11 @@ export default function AddProduct() {
       Boolean(form.description.trim() && form.description.trim().length >= 30),
       Number(form.price) > 0,
       Number(form.stock) >= 0 && form.stock !== "",
-      Boolean(form.image_url.trim()),
+      Boolean(selectedImage || form.image_url.trim()),
     ];
 
     return Math.round((checks.filter(Boolean).length / checks.length) * 100);
-  }, [form]);
+  }, [form, selectedImage]);
 
   const previewPrice = Number(form.price || 0);
   const previewStock = Number(form.stock || 0);
@@ -112,6 +138,33 @@ export default function AddProduct() {
     setMessage(null);
     setError(null);
     setImageBroken(false);
+    setSelectedImage(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
+
+  const handleImageSelection = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setMessage(null);
+    setError(null);
+
+    if (!acceptedImageTypes.has(file.type)) {
+      setSelectedImage(null);
+      e.target.value = "";
+      setError("Choose a JPEG, PNG, or WebP image.");
+      return;
+    }
+
+    if (file.size > maxImageSizeBytes) {
+      setSelectedImage(null);
+      e.target.value = "";
+      setError("Choose an image smaller than 5 MB.");
+      return;
+    }
+
+    setSelectedImage(file);
+    setImageBroken(false);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -131,6 +184,9 @@ export default function AddProduct() {
     setError(null);
     setMessage(null);
 
+    let uploadedImagePath: string | null = null;
+    let removeUploadedImage = false;
+
     try {
       const { data: store, error: storeError } = await supabase
         .from("stores")
@@ -147,6 +203,35 @@ export default function AddProduct() {
         return;
       }
 
+      let imageUrl = form.image_url.trim();
+      if (selectedImage) {
+        const extension = imageExtensions[selectedImage.type];
+        uploadedImagePath = `${user.id}/${crypto.randomUUID()}.${extension}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(productImagesBucket)
+          .upload(uploadedImagePath, selectedImage, {
+            contentType: selectedImage.type,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          throw new Error(`Image upload failed: ${uploadError.message}`);
+        }
+
+        removeUploadedImage = true;
+
+        const { data: publicUrlData } = supabase.storage
+          .from(productImagesBucket)
+          .getPublicUrl(uploadedImagePath);
+
+        if (!publicUrlData.publicUrl) {
+          throw new Error("Image upload succeeded, but its public URL could not be created.");
+        }
+
+        imageUrl = publicUrlData.publicUrl;
+      }
+
       const { data: product, error: productError } = await supabase
         .from("products")
         .insert({
@@ -157,7 +242,7 @@ export default function AddProduct() {
           price: previewPrice,
           stock: previewStock,
           category: form.category.trim(),
-          image_url: form.image_url.trim(),
+          image_url: imageUrl,
           is_featured: false,
           is_hidden: false,
           product_status: "pending",
@@ -168,6 +253,7 @@ export default function AddProduct() {
 
       if (productError) throw productError;
       if (!product) throw new Error("Product was created without an ID.");
+      removeUploadedImage = false;
 
       const { error: variantError } = await supabase
         .from("product_variants")
@@ -191,14 +277,29 @@ export default function AddProduct() {
           );
         }
 
+        removeUploadedImage = Boolean(uploadedImagePath);
         throw new Error(`Could not create the product variant: ${variantError.message}`);
       }
 
       setMessage("Product submitted for review. Admin approval is now pending.");
       setForm(initialForm);
       setImageBroken(false);
+      setSelectedImage(null);
+      if (imageInputRef.current) imageInputRef.current.value = "";
     } catch (err: any) {
-      setError(err.message || "Unable to create product.");
+      let errorMessage = err.message || "Unable to create product.";
+
+      if (uploadedImagePath && removeUploadedImage) {
+        const { error: removeError } = await supabase.storage
+          .from(productImagesBucket)
+          .remove([uploadedImagePath]);
+
+        if (removeError) {
+          errorMessage += ` The uploaded image could not be cleaned up: ${removeError.message}`;
+        }
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -287,8 +388,8 @@ export default function AddProduct() {
                 >
                   Stock is available
                 </ChecklistItem>
-                <ChecklistItem done={Boolean(form.image_url.trim())}>
-                  Image link is added
+                <ChecklistItem done={Boolean(selectedImage || form.image_url.trim())}>
+                  Product image is added
                 </ChecklistItem>
               </div>
             </div>
@@ -404,16 +505,48 @@ export default function AddProduct() {
               />
 
               <div className="mt-6">
-                <Field label="Image URL">
-                  <input
-                    name="image_url"
-                    value={form.image_url}
-                    onChange={handleChange}
-                    placeholder="https://example.com/your-product-photo.jpg"
-                    className={inputClass}
-                    required
-                  />
-                </Field>
+                <div>
+                  <span className="text-sm font-semibold text-slate-700">
+                    Upload Product Image
+                  </span>
+                  <div className="mt-2">
+                    <input
+                      ref={imageInputRef}
+                      id="product-image-upload"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleImageSelection}
+                      className="sr-only"
+                    />
+                    <label
+                      htmlFor="product-image-upload"
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[#E7E0D4] bg-white px-5 py-3 text-sm font-semibold text-[#33381C] transition hover:border-[#A68D65] hover:bg-[#F1ECE3]"
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                      Choose Image
+                    </label>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  JPEG, PNG, or WebP up to 5 MB. Uploaded images take priority over the URL below.
+                </p>
+                {selectedImage && (
+                  <p className="mt-2 text-sm font-medium text-[#33381C]">
+                    Selected: {selectedImage.name}
+                  </p>
+                )}
+
+                <div className="mt-5">
+                  <Field label="Image URL (optional fallback)">
+                    <input
+                      name="image_url"
+                      value={form.image_url}
+                      onChange={handleChange}
+                      placeholder="https://example.com/your-product-photo.jpg"
+                      className={inputClass}
+                    />
+                  </Field>
+                </div>
               </div>
             </section>
 
@@ -461,9 +594,9 @@ export default function AddProduct() {
           <aside className="space-y-6 xl:sticky xl:top-8 xl:self-start">
             <section className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
               <div className="relative h-64 bg-slate-100">
-                {form.image_url && !imageBroken ? (
+                {(selectedImagePreview || form.image_url) && !imageBroken ? (
                   <img
-                    src={form.image_url}
+                    src={selectedImagePreview || form.image_url}
                     alt={form.name || "Product preview"}
                     onError={() => setImageBroken(true)}
                     className="h-full w-full object-cover"
