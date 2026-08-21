@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  CheckCircle2,
+  CircleDollarSign,
   Eye,
+  Filter,
   Mail,
   Package,
   RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Truck,
   UserRound,
   AlertCircle,
 } from "lucide-react";
@@ -96,6 +102,8 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState("all");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
@@ -185,22 +193,16 @@ export default function AdminOrders() {
 
   const filteredOrders = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return orders;
-
-    return orders.filter((order) =>
-      [
-        order.id,
-        getCustomerName(order),
-        getCustomer(order)?.email || "",
-        getCustomer(order)?.phone || "",
-        order.order_status || "",
-        order.payment_status || "",
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(term),
-    );
-  }, [orders, profilesById, search]);
+    return orders.filter((order) => {
+      const matchesSearch = !term || [
+        order.id, getCustomerName(order), getCustomer(order)?.email || "",
+        getCustomer(order)?.phone || "", order.order_status || "", order.payment_status || "",
+      ].join(" ").toLowerCase().includes(term);
+      const matchesOrderStatus = orderStatusFilter === "all" || (order.order_status || "pending").toLowerCase() === orderStatusFilter;
+      const matchesPaymentStatus = paymentStatusFilter === "all" || (order.payment_status || "pending").toLowerCase() === paymentStatusFilter;
+      return matchesSearch && matchesOrderStatus && matchesPaymentStatus;
+    });
+  }, [orders, profilesById, search, orderStatusFilter, paymentStatusFilter]);
 
   const openOrderDetails = async (order: Order) => {
     setSelectedOrder(order);
@@ -436,15 +438,26 @@ export default function AdminOrders() {
     (sum, order) => sum + Number(order.total_amount || 0),
     0,
   );
+  const paidRevenue = orders.filter((order) => (order.payment_status || "").toLowerCase() === "paid").reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
+  const activeOrders = orders.filter((order) => ["processing", "shipped", "out for delivery"].includes((order.order_status || "").toLowerCase())).length;
+  const deliveredOrders = orders.filter((order) => (order.order_status || "").toLowerCase() === "delivered").length;
+  const filtersActive = orderStatusFilter !== "all" || paymentStatusFilter !== "all";
+
+  const clearFilters = () => {
+    setSearch("");
+    setOrderStatusFilter("all");
+    setPaymentStatusFilter("all");
+  };
 
   return (
     <AdminLayout>
-      <div className="space-y-8">
+      <div className="mx-auto max-w-[1500px] space-y-7">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-green-900">Orders</h1>
-            <p className="text-gray-600 mt-2">
-              View customer orders, payment status, and fulfillment status.
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#A68D65]">Operations / Customer orders</p>
+            <h1 className="text-4xl font-semibold text-[#33381C]">Order desk</h1>
+            <p className="mt-2 text-sm text-[#5C5C54] md:text-base">
+              Keep every order, payment, and delivery moving with confidence.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -452,14 +465,14 @@ export default function AdminOrders() {
               type="button"
               variant="outline"
               onClick={exportOrders}
-              className="rounded-full border-green-200 bg-white px-5 py-3 text-sm font-semibold text-green-700 hover:bg-green-50"
+              className="rounded-xl border-[#DED4C4] bg-white px-5 py-3 text-sm font-semibold text-[#4D5528] shadow-sm hover:bg-[#F8F5EE]"
             >
               Export CSV
             </Button>
             <Button
               type="button"
               onClick={fetchOrders}
-              className="rounded-full bg-green-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-800"
+              className="rounded-xl bg-[#33381C] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4D5528]"
             >
               <RefreshCw className="h-4 w-4" />
               Refresh
@@ -467,70 +480,51 @@ export default function AdminOrders() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-green-100 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-gray-500">Total Orders</p>
-            <p className="mt-3 text-3xl font-semibold text-green-900">
-              {orders.length}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-green-100 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-gray-500">Revenue</p>
-            <p className="mt-3 text-3xl font-semibold text-green-700">
-              {formatCurrency(totalRevenue)}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-green-100 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-gray-500">Shown</p>
-            <p className="mt-3 text-3xl font-semibold text-blue-600">
-              {filteredOrders.length}
-            </p>
-          </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-[#E7E0D4] bg-white p-5 shadow-[0_8px_24px_-18px_rgba(51,56,28,0.35)]"><div className="flex items-start justify-between"><div><p className="text-sm font-medium text-[#73736A]">Total orders</p><p className="mt-2 text-3xl font-semibold text-[#33381C]">{orders.length}</p></div><span className="rounded-xl bg-[#EEF0E5] p-2.5 text-[#4D5528]"><Package className="h-5 w-5" /></span></div><p className="mt-3 text-xs text-[#88877D]">All-time order volume</p></div>
+          <div className="rounded-2xl border border-[#E7E0D4] bg-white p-5 shadow-[0_8px_24px_-18px_rgba(51,56,28,0.35)]"><div className="flex items-start justify-between"><div><p className="text-sm font-medium text-[#73736A]">Order value</p><p className="mt-2 text-3xl font-semibold text-[#33381C]">{formatCurrency(totalRevenue)}</p></div><span className="rounded-xl bg-[#F8EEDB] p-2.5 text-[#A66A12]"><CircleDollarSign className="h-5 w-5" /></span></div><p className="mt-3 text-xs text-[#88877D]">{formatCurrency(paidRevenue)} successfully paid</p></div>
+          <div className="rounded-2xl border border-[#E7E0D4] bg-white p-5 shadow-[0_8px_24px_-18px_rgba(51,56,28,0.35)]"><div className="flex items-start justify-between"><div><p className="text-sm font-medium text-[#73736A]">In fulfillment</p><p className="mt-2 text-3xl font-semibold text-[#33381C]">{activeOrders}</p></div><span className="rounded-xl bg-[#E6F1F5] p-2.5 text-[#37748B]"><Truck className="h-5 w-5" /></span></div><p className="mt-3 text-xs text-[#88877D]">Processing, shipped, or out for delivery</p></div>
+          <div className="rounded-2xl border border-[#E7E0D4] bg-white p-5 shadow-[0_8px_24px_-18px_rgba(51,56,28,0.35)]"><div className="flex items-start justify-between"><div><p className="text-sm font-medium text-[#73736A]">Delivered</p><p className="mt-2 text-3xl font-semibold text-[#33381C]">{deliveredOrders}</p></div><span className="rounded-xl bg-[#E8F3E7] p-2.5 text-[#4E8253]"><CheckCircle2 className="h-5 w-5" /></span></div><p className="mt-3 text-xs text-[#88877D]">{filteredOrders.length} orders in current view</p></div>
         </div>
 
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search by customer name, email, phone, payment, or status..."
-          className="w-full rounded-full border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-        />
+        <div className="rounded-2xl border border-[#E7E0D4] bg-white p-3 shadow-[0_8px_24px_-18px_rgba(51,56,28,0.35)]"><div className="flex flex-col gap-3 xl:flex-row xl:items-center"><div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#99978D]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search customer, order ID, email, or tracking number" className="w-full rounded-xl border border-transparent bg-[#F8F6F1] py-3 pl-10 pr-4 text-sm text-[#33381C] outline-none transition placeholder:text-[#A3A095] focus:border-[#CFC0A6] focus:bg-white focus:ring-4 focus:ring-[#F1ECE3]" /></div><div className="grid gap-2 sm:grid-cols-2 xl:flex"><label className="relative"><span className="sr-only">Filter fulfillment</span><select value={orderStatusFilter} onChange={(event) => setOrderStatusFilter(event.target.value)} className="h-11 w-full appearance-none rounded-xl border border-[#E7E0D4] bg-white py-2 pl-3 pr-9 text-sm font-medium text-[#5C5C54] outline-none focus:border-[#A68D65]"><option value="all">All fulfillment</option><option value="pending">Pending</option><option value="processing">Processing</option><option value="shipped">Shipped</option><option value="out for delivery">Out for delivery</option><option value="delivered">Delivered</option><option value="cancelled">Cancelled</option></select><SlidersHorizontal className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-[#8C887D]" /></label><label className="relative"><span className="sr-only">Filter payment</span><select value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="h-11 w-full appearance-none rounded-xl border border-[#E7E0D4] bg-white py-2 pl-3 pr-9 text-sm font-medium text-[#5C5C54] outline-none focus:border-[#A68D65]"><option value="all">All payments</option><option value="pending">Pending payment</option><option value="paid">Paid</option><option value="failed">Failed</option><option value="refunded">Refunded</option></select><CircleDollarSign className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-[#8C887D]" /></label></div>{filtersActive && <Button type="button" variant="ghost" size="sm" onClick={clearFilters} className="h-10 rounded-xl text-[#75684E] hover:bg-[#F8F5EE] hover:text-[#33381C]">Clear filters</Button>}</div></div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+        <div className="overflow-hidden rounded-2xl border border-[#E7E0D4] bg-white shadow-[0_8px_24px_-18px_rgba(51,56,28,0.35)]"><div className="flex flex-col gap-2 border-b border-[#EEE8DE] px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-sans text-base font-semibold text-[#33381C]">Order activity</h2><p className="mt-0.5 text-sm text-[#817D73]">{loading ? "Syncing your latest orders…" : `${filteredOrders.length} ${filteredOrders.length === 1 ? "order" : "orders"} displayed`}</p></div><div className="flex items-center gap-2 text-xs font-medium text-[#75684E]"><Filter className="h-3.5 w-3.5" />{filtersActive ? "Filtered view" : "All orders"}</div></div><div className="overflow-x-auto">
+          <table className="min-w-[1120px] w-full divide-y divide-[#EEE8DE]">
+            <thead className="bg-[#FCFBF8]">
               <tr>
-                <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Customer
+                <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
+                  Customer & order
                 </th>
-                <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
                   Payment
                 </th>
-                <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
                   Status
                 </th>
-                <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
                   Total
                 </th>
-                <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
                   Date
                 </th>
-                <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
                   Estimated
                 </th>
-                <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
                   Tracking
                 </th>
-                <th className="px-5 py-4 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
                   Details
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[#F0ECE5]">
               {loading ? (
                 <tr>
                   <td
                     colSpan={8}
-                    className="px-5 py-12 text-center text-sm text-slate-500"
+                    className="px-5 py-12 text-center text-sm text-[#817D73]"
                   >
                     Loading orders...
                   </td>
@@ -539,7 +533,7 @@ export default function AdminOrders() {
                 <tr>
                   <td
                     colSpan={8}
-                    className="px-5 py-12 text-center text-sm text-red-600"
+                    className="px-5 py-12 text-center text-sm text-rose-600"
                   >
                     {error}
                   </td>
@@ -548,7 +542,7 @@ export default function AdminOrders() {
                 <tr>
                   <td
                     colSpan={8}
-                    className="px-5 py-12 text-center text-sm text-slate-500"
+                    className="px-5 py-12 text-center text-sm text-[#817D73]"
                   >
                     No orders found.
                   </td>
@@ -557,22 +551,22 @@ export default function AdminOrders() {
                 filteredOrders.map((order) => (
                   <tr
                     key={order.id}
-                    className="cursor-pointer hover:bg-slate-50"
+                    className="cursor-pointer transition-colors hover:bg-[#FCFBF8]"
                     onClick={() => openOrderDetails(order)}
                   >
                     <td className="px-5 py-4 text-sm">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-sm font-semibold text-green-800">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF0E5] text-sm font-semibold text-[#4D5528]">
                           {getCustomerName(order).slice(0, 1).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-medium text-slate-900">
+                          <p className="font-semibold text-[#33381C]">
                             {getCustomerName(order)}
                           </p>
-                          <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                            {getShortOrderId(order.id)}
+                          <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-[#A09B90]">
+                            Order #{getShortOrderId(order.id)}
                           </p>
-                          <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                          <p className="mt-1 flex items-center gap-1 text-xs text-[#817D73]">
                             <Mail className="h-3.5 w-3.5" />
                             {getCustomer(order)?.email || "No email available"}
                           </p>
@@ -594,20 +588,20 @@ export default function AdminOrders() {
                         {formatStatus(order.order_status)}
                       </Badge>
                     </td>
-                    <td className="px-5 py-4 text-right text-sm font-semibold text-green-700">
+                    <td className="px-5 py-4 text-right text-sm font-semibold text-[#4D5528]">
                       {formatCurrency(order.total_amount)}
                     </td>
-                    <td className="px-5 py-4 text-right text-sm text-slate-600">
+                    <td className="px-5 py-4 text-right text-sm text-[#625F57]">
                       {formatOrderDate(order.created_at)}
                     </td>
-                    <td className="px-5 py-4 text-right text-sm text-slate-600">
+                    <td className="px-5 py-4 text-right text-sm text-[#625F57]">
                       {formatOrderDate(order.estimated_delivery)}
                     </td>
-                    <td className="px-5 py-4 text-right text-sm text-slate-600">
+                    <td className="px-5 py-4 text-right text-sm font-medium text-[#625F57]">
                       {order.tracking_number || "-"}
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" className="rounded-lg border-[#E4DCCF] bg-white text-[#4D5528] hover:bg-[#F8F5EE]">
                         <Eye className="h-4 w-4" />
                         View
                       </Button>
@@ -616,7 +610,7 @@ export default function AdminOrders() {
                 ))
               )}
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
 

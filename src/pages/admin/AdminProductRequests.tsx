@@ -35,6 +35,7 @@ interface Product {
   id: string;
   name: string;
   category: string;
+  status?: string;
   product_status: string;
   seller_id: string;
   seller_name?: string | null;
@@ -51,6 +52,14 @@ interface ImageLoadState {
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 type SortOption = "newest" | "oldest" | "price_high" | "price_low" | "name_az";
+
+// The production catalog exposes both status columns. Keep them synchronized
+// for every moderation action so catalog visibility and request management use
+// the same decision.
+const moderationStatusUpdate = (status: Exclude<StatusFilter, "all">) => ({
+  status,
+  product_status: status,
+});
 
 const SORT_LABELS: Record<SortOption, string> = {
   newest: "Newest first",
@@ -236,7 +245,9 @@ export default function AdminProductRequests() {
     // tab and count update immediately, without waiting for a refetch.
     setProducts((current) =>
       current.map((p) =>
-        p.id === id ? { ...p, product_status: "approved" } : p,
+        p.id === id
+          ? { ...p, ...moderationStatusUpdate("approved") }
+          : p,
       ),
     );
     setSelectedIds((prev) => {
@@ -252,7 +263,7 @@ export default function AdminProductRequests() {
 
       const { error: updateError } = await supabase
         .from("products")
-        .update({ product_status: "approved" })
+        .update(moderationStatusUpdate("approved"))
         .eq("id", id);
       if (updateError) throw updateError;
 
@@ -304,7 +315,9 @@ export default function AdminProductRequests() {
     // restored below if Supabase rejects the update.
     setProducts((current) =>
       current.map((p) =>
-        p.id === id ? { ...p, product_status: "rejected" } : p,
+        p.id === id
+          ? { ...p, ...moderationStatusUpdate("rejected") }
+          : p,
       ),
     );
     setRejectDialogOpen(false);
@@ -321,7 +334,7 @@ export default function AdminProductRequests() {
 
       const { error: updateError } = await supabase
         .from("products")
-        .update({ product_status: "rejected" })
+        .update(moderationStatusUpdate("rejected"))
         .eq("id", id);
       if (updateError) throw updateError;
 
@@ -374,7 +387,9 @@ export default function AdminProductRequests() {
     const originalProducts = products;
     setProducts((current) =>
       current.map((p) =>
-        idsToReject.has(p.id) ? { ...p, product_status: "rejected" } : p,
+        idsToReject.has(p.id)
+          ? { ...p, ...moderationStatusUpdate("rejected") }
+          : p,
       ),
     );
     setRejectDialogOpen(false);
@@ -387,7 +402,7 @@ export default function AdminProductRequests() {
 
       const { error: updateError } = await supabase
         .from("products")
-        .update({ product_status: "rejected" })
+        .update(moderationStatusUpdate("rejected"))
         .in("id", Array.from(idsToReject));
       if (updateError) throw updateError;
 
@@ -445,7 +460,9 @@ export default function AdminProductRequests() {
     const originalProducts = products;
     setProducts((current) =>
       current.map((p) =>
-        idsToApprove.has(p.id) ? { ...p, product_status: "approved" } : p,
+        idsToApprove.has(p.id)
+          ? { ...p, ...moderationStatusUpdate("approved") }
+          : p,
       ),
     );
     setSelectedIds(new Set());
@@ -456,7 +473,7 @@ export default function AdminProductRequests() {
 
       const { error: updateError } = await supabase
         .from("products")
-        .update({ product_status: "approved" })
+        .update(moderationStatusUpdate("approved"))
         .in("id", Array.from(idsToApprove));
       if (updateError) throw updateError;
 
