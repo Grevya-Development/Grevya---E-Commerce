@@ -6,28 +6,72 @@ import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { toast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function SellerOnboarding() {
-  const { profile, refreshProfile, signOut } = useAuth();
+  const { user, refreshProfile, signOut } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshProfile();
-      toast({
-        title: "Status Refreshed",
-        description: "Checking updated verification records.",
-      });
-      // If approved, redirect to dashboard
-      if (profile?.role === "seller" && profile?.status === "active") {
-        navigate("/seller/dashboard", { replace: true });
+      if (!user) {
+        toast({
+          title: "Unable to check application status",
+          description: "Please sign in again and try once more.",
+          variant: "destructive",
+        });
+        return;
       }
-    } catch (err: any) {
+
+      const { data, error } = await supabase
+        .from("seller_applications")
+        .select("status")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        toast({
+          title: "Refresh failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!data) {
+        toast({
+          title: "No application found",
+          description: "We could not find a seller application for this account.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data.status === "approved") {
+        await refreshProfile();
+        navigate("/seller/dashboard", { replace: true });
+        return;
+      }
+
+      if (data.status === "rejected") {
+        toast({
+          title: "Application rejected",
+          description: "Your application was not approved. You can submit a new application.",
+        });
+        navigate("/seller/application", { replace: true });
+        return;
+      }
+
+      toast({
+        title: "Application under review",
+        description: "Your application is still being reviewed.",
+      });
+    } catch (err: unknown) {
       toast({
         title: "Refresh failed",
-        description: err.message,
+        description: err instanceof Error ? err.message : "Unable to refresh application status.",
         variant: "destructive",
       });
     } finally {
