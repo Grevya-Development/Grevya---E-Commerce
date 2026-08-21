@@ -156,15 +156,8 @@ const Navbar = () => {
         <div className="flex items-center justify-between w-full max-w-7xl mx-auto py-3.5 px-4 md:px-8 relative">
           {/* Logo */}
           <div className="flex items-center gap-2 md:gap-3.5 shrink-0">
-            {/* Logo */}
             <Link
-              to={
-                profile?.role === "admin"
-                  ? "/admin/dashboard"
-                  : profile?.role === "seller"
-                    ? "/seller/dashboard"
-                    : "/"
-              }
+              to="/"
               className="flex items-center gap-2 md:gap-2.5 shrink-0"
               aria-label="Grevya Naturals home"
             >

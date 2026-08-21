@@ -53,7 +53,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface UserProfile {
   id: string;
-  username: string;
+  full_name: string;
   email: string;
   role: string;
   is_active: boolean;
@@ -142,7 +142,7 @@ export default function AdminUsers() {
     const q = search.trim().toLowerCase();
     if (!q) return users;
     return users.filter((user) =>
-      [user.username, user.email, user.role]
+      [user.full_name, user.email, user.role]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
@@ -212,7 +212,7 @@ export default function AdminUsers() {
 
       toast({
         title: current ? "User blocked" : "User activated",
-        description: `${selectedUser.username || selectedUser.email} is now ${
+        description: `${selectedUser.full_name || selectedUser.email} is now ${
           current ? "blocked" : "active"
         }.`,
       });
@@ -396,13 +396,13 @@ export default function AdminUsers() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-sm font-semibold text-green-800">
-                            {(user.username || user.email || "U")
+                            {(user.full_name || user.email || "U")
                               .slice(0, 1)
                               .toUpperCase()}
                           </div>
                           <div>
                             <p className="font-medium text-slate-900">
-                              {user.username || "Unnamed user"}
+                              {user.full_name || "Unnamed user"}
                             </p>
                             <p className="text-xs text-slate-500">
                               ID {user.id.slice(0, 8)}
@@ -534,7 +534,7 @@ export default function AdminUsers() {
           {selectedUser && (
             <div className="rounded-lg border bg-slate-50 p-4">
               <p className="font-medium text-slate-900">
-                {selectedUser.username || "Unnamed user"}
+                {selectedUser.full_name || "Unnamed user"}
               </p>
               <p className="mt-1 text-sm text-slate-500">
                 {selectedUser.email || "No email"}

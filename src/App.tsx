@@ -43,6 +43,7 @@ const ShippingPaymentPolicy = lazy(
 
 // Admin Pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminAnalytics = lazy(() => import("./pages/admin/AdminAnalytics"));
 const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
 const AdminProductRequests = lazy(
   () => import("./pages/admin/AdminProductRequests"),
@@ -183,6 +184,17 @@ const AppContent = () => {
                     loginPath="/admin/login"
                   >
                     <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/analytics"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["admin"]}
+                    loginPath="/admin/login"
+                  >
+                    <AdminAnalytics />
                   </ProtectedRoute>
                 }
               />

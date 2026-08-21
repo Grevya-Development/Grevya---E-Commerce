@@ -126,6 +126,15 @@ const ProductCard = (props: ProductProps) => {
     );
   };
 
+  const saveProductsScrollPosition = () => {
+    if (location.pathname !== "/products") return;
+
+    sessionStorage.setItem(
+      `products-scroll:${location.search}`,
+      JSON.stringify({ top: window.scrollY, left: window.scrollX }),
+    );
+  };
+
   const hasRatings = (reviewCount ?? 0) > 0 && typeof rating === "number";
 
   return (
@@ -153,6 +162,7 @@ const ProductCard = (props: ProductProps) => {
         {/* Product image with zoom transitions */}
         <Link
           to={`/products/${category}/${slug}`}
+          onClick={saveProductsScrollPosition}
           className="block w-full h-full"
         >
           <img
@@ -254,7 +264,11 @@ const ProductCard = (props: ProductProps) => {
 
       {/* Details Container */}
       <div className="p-2.5 sm:p-3 md:p-4 flex flex-col flex-grow bg-white/40">
-        <Link to={`/products/${category}/${slug}`} className="block mb-auto">
+        <Link
+          to={`/products/${category}/${slug}`}
+          onClick={saveProductsScrollPosition}
+          className="block mb-auto"
+        >
           {/* Category */}
           <span className="text-[7.5px] md:text-[9px] font-bold uppercase tracking-wider text-[#A68D65] block mb-0.5">
             {category}
