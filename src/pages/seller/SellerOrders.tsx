@@ -66,7 +66,9 @@ const sellerAllowedStatuses = [
   "confirmed",
   "processing",
   "shipped",
-  "cancelled",
+  "in_transit",
+  "out_for_delivery",
+  "delivered",
 ];
 
 const allStatusOptions = [
@@ -74,6 +76,7 @@ const allStatusOptions = [
   "confirmed",
   "processing",
   "shipped",
+  "in_transit",
   "out_for_delivery",
   "delivered",
   "cancelled",
@@ -226,7 +229,11 @@ export default function SellerOrders() {
             user_id: fullOrder?.user_id,
             shipping_address: fullOrder?.shipping_address,
             payment_status: fullOrder?.payment_status || o.payment_status,
-            status: fullOrder?.status || o.order_status,
+            // `orders.status` is the canonical order status.
+            // The RPC can return a stale `order_status` from order_items,
+            // so keep both fields synchronized with the current orders row.
+            status: fullOrder?.status || o.order_status || "pending",
+            order_status: fullOrder?.status || o.order_status || "pending",
           };
         });
         setOrders(enrichedOrders as Order[]);
@@ -392,7 +399,10 @@ export default function SellerOrders() {
           o.id === selectedOrder.id
             ? {
                 ...o,
-                order_status: inputs.order_status || o.order_status,
+                // Keep the UI's canonical status fields synchronized.
+                // The table renders `order_status` first.
+                order_status: inputs.order_status || o.order_status || o.status,
+                status: inputs.order_status || o.status || o.order_status,
                 estimated_delivery: updatePayload.estimated_delivery,
                 tracking_number: updatePayload.tracking_number,
               }
@@ -436,7 +446,7 @@ export default function SellerOrders() {
       // Filter by status
       const statusMatch =
         !statusFilter ||
-        (order.order_status || order.status || "pending")
+        (order.status || order.order_status || "pending")
           .toLowerCase()
           .includes(statusFilter.toLowerCase());
 
@@ -712,9 +722,9 @@ export default function SellerOrders() {
                           className="px-5 py-4 text-right text-sm"
                         >
                           <Badge
-                            className={`capitalize ${getOrderStatusBadgeClass(order.order_status || order.status)}`}
+                            className={`capitalize ${getOrderStatusBadgeClass(order.status || order.order_status)}`}
                           >
-                            {formatStatus(order.order_status || order.status)}
+                            {formatStatus(order.status || order.order_status)}
                           </Badge>
                         </td>
                       )}
@@ -914,9 +924,8 @@ export default function SellerOrders() {
                           </option>
                         ))}
                       </select>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Note: Delivered/Out for Delivery are set by
-                        courier/admin
+                     <p className="mt-1 text-xs text-slate-500">
+                      Update the fulfillment status as the order progresses.
                       </p>
                     </div>
 
