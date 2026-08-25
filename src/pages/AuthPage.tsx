@@ -201,64 +201,79 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   // If already logged in, validate roles directly
   useEffect(() => {
     if (user && !authLoading) {
-      validateActiveUserSession();
+      void validateActiveUserSession().catch(() => undefined);
     }
   }, [user, authLoading]);
 
-  const validateActiveUserSession = async () => {
-    if (!user?.id) return;
+  const validateActiveUserSession = async (authenticatedUserId?: string) => {
+    const userId = authenticatedUserId || user?.id;
+    if (!userId) return false;
     setLoading(true);
     try {
-      const { data: profileRow } = await supabase
+      const { data: profileRow, error: profileError } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user.id)
+        .eq("id", userId)
         .maybeSingle();
 
-      if (profileRow) {
-        const actualRole = profileRow.role || "customer";
+      if (profileError) throw profileError;
 
-        const availableRoles = [actualRole];
-        if (actualRole === "admin") {
-          availableRoles.push("seller", "customer");
-        } else if (actualRole === "seller") {
-          availableRoles.push("customer");
-        }
-        setUserRoles(availableRoles);
+      if (!profileRow) {
+        await supabase.auth.signOut();
+        throw new Error(
+          "Your account could not be verified. Please contact the administrator.",
+        );
+      }
 
-        const target = selectedRole || expectedRole || "customer";
+      if (profileRow.is_active === false) {
+        await supabase.auth.signOut();
+        throw new Error(
+          "Your account has been blocked. Please contact the administrator.",
+        );
+      }
 
-        if (availableRoles.includes(target)) {
-          if (target === "seller") {
-            const { data: sellerApplication, error: sellerApplicationError } =
-              await supabase
-                .from("seller_applications")
-                .select("status")
-                .eq("user_id", user.id)
-                .maybeSingle();
+      const actualRole = profileRow.role || "customer";
 
-            if (sellerApplicationError) throw sellerApplicationError;
+      const availableRoles = [actualRole];
+      if (actualRole === "admin") {
+        availableRoles.push("seller", "customer");
+      } else if (actualRole === "seller") {
+        availableRoles.push("customer");
+      }
+      setUserRoles(availableRoles);
 
-            if (!sellerApplication || sellerApplication.status === "rejected") {
-              navigate("/seller/application", { replace: true });
-            } else if (sellerApplication.status === "approved") {
-              navigate("/seller/dashboard", { replace: true });
-            } else {
-              navigate("/seller/onboarding", { replace: true });
-            }
+      const target = selectedRole || expectedRole || "customer";
+
+      if (availableRoles.includes(target)) {
+        if (target === "seller") {
+          const { data: sellerApplication, error: sellerApplicationError } =
+            await supabase
+              .from("seller_applications")
+              .select("status")
+              .eq("user_id", userId)
+              .maybeSingle();
+
+          if (sellerApplicationError) throw sellerApplicationError;
+
+          if (!sellerApplication || sellerApplication.status === "rejected") {
+            navigate("/seller/application", { replace: true });
+          } else if (sellerApplication.status === "approved") {
+            navigate("/seller/dashboard", { replace: true });
           } else {
-            navigate(defaultRedirect(target), { replace: true });
+            navigate("/seller/onboarding", { replace: true });
           }
         } else {
-          if (availableRoles.length > 1) {
-            setMultipleRolesChooser(true);
-          } else {
-            setValidationError({ expected: target, actual: actualRole });
-          }
+          navigate(defaultRedirect(target), { replace: true });
         }
+      } else if (availableRoles.length > 1) {
+        setMultipleRolesChooser(true);
+      } else {
+        setValidationError({ expected: target, actual: actualRole });
       }
+      return true;
     } catch (err) {
       console.error("Session verification failed:", err);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -345,8 +360,11 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
       const targetRole = selectedRole || expectedRole || "customer";
 
       if (mode === "login") {
-        await signInWithEmail(normalizedEmail, password);
-        await validateActiveUserSession();
+        const { user: authenticatedUser } = await signInWithEmail(
+          normalizedEmail,
+          password,
+        );
+        await validateActiveUserSession(authenticatedUser?.id);
       }
 
       if (mode === "signup") {

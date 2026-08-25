@@ -8,10 +8,12 @@ import React, {
   useCallback,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { ensureUserProfile } from "@/lib/profileSync";
 import { useCartStore } from "@/store/useCartStore";
 import { useWishlistStore } from "@/store/useWishlistStore";
+import { toast } from "@/components/ui/use-toast";
 
 export interface UserProfile {
   id: string;
@@ -23,6 +25,7 @@ export interface UserProfile {
   preferences: Record<string, any> | null;
   role?: string | null;
   status?: string | null;
+  is_active?: boolean;
   created_at?: string;
   last_login_at?: string | null;
 }
@@ -40,14 +43,40 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const loadedUserIdRef = useRef<string | null>(null);
-
+  const blockedSignOutInProgressRef = useRef(false);
   const loading = authLoading || profileLoading;
+
+  const signOutBlockedUser = useCallback(async () => {
+    if (blockedSignOutInProgressRef.current) return;
+    blockedSignOutInProgressRef.current = true;
+
+    try {
+      await supabase.auth.signOut();
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      loadedUserIdRef.current = null;
+      useCartStore.getState().syncUserSession(null);
+      useWishlistStore.getState().syncUserSession(null);
+      toast({
+        title: "Account blocked",
+        description: "Your account has been blocked. Please contact the administrator.",
+        variant: "destructive",
+      });
+      navigate("/login", { replace: true });
+    } catch (error) {
+      console.error("[AuthContext] Could not sign out blocked user:", error);
+    } finally {
+      blockedSignOutInProgressRef.current = false;
+    }
+  }, [navigate]);
 
   const loadProfile = useCallback(
     async (currUser: User) => {
@@ -56,6 +85,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setProfileLoading(true);
 
       try {
+        const { data: existingProfile, error: profileError } = await supabase
+          .from("profiles")
+          .select("id, is_active")
+          .eq("id", currUser.id)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+
+        // A profile is required for every authenticated application session.
+        // Do not recreate a missing profile during sign-in, since it may have
+        // been deliberately removed or failed verification.
+        if (!existingProfile || existingProfile.is_active === false) {
+          await supabase.auth.signOut();
+          return;
+        }
+
         const syncedProfile = await ensureUserProfile(currUser);
         setProfile(syncedProfile as UserProfile);
 
@@ -65,20 +110,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       } catch (error) {
         console.error("[AuthContext] Profile sync error:", error);
-        setProfile({
-          id: currUser.id,
-          username: null,
-          full_name: currUser.user_metadata?.full_name || null,
-          avatar_url:
-            currUser.user_metadata?.avatar_url ||
-            currUser.user_metadata?.picture ||
-            null,
-          phone: currUser.user_metadata?.phone || null,
-          email: currUser.email || null,
-          preferences: null,
-          role: "customer",
-          status: "active",
-        });
+        await supabase.auth.signOut();
+        setProfile(null);
       } finally {
         setProfileLoading(false);
       }
@@ -148,6 +181,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       authSubscription?.unsubscribe();
     };
   }, [loadProfile]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    blockedSignOutInProgressRef.current = false;
+
+    const profileChannel = supabase
+      .channel(`current-user-profile:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload.new.is_active === false) {
+            void signOutBlockedUser();
+            return;
+          }
+
+          setProfile(payload.new as UserProfile);
+        },
+      )
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn("[AuthContext] Profile realtime subscription unavailable.");
+        }
+      });
+
+    return () => {
+      void supabase.removeChannel(profileChannel);
+    };
+  }, [signOutBlockedUser, user?.id]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();

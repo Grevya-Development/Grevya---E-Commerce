@@ -108,6 +108,11 @@ const ProtectedRoute = ({
     return <Navigate to={redirectTo} replace state={{ from: location }} />;
   }
 
+  if (!profile || profile.is_active === false) {
+    const redirectTo = loginPath || "/login";
+    return <Navigate to={redirectTo} replace state={{ from: location }} />;
+  }
+
   if (allowedRoles && allowedRoles.length > 0) {
     const userRole = sellerApplicationState === "approved" && isSellerRoute
       ? "seller"

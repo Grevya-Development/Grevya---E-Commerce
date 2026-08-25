@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as ToasterSonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AnimatePresence, motion } from "framer-motion";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 import { supabase } from "@/lib/supabaseClient";
@@ -55,6 +55,9 @@ const AdminProducts = lazy(() => import("./pages/admin/AdminProducts"));
 const AdminOrders = lazy(() => import("./pages/admin/AdminOrders"));
 const AdminNotifications = lazy(
   () => import("./pages/admin/AdminNotifications"),
+);
+const AdminReturnRequests = lazy(
+  () => import("./pages/admin/AdminReturnRequests"),
 );
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 
@@ -241,6 +244,17 @@ const AppContent = () => {
                     loginPath="/admin/login"
                   >
                     <AdminNotifications />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/return-refund-requests"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["admin"]}
+                    loginPath="/admin/login"
+                  >
+                    <AdminReturnRequests />
                   </ProtectedRoute>
                 }
               />
@@ -437,9 +451,7 @@ const App = () => {
     <TooltipProvider>
       <Toaster />
       <ToasterSonner />
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
+      <AppContent />
     </TooltipProvider>
   );
 };

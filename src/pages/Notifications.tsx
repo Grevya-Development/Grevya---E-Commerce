@@ -13,6 +13,7 @@ interface Notification {
   message: string;
   type: string;
   read: boolean;
+  is_read?: boolean;
   created_at: string;
 }
 
@@ -41,10 +42,73 @@ export default function Notifications() {
   };
 
   useEffect(() => {
-    if (!authLoading && profile?.id) {
+    if (authLoading || !profile?.id) return;
+
+    fetchNotifications();
+
+    // Keep the inbox current even when the project's Realtime publication has
+    // not yet been enabled in Supabase. Postgres Changes remains the instant
+    // path below; this is a reliable no-refresh fallback.
+    const refreshInterval = window.setInterval(() => {
       fetchNotifications();
-    }
+    }, 2_000);
+
+    return () => window.clearInterval(refreshInterval);
   }, [authLoading, profile]);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const channel = supabase
+      .channel(`customer-notifications-${profile.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${profile.id}`,
+        },
+        (payload) => {
+          const incoming = payload.new as Notification;
+          const notification: Notification = {
+            ...incoming,
+            read:
+              typeof incoming.read === "boolean"
+                ? incoming.read
+                : Boolean(incoming.is_read),
+          };
+
+          setNotifications((current) => [
+            notification,
+            ...current.filter((item) => item.id !== notification.id),
+          ]);
+          toast({
+            title: "New notification",
+            description: notification.message,
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${profile.id}`,
+        },
+        (payload) => {
+          setNotifications((current) =>
+            current.filter((notification) => notification.id !== payload.old.id),
+          );
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]);
 
   const handleMarkAsRead = async (id: string) => {
     try {

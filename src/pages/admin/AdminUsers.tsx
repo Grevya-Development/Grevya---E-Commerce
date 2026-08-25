@@ -59,6 +59,19 @@ interface UserProfile {
   is_active: boolean;
 }
 
+const getMutationErrorMessage = (error: unknown, fallback: string) => {
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+
+  return error instanceof Error ? error.message : fallback;
+};
+
 const roleLabels: Record<string, string> = {
   admin: "Admin",
   seller: "Seller",
@@ -200,7 +213,7 @@ export default function AdminUsers() {
       if (error) throw error;
       if (!data || data.is_active !== !current) {
         throw new Error(
-          "Supabase blocked this update. Run supabase/fix-admin-users-rls.sql so admins can update other users.",
+          "The status update was not saved. Refresh the page and try again.",
         );
       }
 
@@ -220,8 +233,10 @@ export default function AdminUsers() {
       console.error("Toggle error:", err);
       toast({
         title: "Action failed",
-        description:
-          err instanceof Error ? err.message : "Failed to update user status",
+        description: getMutationErrorMessage(
+          err,
+          "Failed to update user status",
+        ),
         variant: "destructive",
       });
       fetchUsers();
@@ -249,7 +264,7 @@ export default function AdminUsers() {
       if (error) throw error;
       if (!data || data.role !== role) {
         throw new Error(
-          "Supabase blocked this update. Run supabase/fix-admin-users-rls.sql so admins can update other users.",
+          "The role update was not saved. Refresh the page and try again.",
         );
       }
 
@@ -262,7 +277,7 @@ export default function AdminUsers() {
       setUsers(previousUsers);
       toast({
         title: "Failed to update role",
-        description: err instanceof Error ? err.message : "Unknown error",
+        description: getMutationErrorMessage(err, "Failed to update role"),
         variant: "destructive",
       });
       fetchUsers();

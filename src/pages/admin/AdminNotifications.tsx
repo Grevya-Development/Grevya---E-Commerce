@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import type { DateRange } from "react-day-picker";
 import {
   AlertCircle,
   AlertTriangle,
   Bell,
+  CalendarDays,
   CheckCircle2,
   ChevronRight,
   Circle,
@@ -27,6 +29,8 @@ import {
 } from "lucide-react";
 
 import AdminLayout from "@/layouts/AdminLayout";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -62,7 +66,7 @@ const getErrorMessage = (error: unknown) => {
 
 type RecipientTarget = "sellers" | "users" | "individual";
 type ReadFilter = "all" | "read" | "unread";
-type DateFilter = "all" | "today" | "week" | "month";
+type DateFilter = "all" | "today" | "week" | "month" | "custom";
 type SortOrder = "newest" | "oldest";
 
 const DEFAULT_TYPES = ["general", "order", "system", "alert", "info"];
@@ -102,6 +106,15 @@ const formatTime = (date: string) =>
     minute: "2-digit",
   });
 
+const formatDateRange = (range: DateRange | undefined) => {
+  if (!range?.from) return "Select date range";
+
+  const options: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
+  const from = range.from.toLocaleDateString("en-IN", options);
+  const to = range.to?.toLocaleDateString("en-IN", options);
+  return to ? `${from} – ${to}` : `${from} – Select end date`;
+};
+
 const formatRelativeTime = (date: string) => {
   const difference = Date.now() - new Date(date).getTime();
   const minutes = Math.floor(difference / 60_000);
@@ -140,6 +153,8 @@ export default function AdminNotifications() {
   const [filterType, setFilterType] = useState("all");
   const [filterRead, setFilterRead] = useState<ReadFilter>("all");
   const [filterDate, setFilterDate] = useState<DateFilter>("all");
+  const [customDateRange, setCustomDateRange] = useState<DateRange>();
+  const [isCustomCalendarOpen, setIsCustomCalendarOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [showSendModal, setShowSendModal] = useState(false);
   const [selectedNotification, setSelectedNotification] =
@@ -302,7 +317,7 @@ export default function AdminNotifications() {
       filtered = filtered.filter((notification) => !notification.is_read);
     }
 
-    if (filterDate !== "all") {
+    if (filterDate !== "all" && filterDate !== "custom") {
       const now = new Date();
       const start = new Date(now);
 
@@ -319,12 +334,24 @@ export default function AdminNotifications() {
       );
     }
 
+    if (filterDate === "custom" && customDateRange?.from) {
+      const start = new Date(customDateRange.from);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(customDateRange.to ?? customDateRange.from);
+      end.setHours(23, 59, 59, 999);
+
+      filtered = filtered.filter((notification) => {
+        const date = new Date(notification.created_at);
+        return date >= start && date <= end;
+      });
+    }
+
     return [...filtered].sort((a, b) => {
       const difference =
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       return sortOrder === "newest" ? difference : -difference;
     });
-  }, [filterDate, filterRead, filterType, notifications, search, sortOrder]);
+  }, [customDateRange, filterDate, filterRead, filterType, notifications, search, sortOrder]);
 
   const stats = useMemo(() => {
     const unread = notifications.filter(
@@ -350,7 +377,8 @@ export default function AdminNotifications() {
     search.trim() ||
     filterType !== "all" ||
     filterRead !== "all" ||
-    filterDate !== "all";
+    filterDate !== "all" ||
+    Boolean(customDateRange?.from);
   const selectedPresentation = selectedNotification
     ? getNotificationPresentation(selectedNotification.type)
     : null;
@@ -369,6 +397,8 @@ export default function AdminNotifications() {
     setFilterType("all");
     setFilterRead("all");
     setFilterDate("all");
+    setCustomDateRange(undefined);
+    setIsCustomCalendarOpen(false);
     setSortOrder("newest");
   };
 
@@ -797,18 +827,53 @@ export default function AdminNotifications() {
               ))}
             </select>
 
-            <select
-              value={filterDate}
-              onChange={(event) =>
-                setFilterDate(event.target.value as DateFilter)
-              }
-              className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+            <Popover
+              open={filterDate === "custom" && isCustomCalendarOpen}
+              onOpenChange={setIsCustomCalendarOpen}
             >
-              <option value="all">All Dates</option>
-              <option value="today">Today</option>
-              <option value="week">Last 7 Days</option>
-              <option value="month">Last 30 Days</option>
-            </select>
+              <PopoverAnchor asChild>
+                <select
+                  value={filterDate}
+                  onChange={(event) => {
+                    const value = event.target.value as DateFilter;
+                    setFilterDate(value);
+                    setIsCustomCalendarOpen(value === "custom");
+                    if (value !== "custom") setCustomDateRange(undefined);
+                  }}
+                  className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                >
+                  <option value="all">All Dates</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">Last 30 Days</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </PopoverAnchor>
+              <PopoverContent align="start" className="w-auto p-0">
+                <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
+                  <CalendarDays size={16} className="text-slate-500" />
+                  {formatDateRange(customDateRange)}
+                </div>
+                <Calendar
+                  mode="range"
+                  selected={customDateRange}
+                  onSelect={setCustomDateRange}
+                  numberOfMonths={1}
+                  initialFocus
+                />
+                {customDateRange?.from && (
+                  <div className="flex justify-end border-t border-slate-100 p-2">
+                    <button
+                      type="button"
+                      onClick={() => setCustomDateRange(undefined)}
+                      className="rounded-md px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
+                    >
+                      Clear dates
+                    </button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
 
             <select
               value={sortOrder}
@@ -1171,8 +1236,8 @@ export default function AdminNotifications() {
           document.body,
         )}
 
-        {showSendModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+        {showSendModal && createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
             <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
               <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
                 <div>
@@ -1348,7 +1413,8 @@ export default function AdminNotifications() {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
     </AdminLayout>
