@@ -17,6 +17,7 @@ import {
   Calendar,
   CheckCircle,
   Eye,
+  FileCheck2,
   Loader2,
   Search,
   XCircle,
@@ -156,21 +157,18 @@ const createStoreSlug = (companyName: string, sellerId: string) => {
 export default function AdminSellerApplications() {
   const { user } = useAuth();
 
-  const [applications, setApplications] = useState<SellerApplication[]>(
-    [],
-  );
+  const [applications, setApplications] = useState<SellerApplication[]>([]);
 
   const [loading, setLoading] = useState(true);
 
-  const [actionLoading, setActionLoading] = useState<string | null>(
-    null,
-  );
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const [selectedApplication, setSelectedApplication] =
     useState<SellerApplication | null>(null);
 
-  const [rejectTarget, setRejectTarget] =
-    useState<SellerApplication | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<SellerApplication | null>(
+    null,
+  );
 
   const [rejectReason, setRejectReason] = useState("");
 
@@ -213,9 +211,7 @@ export default function AdminSellerApplications() {
    * Loads the complete application information when
    * the admin clicks View.
    */
-  const fetchApplicationDetails = async (
-    application: SellerApplication,
-  ) => {
+  const fetchApplicationDetails = async (application: SellerApplication) => {
     try {
       const [
         addressesResult,
@@ -260,26 +256,18 @@ export default function AdminSellerApplications() {
 
       setSelectedApplication({
         ...application,
-        application_addresses:
-          addressesResult.data || [],
-        application_warehouse:
-          warehouseResult.data || null,
-        application_storefront:
-          storefrontResult.data || null,
-        status_history:
-          historyResult.data || [],
+        application_addresses: addressesResult.data || [],
+        application_warehouse: warehouseResult.data || null,
+        application_storefront: storefrontResult.data || null,
+        status_history: historyResult.data || [],
       });
     } catch (error: any) {
-      console.error(
-        "Failed to load seller application details:",
-        error,
-      );
+      console.error("Failed to load seller application details:", error);
 
       toast({
         title: "Unable to load application details",
         description:
-          error?.message ||
-          "Could not load the complete seller application.",
+          error?.message || "Could not load the complete seller application.",
         variant: "destructive",
       });
     }
@@ -301,15 +289,11 @@ export default function AdminSellerApplications() {
         application.business_phone,
         application.trade_name,
         application.pan_number,
-      ].some((value) =>
-        value?.toLowerCase().includes(search),
-      ),
+      ].some((value) => value?.toLowerCase().includes(search)),
     );
   }, [applications, searchTerm]);
 
-  const approveApplication = async (
-    application: SellerApplication,
-  ) => {
+  const approveApplication = async (application: SellerApplication) => {
     if (!user?.id) {
       toast({
         title: "Unable to approve application",
@@ -334,26 +318,21 @@ export default function AdminSellerApplications() {
        * STEP 1
        * Update seller application status
        */
-      console.log(
-        "STEP 1 START - Updating seller application",
-        {
-          userId: application.user_id,
-        },
-      );
+      console.log("STEP 1 START - Updating seller application", {
+        userId: application.user_id,
+      });
 
-      const {
-        data: updatedApplication,
-        error: applicationError,
-      } = await supabase
-        .from("seller_applications")
-        .update({
-          status: "approved",
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: user.id,
-        })
-        .eq("id", application.id)
-        .select("id, user_id, status")
-        .single();
+      const { data: updatedApplication, error: applicationError } =
+        await supabase
+          .from("seller_applications")
+          .update({
+            status: "approved",
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: user.id,
+          })
+          .eq("id", application.id)
+          .select("id, user_id, status")
+          .single();
 
       console.log("STEP 1 RESULT", {
         userId: application.user_id,
@@ -372,26 +351,18 @@ export default function AdminSellerApplications() {
           userId: application.user_id,
         });
 
-        throw new Error(
-          "STEP 1 failed: ZERO ROWS UPDATED",
-        );
+        throw new Error("STEP 1 failed: ZERO ROWS UPDATED");
       }
 
       /*
        * STEP 2
        * Update seller profile
        */
-      console.log(
-        "STEP 2 START - Updating seller profile",
-        {
-          userId: application.user_id,
-        },
-      );
+      console.log("STEP 2 START - Updating seller profile", {
+        userId: application.user_id,
+      });
 
-      const {
-        data: updatedProfile,
-        error: profileError,
-      } = await supabase
+      const { data: updatedProfile, error: profileError } = await supabase
         .from("profiles")
         .update({
           role: "seller",
@@ -408,10 +379,7 @@ export default function AdminSellerApplications() {
         error: profileError,
       });
 
-      console.log(
-        "STEP 2 PROFILE ROW",
-        updatedProfile,
-      );
+      console.log("STEP 2 PROFILE ROW", updatedProfile);
 
       if (profileError) {
         console.error("STEP 2 FAILED", profileError);
@@ -424,26 +392,18 @@ export default function AdminSellerApplications() {
           userId: application.user_id,
         });
 
-        throw new Error(
-          "STEP 2 failed: ZERO ROWS UPDATED",
-        );
+        throw new Error("STEP 2 failed: ZERO ROWS UPDATED");
       }
 
       /*
        * STEP 3
        * Fetch seller role
        */
-      console.log(
-        "STEP 3 START - Fetching seller role",
-        {
-          userId: application.user_id,
-        },
-      );
+      console.log("STEP 3 START - Fetching seller role", {
+        userId: application.user_id,
+      });
 
-      const {
-        data: sellerRole,
-        error: sellerRoleError,
-      } = await supabase
+      const { data: sellerRole, error: sellerRoleError } = await supabase
         .from("roles")
         .select("id")
         .eq("name", "seller")
@@ -456,35 +416,23 @@ export default function AdminSellerApplications() {
       });
 
       if (sellerRoleError) {
-        console.error(
-          "STEP 3 FAILED",
-          sellerRoleError,
-        );
+        console.error("STEP 3 FAILED", sellerRoleError);
 
         throw sellerRoleError;
       }
 
-      console.log(
-        "Seller Role ID:",
-        sellerRole.id,
-      );
+      console.log("Seller Role ID:", sellerRole.id);
 
       /*
        * STEP 4
        * Insert seller user role
        */
-      console.log(
-        "STEP 4 START - Inserting seller user role",
-        {
-          userId: application.user_id,
-          sellerRoleId: sellerRole.id,
-        },
-      );
+      console.log("STEP 4 START - Inserting seller user role", {
+        userId: application.user_id,
+        sellerRoleId: sellerRole.id,
+      });
 
-      const {
-        data: userRole,
-        error: userRoleError,
-      } = await supabase
+      const { data: userRole, error: userRoleError } = await supabase
         .from("user_roles")
         .upsert(
           {
@@ -504,16 +452,10 @@ export default function AdminSellerApplications() {
         error: userRoleError,
       });
 
-      console.log(
-        "STEP 4 USER ROLE ROW",
-        userRole,
-      );
+      console.log("STEP 4 USER ROLE ROW", userRole);
 
       if (userRoleError) {
-        console.error(
-          "STEP 4 FAILED",
-          userRoleError,
-        );
+        console.error("STEP 4 FAILED", userRoleError);
 
         throw userRoleError;
       }
@@ -524,54 +466,33 @@ export default function AdminSellerApplications() {
           userId: application.user_id,
         });
 
-        throw new Error(
-          "STEP 4 failed: ZERO ROWS UPDATED",
-        );
+        throw new Error("STEP 4 failed: ZERO ROWS UPDATED");
       }
 
       /*
        * STEP 5
        * Check existing store
        */
-      console.log(
-        "========== APPROVE SELLER ==========",
-      );
+      console.log("========== APPROVE SELLER ==========");
 
-      console.log(
-        "Applicant User ID:",
-        application.user_id,
-      );
+      console.log("Applicant User ID:", application.user_id);
 
-      console.log(
-        "Checking whether a store already exists...",
-      );
+      console.log("Checking whether a store already exists...");
 
-      console.log(
-        "STEP 5 START - Checking existing store",
-        {
-          userId: application.user_id,
-        },
-      );
+      console.log("STEP 5 START - Checking existing store", {
+        userId: application.user_id,
+      });
 
-      const {
-        data: existingStore,
-        error: existingStoreError,
-      } = await supabase
+      const { data: existingStore, error: existingStoreError } = await supabase
         .from("stores")
         .select("id")
         .eq("seller_id", application.user_id)
         .limit(1)
         .maybeSingle();
 
-      console.log(
-        "Existing store result:",
-        existingStore,
-      );
+      console.log("Existing store result:", existingStore);
 
-      console.log(
-        "Existing store error:",
-        existingStoreError,
-      );
+      console.log("Existing store error:", existingStoreError);
 
       console.log("STEP 5 RESULT", {
         userId: application.user_id,
@@ -580,10 +501,7 @@ export default function AdminSellerApplications() {
       });
 
       if (existingStoreError) {
-        console.error(
-          "STEP 5 FAILED",
-          existingStoreError,
-        );
+        console.error("STEP 5 FAILED", existingStoreError);
 
         throw existingStoreError;
       }
@@ -593,21 +511,16 @@ export default function AdminSellerApplications() {
        * Create store if it does not exist
        */
       if (!existingStore) {
-        console.log(
-          "STEP 6 START - Fetching seller profile",
-          {
-            userId: application.user_id,
-          },
-        );
+        console.log("STEP 6 START - Fetching seller profile", {
+          userId: application.user_id,
+        });
 
-        const {
-          data: sellerProfile,
-          error: sellerProfileError,
-        } = await supabase
-          .from("profiles")
-          .select("full_name, email")
-          .eq("id", application.user_id)
-          .single();
+        const { data: sellerProfile, error: sellerProfileError } =
+          await supabase
+            .from("profiles")
+            .select("full_name, email")
+            .eq("id", application.user_id)
+            .single();
 
         console.log("STEP 6 RESULT", {
           userId: application.user_id,
@@ -616,10 +529,7 @@ export default function AdminSellerApplications() {
         });
 
         if (sellerProfileError) {
-          console.error(
-            "STEP 6 FAILED",
-            sellerProfileError,
-          );
+          console.error("STEP 6 FAILED", sellerProfileError);
 
           throw sellerProfileError;
         }
@@ -628,21 +538,14 @@ export default function AdminSellerApplications() {
           application.company_name?.trim() ||
           `${sellerProfile.full_name || "Seller"}'s Store`;
 
-        console.log(
-          "No existing store found.",
-        );
+        console.log("No existing store found.");
 
-        console.log(
-          "Creating seller store...",
-        );
+        console.log("Creating seller store...");
 
         console.log({
           seller_id: application.user_id,
           name: storeName,
-          slug: createStoreSlug(
-            storeName,
-            application.user_id,
-          ),
+          slug: createStoreSlug(storeName, application.user_id),
           status: "active",
           support_email: sellerProfile?.email,
         });
@@ -651,12 +554,9 @@ export default function AdminSellerApplications() {
          * STEP 6.5
          * Create seller profile
          */
-        console.log(
-          "STEP 6.5 START - Creating seller profile",
-          {
-            userId: application.user_id,
-          },
-        );
+        console.log("STEP 6.5 START - Creating seller profile", {
+          userId: application.user_id,
+        });
 
         const {
           data: existingSellerProfile,
@@ -668,16 +568,12 @@ export default function AdminSellerApplications() {
           .maybeSingle();
 
         if (existingSellerProfileError) {
-          console.error(
-            "STEP 6.5 FAILED",
-            existingSellerProfileError,
-          );
+          console.error("STEP 6.5 FAILED", existingSellerProfileError);
 
           throw existingSellerProfileError;
         }
 
-        let sellerProfileRow =
-          existingSellerProfile;
+        let sellerProfileRow = existingSellerProfile;
 
         if (!sellerProfileRow) {
           const {
@@ -688,18 +584,13 @@ export default function AdminSellerApplications() {
             .insert({
               id: application.user_id,
               application_id: application.id,
-              company_name:
-                application.company_name,
-              business_type:
-                application.business_type,
-              registration_number:
-                application.registration_number,
+              company_name: application.company_name,
+              business_type: application.business_type,
+              registration_number: application.registration_number,
               tax_id: application.tax_id,
-              bank_details:
-                application.bank_details,
+              bank_details: application.bank_details,
               is_verified: true,
-              verified_at:
-                new Date().toISOString(),
+              verified_at: new Date().toISOString(),
             })
             .select(
               "id, application_id, company_name, is_verified, verified_at",
@@ -707,16 +598,12 @@ export default function AdminSellerApplications() {
             .single();
 
           if (sellerProfileInsertError) {
-            console.error(
-              "STEP 6.5 FAILED",
-              sellerProfileInsertError,
-            );
+            console.error("STEP 6.5 FAILED", sellerProfileInsertError);
 
             throw sellerProfileInsertError;
           }
 
-          sellerProfileRow =
-            createdSellerProfile;
+          sellerProfileRow = createdSellerProfile;
         }
 
         console.log("STEP 6.5 RESULT", {
@@ -729,47 +616,26 @@ export default function AdminSellerApplications() {
          * STEP 7
          * Insert store
          */
-        console.log(
-          "STEP 7 START - Inserting store",
-          {
-            userId: application.user_id,
-            slug: createStoreSlug(
-              storeName,
-              application.user_id,
-            ),
-          },
-        );
+        console.log("STEP 7 START - Inserting store", {
+          userId: application.user_id,
+          slug: createStoreSlug(storeName, application.user_id),
+        });
 
-        const {
-          data: createdStore,
-          error: storeError,
-        } = await supabase
+        const { data: createdStore, error: storeError } = await supabase
           .from("stores")
           .insert({
             seller_id: application.user_id,
             name: storeName,
-            slug: createStoreSlug(
-              storeName,
-              application.user_id,
-            ),
+            slug: createStoreSlug(storeName, application.user_id),
             status: "active",
-            support_email:
-              sellerProfile.email || null,
+            support_email: sellerProfile.email || null,
           })
-          .select(
-            "id, seller_id, name, slug, status, support_email",
-          )
+          .select("id, seller_id, name, slug, status, support_email")
           .single();
 
-        console.log(
-          "Store insert result:",
-          createdStore,
-        );
+        console.log("Store insert result:", createdStore);
 
-        console.log(
-          "Store insert error:",
-          storeError,
-        );
+        console.log("Store insert error:", storeError);
 
         console.log("STEP 7 RESULT", {
           userId: application.user_id,
@@ -777,96 +643,59 @@ export default function AdminSellerApplications() {
           error: storeError,
         });
 
-        console.log(
-          "STEP 7 STORE ROW",
-          createdStore,
-        );
+        console.log("STEP 7 STORE ROW", createdStore);
 
         if (storeError) {
-          console.error(
-            "STEP 7 FAILED",
-            storeError,
-          );
+          console.error("STEP 7 FAILED", storeError);
 
-          console.error(
-            "STORE INSERT FAILED",
-            storeError,
-          );
+          console.error("STORE INSERT FAILED", storeError);
 
           throw storeError;
         }
 
         if (!createdStore) {
-          console.error(
-            "ZERO ROWS UPDATED",
-            {
-              step: 7,
-              userId: application.user_id,
-            },
-          );
+          console.error("ZERO ROWS UPDATED", {
+            step: 7,
+            userId: application.user_id,
+          });
 
-          throw new Error(
-            "STEP 7 failed: ZERO ROWS UPDATED",
-          );
+          throw new Error("STEP 7 failed: ZERO ROWS UPDATED");
         }
 
-        console.log(
-          "Store created successfully.",
-        );
+        console.log("Store created successfully.");
       }
 
-      console.log(
-        "Seller approved:",
-        application.user_id,
-      );
+      console.log("Seller approved:", application.user_id);
 
-      console.log(
-        "Seller approval completed successfully.",
-      );
+      console.log("Seller approval completed successfully.");
 
-      console.log(
-        "===================================",
-      );
+      console.log("===================================");
 
       toast({
         title: "Success",
-        description:
-          "Seller application approved successfully.",
+        description: "Seller application approved successfully.",
       });
 
       setSelectedApplication(null);
 
-      console.log(
-        "STEP 8 START - Refreshing pending applications",
-        {
-          userId: application.user_id,
-        },
-      );
+      console.log("STEP 8 START - Refreshing pending applications", {
+        userId: application.user_id,
+      });
 
       await fetchPendingApplications();
 
-      console.log(
-        "STEP 8 RESULT",
-        {
-          data: undefined,
-          error: undefined,
-        },
-      );
+      console.log("STEP 8 RESULT", {
+        data: undefined,
+        error: undefined,
+      });
 
-      console.log(
-        "SELLER APPROVAL COMPLETED",
-      );
+      console.log("SELLER APPROVAL COMPLETED");
     } catch (error: any) {
-      console.error(
-        "SELLER APPROVAL FAILED",
-      );
+      console.error("SELLER APPROVAL FAILED");
 
       console.error(error);
 
-      console.error(
-        "Failed to approve seller application:",
-        error,
-      );
+      console.error("Failed to approve seller application:", error);
 
       toast({
         title: "Unable to approve application",
@@ -888,8 +717,7 @@ export default function AdminSellerApplications() {
     if (!reason) {
       toast({
         title: "Rejection reason required",
-        description:
-          "Please provide a reason before rejecting.",
+        description: "Please provide a reason before rejecting.",
         variant: "destructive",
       });
 
@@ -903,8 +731,7 @@ export default function AdminSellerApplications() {
       .update({
         status: "rejected",
         rejection_reason: reason,
-        reviewed_at:
-          new Date().toISOString(),
+        reviewed_at: new Date().toISOString(),
         reviewed_by: user.id,
       })
       .eq("id", rejectTarget.id);
@@ -918,8 +745,7 @@ export default function AdminSellerApplications() {
     } else {
       toast({
         title: "Application rejected",
-        description:
-          "The seller application has been rejected.",
+        description: "The seller application has been rejected.",
       });
 
       setRejectTarget(null);
@@ -932,62 +758,117 @@ export default function AdminSellerApplications() {
     setActionLoading(null);
   };
 
-  const openRejectDialog = (
-    application: SellerApplication,
-  ) => {
+  const openRejectDialog = (application: SellerApplication) => {
     setRejectTarget(application);
     setRejectReason("");
   };
 
+  const oldestApplication = applications[applications.length - 1];
+  const uniqueBusinessTypes = new Set(
+    applications
+      .map((application) => application.business_type)
+      .filter(Boolean),
+  ).size;
+
   return (
     <AdminLayout>
-      <div className="space-y-8">
-
+      <div className="mx-auto max-w-7xl space-y-7">
         {/* PAGE HEADER */}
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-8 border border-green-200">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <div className="relative overflow-hidden rounded-2xl border border-[#DDE5D8] bg-[#F3F7EF] px-6 py-7 shadow-sm md:px-9 md:py-8">
+          <div className="absolute -right-12 -top-20 h-52 w-52 rounded-full border-[24px] border-[#DCE8D8]" />
+          <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-end">
             <div>
-              <h1 className="text-5xl md:text-6xl font-bold text-green-900">
+              <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#7B8064]">
+                <FileCheck2 className="h-4 w-4" /> Seller onboarding
+              </div>
+              <h1 className="font-serif text-4xl font-semibold text-[#33381C] md:text-5xl">
                 Seller Applications
               </h1>
-
-              <p className="text-green-700 mt-2 text-lg md:text-xl">
-                Review pending seller verification requests
+              <p className="mt-2 max-w-xl text-sm leading-6 text-[#777D70]">
+                Validate business details and welcome the next trusted partner
+                to Grevya.
               </p>
             </div>
-
-            <div className="bg-white rounded-lg p-5 border border-green-200 shadow-sm md:text-right">
-              <p className="text-sm text-gray-600 font-medium">
-                Pending Review
-              </p>
-
-              <p className="text-4xl font-bold text-orange-600">
-                {filteredApplications.length}
-              </p>
+            <div className="flex items-center gap-3 rounded-2xl border border-white/80 bg-white/80 px-5 py-4 shadow-sm backdrop-blur">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFF1DE] text-[#C06C22]">
+                <Building2 className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A877C]">
+                  Pending review
+                </p>
+                <p className="mt-0.5 text-3xl font-semibold text-[#33381C]">
+                  {filteredApplications.length}
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* SEARCH */}
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-md">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            [
+              "Awaiting decision",
+              applications.length,
+              "Applications currently in your queue",
+              "bg-[#F5F7F0]",
+            ],
+            [
+              "Business categories",
+              uniqueBusinessTypes,
+              "Distinct business types represented",
+              "bg-[#F8F2E9]",
+            ],
+            [
+              "Oldest submission",
+              oldestApplication
+                ? formatDate(oldestApplication.created_at)
+                : "-",
+              "Use age to prioritize review",
+              "bg-[#F1F4F6]",
+            ],
+          ].map(([label, value, caption, background]) => (
+            <div
+              key={label}
+              className={`rounded-2xl border border-[#E5E8E3] ${background} px-5 py-4`}
+            >
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#8A877C]">
+                {label}
+              </p>
+              <p className="mt-1 truncate font-serif text-2xl font-semibold text-[#33381C]">
+                {value}
+              </p>
+              <p className="mt-1 text-xs text-[#777D70]">{caption}</p>
+            </div>
+          ))}
+        </div>
 
+        <div className="flex flex-col gap-3 border-b border-[#E5E8E3] pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[#33381C]">
+              Verification queue
+            </p>
+            <p className="mt-1 text-xs text-[#8A877C]">
+              {filteredApplications.length} request
+              {filteredApplications.length === 1 ? "" : "s"} requiring attention
+            </p>
+          </div>
+          <div className="relative w-full sm:max-w-md">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A09B90]" />
             <input
               type="text"
-              placeholder="Search by company, business type, registration number, GST, PAN, contact person, or email..."
+              aria-label="Search seller applications"
+              placeholder="Search company, contact, registration..."
               value={searchTerm}
-              onChange={(event) =>
-                setSearchTerm(event.target.value)
-              }
-              className="w-full pl-12 pr-5 py-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition text-base placeholder-gray-400"
+              onChange={(event) => setSearchTerm(event.target.value)}
+              className="h-11 w-full rounded-xl border border-[#DDE2D9] bg-white pl-10 pr-4 text-sm text-[#33381C] shadow-sm outline-none transition placeholder:text-[#A09B90] focus:border-[#7B8064] focus:ring-2 focus:ring-[#DCE5D4]"
             />
           </div>
         </div>
 
         {/* APPLICATIONS */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {[...Array(6)].map((_, index) => (
               <div
                 key={index}
@@ -1023,131 +904,100 @@ export default function AdminSellerApplications() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredApplications.map(
-              (application) => {
-                const bank =
-                  application.bank_details || {};
+            {filteredApplications.map((application) => {
+              const bank = application.bank_details || {};
 
-                return (
-                  <div
-                    key={application.id}
-                    className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-200 p-5 flex flex-col gap-4"
-                  >
-                    {/* CARD HEADER */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h2 className="font-bold text-xl text-gray-900">
-                          {application.company_name ||
-                            "Unnamed company"}
-                        </h2>
+              return (
+                <div
+                  key={application.id}
+                  className="group flex flex-col gap-4 rounded-2xl border border-[#E5E8E3] bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-[#A68D65]/40 hover:shadow-md"
+                >
+                  {/* CARD HEADER */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="font-serif text-xl font-semibold text-[#33381C]">
+                        {application.company_name || "Unnamed company"}
+                      </h2>
 
-                        <p className="mt-1 text-sm text-gray-600">
-                          {application.business_type ||
-                            "Business type not provided"}
-                        </p>
-                      </div>
-
-                      <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-bold capitalize">
-                        {application.status}
-                      </span>
-                    </div>
-
-                    {/* CARD DETAILS */}
-                    <div className="space-y-2 text-sm text-gray-700">
-                      <p>
-                        <span className="font-semibold text-gray-800">
-                          Registration:
-                        </span>{" "}
-                        {application.registration_number ||
-                          "Not provided"}
-                      </p>
-
-                      <p>
-                        <span className="font-semibold text-gray-800">
-                          GST / Tax ID:
-                        </span>{" "}
-                        {application.tax_id ||
-                          "Not provided"}
-                      </p>
-
-                      <p>
-                        <span className="font-semibold text-gray-800">
-                          Bank:
-                        </span>{" "}
-                        {bank.bank_name ||
-                          "Not provided"}
-                      </p>
-
-                      <p>
-                        <span className="font-semibold text-gray-800">
-                          Account:
-                        </span>{" "}
-                        {maskAccountNumber(
-                          bank.account_number,
-                        )}
-                      </p>
-
-                      <p className="flex items-center gap-2 text-xs text-gray-500 pt-1">
-                        <Calendar className="h-4 w-4" />
-
-                        Submitted{" "}
-                        {formatDate(
-                          application.created_at,
-                        )}
+                      <p className="mt-1 text-xs font-medium uppercase tracking-[0.1em] text-[#8A877C]">
+                        {application.business_type ||
+                          "Business type not provided"}
                       </p>
                     </div>
 
-                    {/* ACTIONS */}
-                    <div className="flex gap-2 mt-auto pt-2">
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          void fetchApplicationDetails(
-                            application,
-                          )
-                        }
-                        className="flex-1 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        View
-                      </Button>
-
-                      <Button
-                        onClick={() =>
-                          void approveApplication(
-                            application,
-                          )
-                        }
-                        disabled={
-                          actionLoading ===
-                          application.id
-                        }
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                      >
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Approve
-                      </Button>
-
-                      <Button
-                        variant="destructive"
-                        onClick={() =>
-                          openRejectDialog(
-                            application,
-                          )
-                        }
-                        disabled={
-                          actionLoading ===
-                          application.id
-                        }
-                      >
-                        <XCircle className="mr-2 h-4 w-4" />
-                        Reject
-                      </Button>
-                    </div>
+                    <span className="rounded-full bg-[#FFF1DE] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#C06C22]">
+                      {application.status}
+                    </span>
                   </div>
-                );
-              },
-            )}
+
+                  {/* CARD DETAILS */}
+                  <div className="grid gap-x-5 gap-y-2 border-y border-[#EEF0EB] py-3 text-xs text-[#777D70] sm:grid-cols-2">
+                    <p>
+                      <span className="font-semibold text-[#4D5528]">
+                        Registration:
+                      </span>{" "}
+                      {application.registration_number || "Not provided"}
+                    </p>
+
+                    <p>
+                      <span className="font-semibold text-[#4D5528]">
+                        GST / Tax ID:
+                      </span>{" "}
+                      {application.tax_id || "Not provided"}
+                    </p>
+
+                    <p>
+                      <span className="font-semibold text-[#4D5528]">
+                        Bank:
+                      </span>{" "}
+                      {bank.bank_name || "Not provided"}
+                    </p>
+
+                    <p>
+                      <span className="font-semibold text-[#4D5528]">
+                        Account:
+                      </span>{" "}
+                      {maskAccountNumber(bank.account_number)}
+                    </p>
+
+                    <p className="flex items-center gap-2 pt-1 text-xs text-[#8A877C] sm:col-span-2">
+                      <Calendar className="h-4 w-4" />
+                      Submitted {formatDate(application.created_at)}
+                    </p>
+                  </div>
+
+                  {/* ACTIONS */}
+                  <div className="mt-auto flex gap-2 pt-1">
+                    <Button
+                      variant="outline"
+                      onClick={() => void fetchApplicationDetails(application)}
+                      className="flex-1 border-[#D8E3F4] bg-[#F3F7FD] text-[#41658F] hover:bg-[#E9F0FA]"
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      View
+                    </Button>
+
+                    <Button
+                      onClick={() => void approveApplication(application)}
+                      disabled={actionLoading === application.id}
+                      className="flex-1 bg-[#59632F] text-white hover:bg-[#33381C]"
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Approve
+                    </Button>
+
+                    <Button
+                      variant="destructive"
+                      onClick={() => openRejectDialog(application)}
+                      disabled={actionLoading === application.id}
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -1167,38 +1017,27 @@ export default function AdminSellerApplications() {
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           {selectedApplication &&
             (() => {
-              const application =
-                selectedApplication;
+              const application = selectedApplication;
 
-              const bank =
-                application.bank_details || {};
+              const bank = application.bank_details || {};
 
-              const registeredAddress =
-                application.application_addresses?.find(
-                  (address) =>
-                    address.address_type ===
-                    "registered",
-                );
+              const registeredAddress = application.application_addresses?.find(
+                (address) => address.address_type === "registered",
+              );
 
-              const pickupAddress =
-                application.application_addresses?.find(
-                  (address) =>
-                    address.address_type ===
-                    "pickup",
-                );
+              const pickupAddress = application.application_addresses?.find(
+                (address) => address.address_type === "pickup",
+              );
 
-              const warehouse =
-                application.application_warehouse;
+              const warehouse = application.application_warehouse;
 
-              const storefront =
-                application.application_storefront;
+              const storefront = application.application_storefront;
 
               return (
                 <>
                   <DialogHeader>
                     <DialogTitle className="text-3xl font-bold text-gray-900">
-                      {application.company_name ||
-                        "Seller application"}
+                      {application.company_name || "Seller application"}
                     </DialogTitle>
 
                     <DialogDescription>
@@ -1207,7 +1046,6 @@ export default function AdminSellerApplications() {
                   </DialogHeader>
 
                   <div className="space-y-8">
-
                     {/* ================================================= */}
                     {/* BUSINESS INFORMATION                              */}
                     {/* ================================================= */}
@@ -1220,53 +1058,36 @@ export default function AdminSellerApplications() {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <Detail
                           label="Company name"
-                          value={
-                            application.company_name
-                          }
+                          value={application.company_name}
                         />
 
                         <Detail
                           label="Trade name"
-                          value={
-                            application.trade_name
-                          }
+                          value={application.trade_name}
                         />
 
                         <Detail
                           label="Business type"
-                          value={
-                            application.business_type
-                          }
+                          value={application.business_type}
                         />
 
                         <Detail
                           label="Registration number"
-                          value={
-                            application.registration_number
-                          }
+                          value={application.registration_number}
                         />
 
                         <Detail
                           label="GST / Tax ID"
-                          value={
-                            application.tax_id
-                          }
+                          value={application.tax_id}
                         />
 
-                        <Detail
-                          label="PAN"
-                          value={
-                            application.pan_number
-                          }
-                        />
+                        <Detail label="PAN" value={application.pan_number} />
 
                         <Detail
                           label="Year established"
                           value={
                             application.year_established
-                              ? String(
-                                  application.year_established,
-                                )
+                              ? String(application.year_established)
                               : null
                           }
                         />
@@ -1275,9 +1096,7 @@ export default function AdminSellerApplications() {
                       <div className="mt-4">
                         <Detail
                           label="Business description"
-                          value={
-                            application.business_description
-                          }
+                          value={application.business_description}
                         />
                       </div>
                     </section>
@@ -1294,23 +1113,17 @@ export default function AdminSellerApplications() {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <Detail
                           label="Contact person"
-                          value={
-                            application.contact_person
-                          }
+                          value={application.contact_person}
                         />
 
                         <Detail
                           label="Business email"
-                          value={
-                            application.business_email
-                          }
+                          value={application.business_email}
                         />
 
                         <Detail
                           label="Business phone"
-                          value={
-                            application.business_phone
-                          }
+                          value={application.business_phone}
                         />
                       </div>
                     </section>
@@ -1327,31 +1140,17 @@ export default function AdminSellerApplications() {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <Detail
                           label="Account holder"
-                          value={
-                            bank.account_holder_name
-                          }
+                          value={bank.account_holder_name}
                         />
 
-                        <Detail
-                          label="Bank name"
-                          value={
-                            bank.bank_name
-                          }
-                        />
+                        <Detail label="Bank name" value={bank.bank_name} />
 
                         <Detail
                           label="Account number"
-                          value={maskAccountNumber(
-                            bank.account_number,
-                          )}
+                          value={maskAccountNumber(bank.account_number)}
                         />
 
-                        <Detail
-                          label="IFSC"
-                          value={
-                            bank.ifsc_code
-                          }
-                        />
+                        <Detail label="IFSC" value={bank.ifsc_code} />
                       </div>
                     </section>
 
@@ -1365,15 +1164,9 @@ export default function AdminSellerApplications() {
                       </h3>
 
                       {registeredAddress ? (
-                        <AddressCard
-                          address={
-                            registeredAddress
-                          }
-                        />
+                        <AddressCard address={registeredAddress} />
                       ) : (
-                        <EmptyDetail
-                          text="Registered address not provided"
-                        />
+                        <EmptyDetail text="Registered address not provided" />
                       )}
                     </section>
 
@@ -1387,19 +1180,11 @@ export default function AdminSellerApplications() {
                       </h3>
 
                       {warehouse?.pickup_same_as_registered ? (
-                        <EmptyDetail
-                          text="Same as registered address"
-                        />
+                        <EmptyDetail text="Same as registered address" />
                       ) : pickupAddress ? (
-                        <AddressCard
-                          address={
-                            pickupAddress
-                          }
-                        />
+                        <AddressCard address={pickupAddress} />
                       ) : (
-                        <EmptyDetail
-                          text="Pickup address not provided"
-                        />
+                        <EmptyDetail text="Pickup address not provided" />
                       )}
                     </section>
 
@@ -1416,18 +1201,12 @@ export default function AdminSellerApplications() {
                         <div className="grid gap-4 sm:grid-cols-2">
                           <Detail
                             label="Warehouse name"
-                            value={
-                              warehouse.warehouse_name
-                            }
+                            value={warehouse.warehouse_name}
                           />
 
                           <Detail
                             label="Primary warehouse"
-                            value={
-                              warehouse.is_primary
-                                ? "Yes"
-                                : "No"
-                            }
+                            value={warehouse.is_primary ? "Yes" : "No"}
                           />
 
                           <Detail
@@ -1440,9 +1219,7 @@ export default function AdminSellerApplications() {
                           />
                         </div>
                       ) : (
-                        <EmptyDetail
-                          text="Warehouse information not provided"
-                        />
+                        <EmptyDetail text="Warehouse information not provided" />
                       )}
                     </section>
 
@@ -1460,30 +1237,22 @@ export default function AdminSellerApplications() {
                           <div className="grid gap-4 sm:grid-cols-2">
                             <Detail
                               label="Store name"
-                              value={
-                                storefront.store_name
-                              }
+                              value={storefront.store_name}
                             />
 
                             <Detail
                               label="Store slug"
-                              value={
-                                storefront.store_slug
-                              }
+                              value={storefront.store_slug}
                             />
 
                             <Detail
                               label="Support email"
-                              value={
-                                storefront.support_email
-                              }
+                              value={storefront.support_email}
                             />
 
                             <Detail
                               label="Support phone"
-                              value={
-                                storefront.support_phone
-                              }
+                              value={storefront.support_phone}
                             />
 
                             <Detail
@@ -1495,32 +1264,24 @@ export default function AdminSellerApplications() {
 
                             <Detail
                               label="Processing time"
-                              value={formatOption(
-                                storefront.processing_time,
-                              )}
+                              value={formatOption(storefront.processing_time)}
                             />
 
                             <Detail
                               label="Return handling"
-                              value={formatOption(
-                                storefront.return_handling,
-                              )}
+                              value={formatOption(storefront.return_handling)}
                             />
                           </div>
 
                           <div className="mt-4">
                             <Detail
                               label="Store description"
-                              value={
-                                storefront.store_description
-                              }
+                              value={storefront.store_description}
                             />
                           </div>
                         </>
                       ) : (
-                        <EmptyDetail
-                          text="Storefront information not provided"
-                        />
+                        <EmptyDetail text="Storefront information not provided" />
                       )}
                     </section>
 
@@ -1534,54 +1295,38 @@ export default function AdminSellerApplications() {
                       </h3>
 
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <Detail
-                          label="Application ID"
-                          value={
-                            application.id
-                          }
-                        />
+                        <Detail label="Application ID" value={application.id} />
 
                         <Detail
                           label="Applicant User ID"
-                          value={
-                            application.user_id
-                          }
+                          value={application.user_id}
                         />
 
                         <Detail
                           label="Current status"
-                          value={
-                            application.status
-                          }
+                          value={application.status}
                         />
 
                         <Detail
                           label="Submitted date"
-                          value={formatDate(
-                            application.created_at,
-                          )}
+                          value={formatDate(application.created_at)}
                         />
 
                         <Detail
                           label="Submitted date & time"
-                          value={formatDateTime(
-                            application.created_at,
-                          )}
+                          value={formatDateTime(application.created_at)}
                         />
 
                         <Detail
                           label="Reviewed date"
                           value={formatDateTime(
-                            application.reviewed_at ||
-                              null,
+                            application.reviewed_at || null,
                           )}
                         />
 
                         <Detail
                           label="Declaration version"
-                          value={
-                            application.declaration_version
-                          }
+                          value={application.declaration_version}
                         />
 
                         <Detail
@@ -1597,16 +1342,12 @@ export default function AdminSellerApplications() {
 
                         <Detail
                           label="Reviewed by"
-                          value={
-                            application.reviewed_by
-                          }
+                          value={application.reviewed_by}
                         />
 
                         <Detail
                           label="Rejection reason"
-                          value={
-                            application.rejection_reason
-                          }
+                          value={application.rejection_reason}
                         />
                       </div>
                     </section>
@@ -1616,95 +1357,68 @@ export default function AdminSellerApplications() {
                     {/* ================================================= */}
 
                     {application.status_history &&
-                      application.status_history
-                        .length > 0 && (
+                      application.status_history.length > 0 && (
                         <section>
                           <h3 className="mb-4 text-lg font-bold text-gray-900">
                             Application Status History
                           </h3>
 
                           <div className="space-y-3">
-                            {application.status_history.map(
-                              (history) => (
-                                <div
-                                  key={history.id}
-                                  className="rounded-lg border border-gray-200 bg-gray-50 p-4"
-                                >
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <p className="font-semibold text-gray-900">
-                                      {history.from_status ||
-                                        "Created"}{" "}
-                                      →{" "}
-                                      {history.to_status}
-                                    </p>
+                            {application.status_history.map((history) => (
+                              <div
+                                key={history.id}
+                                className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <p className="font-semibold text-gray-900">
+                                    {history.from_status || "Created"} →{" "}
+                                    {history.to_status}
+                                  </p>
 
-                                    <p className="text-xs text-gray-500">
-                                      {formatDateTime(
-                                        history.created_at,
-                                      )}
-                                    </p>
-                                  </div>
-
-                                  {history.reason && (
-                                    <p className="mt-2 text-sm text-gray-600">
-                                      {history.reason}
-                                    </p>
-                                  )}
-
-                                  {history.changed_by && (
-                                    <p className="mt-1 text-xs text-gray-500">
-                                      Changed by:{" "}
-                                      {
-                                        history.changed_by
-                                      }
-                                    </p>
-                                  )}
+                                  <p className="text-xs text-gray-500">
+                                    {formatDateTime(history.created_at)}
+                                  </p>
                                 </div>
-                              ),
-                            )}
+
+                                {history.reason && (
+                                  <p className="mt-2 text-sm text-gray-600">
+                                    {history.reason}
+                                  </p>
+                                )}
+
+                                {history.changed_by && (
+                                  <p className="mt-1 text-xs text-gray-500">
+                                    Changed by: {history.changed_by}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         </section>
                       )}
-
                   </div>
 
                   {/* MODAL ACTIONS */}
                   <DialogFooter className="gap-2 sm:gap-2">
                     <Button
                       variant="destructive"
-                      onClick={() =>
-                        openRejectDialog(
-                          application,
-                        )
-                      }
-                      disabled={
-                        actionLoading ===
-                        application.id
-                      }
+                      onClick={() => openRejectDialog(application)}
+                      disabled={actionLoading === application.id}
                     >
                       <XCircle className="mr-2 h-4 w-4" />
                       Reject
                     </Button>
 
                     <Button
-                      onClick={() =>
-                        void approveApplication(
-                          application,
-                        )
-                      }
-                      disabled={
-                        actionLoading ===
-                        application.id
-                      }
+                      onClick={() => void approveApplication(application)}
+                      disabled={actionLoading === application.id}
                       className="bg-green-600 hover:bg-green-700"
                     >
-                      {actionLoading ===
-                      application.id ? (
+                      {actionLoading === application.id ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
                         <CheckCircle className="mr-2 h-4 w-4" />
                       )}
-
                       Approve application
                     </Button>
                   </DialogFooter>
@@ -1728,50 +1442,34 @@ export default function AdminSellerApplications() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              Reject seller application
-            </DialogTitle>
+            <DialogTitle>Reject seller application</DialogTitle>
 
             <DialogDescription>
-              Provide a clear reason the seller can
-              address before applying again.
+              Provide a clear reason the seller can address before applying
+              again.
             </DialogDescription>
           </DialogHeader>
 
           <textarea
             value={rejectReason}
-            onChange={(event) =>
-              setRejectReason(event.target.value)
-            }
+            onChange={(event) => setRejectReason(event.target.value)}
             placeholder="Enter rejection reason..."
             className="min-h-28 w-full rounded-lg border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-500"
           />
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() =>
-                setRejectTarget(null)
-              }
-            >
+            <Button variant="outline" onClick={() => setRejectTarget(null)}>
               Cancel
             </Button>
 
             <Button
               variant="destructive"
-              onClick={() =>
-                void rejectApplication()
-              }
-              disabled={
-                actionLoading ===
-                rejectTarget?.id
-              }
+              onClick={() => void rejectApplication()}
+              disabled={actionLoading === rejectTarget?.id}
             >
-              {actionLoading ===
-                rejectTarget?.id && (
+              {actionLoading === rejectTarget?.id && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-
               Confirm rejection
             </Button>
           </DialogFooter>
@@ -1785,13 +1483,7 @@ export default function AdminSellerApplications() {
 /* DETAIL COMPONENT                                               */
 /* ============================================================= */
 
-function Detail({
-  label,
-  value,
-}: {
-  label: string;
-  value?: string | null;
-}) {
+function Detail({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -1809,56 +1501,28 @@ function Detail({
 /* ADDRESS COMPONENT                                             */
 /* ============================================================= */
 
-function AddressCard({
-  address,
-}: {
-  address: SellerApplicationAddress;
-}) {
+function AddressCard({ address }: { address: SellerApplicationAddress }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 p-5">
       <div className="grid gap-4 sm:grid-cols-2">
-
         <Detail
           label="Address type"
-          value={formatOption(
-            address.address_type,
-          )}
+          value={formatOption(address.address_type)}
         />
 
-        <Detail
-          label="Country"
-          value={address.country}
-        />
+        <Detail label="Country" value={address.country} />
 
-        <Detail
-          label="Address line 1"
-          value={address.address_line_1}
-        />
+        <Detail label="Address line 1" value={address.address_line_1} />
 
-        <Detail
-          label="Address line 2"
-          value={address.address_line_2}
-        />
+        <Detail label="Address line 2" value={address.address_line_2} />
 
-        <Detail
-          label="Landmark"
-          value={address.landmark}
-        />
+        <Detail label="Landmark" value={address.landmark} />
 
-        <Detail
-          label="City"
-          value={address.city}
-        />
+        <Detail label="City" value={address.city} />
 
-        <Detail
-          label="State"
-          value={address.state}
-        />
+        <Detail label="State" value={address.state} />
 
-        <Detail
-          label="Pincode"
-          value={address.pincode}
-        />
+        <Detail label="Pincode" value={address.pincode} />
       </div>
     </div>
   );
@@ -1868,16 +1532,10 @@ function AddressCard({
 /* EMPTY DETAIL COMPONENT                                        */
 /* ============================================================= */
 
-function EmptyDetail({
-  text,
-}: {
-  text: string;
-}) {
+function EmptyDetail({ text }: { text: string }) {
   return (
     <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-5">
-      <p className="text-sm text-gray-500">
-        {text}
-      </p>
+      <p className="text-sm text-gray-500">{text}</p>
     </div>
   );
 }

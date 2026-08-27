@@ -47,34 +47,15 @@ const ReturnRefundPolicy = () => {
 
     setSubmitting(true);
     setError(null);
-    const { data: claim, error: insertError } = await supabase
-      .from("return_refund_claims")
-      .insert({
-        order_id: orderId.trim(),
-        customer_id: user.id,
-        issue_type: issueType,
-        description: description.trim(),
-      })
-      .select("id")
-      .single();
-
-    if (insertError || !claim) {
-      setError(
-        insertError?.message ||
-          "We could not submit your request. Check the Order ID and try again.",
-      );
-      setSubmitting(false);
-      return;
-    }
+    const claimId = crypto.randomUUID();
 
     const evidenceUrls: string[] = [];
     for (const file of files) {
-      const path = `${user.id}/${claim.id}/${file.name}`;
+      const path = `${user.id}/${claimId}/${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from("return-refund-evidence")
         .upload(path, file);
       if (uploadError) {
-        await supabase.from("return_refund_claims").delete().eq("id", claim.id);
         setError(`Upload failed for ${file.name}: ${uploadError.message}`);
         setSubmitting(false);
         return;
@@ -82,11 +63,21 @@ const ReturnRefundPolicy = () => {
       evidenceUrls.push(path);
     }
 
-    await supabase
+    const { error: insertError } = await supabase
       .from("return_refund_claims")
-      .update({ evidence_urls: evidenceUrls })
-      .eq("id", claim.id);
-    setSubmitted(true);
+      .insert({
+        id: claimId,
+        order_id: orderId.trim(),
+        customer_id: user.id,
+        issue_type: issueType,
+        description: description.trim(),
+        evidence_urls: evidenceUrls,
+      });
+    if (insertError) {
+      setError(insertError.message);
+    } else {
+      setSubmitted(true);
+    }
     setOrderId("");
     setDescription("");
     setFiles([]);
@@ -378,25 +369,27 @@ const ReturnRefundPolicy = () => {
                 {files.length > 0 && (
                   <div className="mt-2 space-y-1">
                     {files.map((file) => (
-                        <div
+                      <div
                         key={`${file.name}-${file.lastModified}`}
-                          className="flex items-center justify-between gap-2 rounded-lg bg-green-50 px-3 py-1.5 text-xs font-medium text-green-800"
+                        className="flex items-center justify-between gap-2 rounded-lg bg-green-50 px-3 py-1.5 text-xs font-medium text-green-800"
                       >
-                          <span className="truncate">{file.name}</span>
-                          <button
-                            type="button"
-                            title={`Remove ${file.name}`}
-                            aria-label={`Remove ${file.name}`}
-                            onClick={() =>
-                              setFiles((currentFiles) =>
-                                currentFiles.filter((currentFile) => currentFile !== file),
-                              )
-                            }
-                            className="shrink-0 rounded-full p-1 text-green-900 transition hover:bg-green-100"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                        <span className="truncate">{file.name}</span>
+                        <button
+                          type="button"
+                          title={`Remove ${file.name}`}
+                          aria-label={`Remove ${file.name}`}
+                          onClick={() =>
+                            setFiles((currentFiles) =>
+                              currentFiles.filter(
+                                (currentFile) => currentFile !== file,
+                              ),
+                            )
+                          }
+                          className="shrink-0 rounded-full p-1 text-green-900 transition hover:bg-green-100"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}

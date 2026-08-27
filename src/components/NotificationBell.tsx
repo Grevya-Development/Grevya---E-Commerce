@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Bell, Check, Info, Package, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
@@ -29,7 +30,14 @@ interface OrderWithItems {
 const orderReferenceFromGenericMessage = (message: string) =>
   message.match(/^Order (.+?) has been placed successfully!?$/)?.[1];
 
+const returnRefundOrderId = (message: string) =>
+  message.match(/\[return_refund_order:([^\]]+)\]/)?.[1] || null;
+
+const visibleNotificationMessage = (message: string) =>
+  message.replace(/\s*\[return_refund_order:[^\]]+\]/, "");
+
 const NotificationBell = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -383,6 +391,11 @@ const NotificationBell = () => {
                           notification={notification}
                           markAsRead={markAsRead}
                           toggleReadStatus={toggleReadStatus}
+                          onOpen={() =>
+                            navigate(
+                              `/orders/${returnRefundOrderId(notification.message)}`,
+                            )
+                          }
                         />
                       </motion.div>
                     ))}
@@ -437,19 +450,23 @@ interface NotificationItemProps {
   notification: Notification;
   markAsRead: (id: string, read: boolean) => void;
   toggleReadStatus: (id: string, read: boolean) => void;
+  onOpen: () => void;
 }
 
 const NotificationItem = ({
   notification,
   markAsRead,
   toggleReadStatus,
+  onOpen,
 }: NotificationItemProps) => {
+  const orderId = returnRefundOrderId(notification.message);
   return (
     <DropdownMenuItem
       className={`p-4 cursor-pointer flex items-start space-x-3 transition-colors ${!notification.read ? "bg-emerald-50/25" : "bg-transparent"}`}
       onClick={(e) => {
         e.preventDefault();
         markAsRead(notification.id, notification.read);
+        if (orderId) onOpen();
       }}
     >
       <div
@@ -465,7 +482,7 @@ const NotificationItem = ({
         <p
           className={`text-xs ${!notification.read ? "font-bold text-[#33381C]" : "text-neutral-600 font-medium"}`}
         >
-          {notification.message}
+          {visibleNotificationMessage(notification.message)}
         </p>
         <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">
           {new Date(notification.created_at).toLocaleTimeString([], {
