@@ -12,6 +12,8 @@ returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
+declare
+  product_names text;
 begin
   -- Prevent any updates to orders that are already cancelled or delivered
   if old.status = 'cancelled' then
@@ -69,11 +71,16 @@ begin
       perform json_build_object('log', 'order_status_history table not found');
     end;
 
+    select string_agg(nullif(trim(product_name), ''), ', ' order by created_at)
+      into product_names
+      from public.order_items
+      where order_id = new.id;
+
     -- Insert in-app notification row
     insert into public.notifications (user_id, message, type)
     values (
       new.user_id,
-      'Your order #' || substring(new.id::text from 1 for 8) || ' status has been updated to ' || new.status || '.',
+      'Your order for ' || coalesce(product_names, 'your items') || ' status has been updated to ' || new.status || '.',
       'order'
     );
   end if;

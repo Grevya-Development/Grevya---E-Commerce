@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import { AuthProvider } from '@/context/AuthContext'
 import './index.css'
@@ -68,9 +69,11 @@ class ErrorBoundary extends Component<Props, State> {
 
 createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </BrowserRouter>
   </ErrorBoundary>
 );
 

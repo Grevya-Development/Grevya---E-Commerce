@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as ToasterSonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AnimatePresence, motion } from "framer-motion";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 import { supabase } from "@/lib/supabaseClient";
@@ -13,6 +13,7 @@ import MemberBenefitsBar from "@/components/MemberBenefitsBar";
 import SpotlightSearch from "@/components/SpotlightSearch";
 import QuickViewModal from "@/components/QuickViewModal";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import ScrollToTop from "@/components/ScrollToTop";
 import ScrollToTop from "@/components/ScrollToTop";
 
 // Lazy-loaded pages
@@ -43,6 +44,7 @@ const ShippingPaymentPolicy = lazy(
 
 // Admin Pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminAnalytics = lazy(() => import("./pages/admin/AdminAnalytics"));
 const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
 const AdminProductRequests = lazy(
   () => import("./pages/admin/AdminProductRequests"),
@@ -55,6 +57,9 @@ const AdminOrders = lazy(() => import("./pages/admin/AdminOrders"));
 const AdminNotifications = lazy(
   () => import("./pages/admin/AdminNotifications"),
 );
+const AdminReturnRequests = lazy(
+  () => import("./pages/admin/AdminReturnRequests"),
+);
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 
 // Seller Pages
@@ -65,12 +70,15 @@ const SellerOrders = lazy(() => import("./pages/seller/SellerOrders"));
 const PendingProducts = lazy(() => import("./pages/seller/PendingProducts"));
 const SellerSettings = lazy(() => import("./pages/seller/SellerSettings"));
 const SellerOnboarding = lazy(() => import("./pages/seller/SellerOnboarding"));
-const SellerApplicationForm = lazy(() => import("./pages/seller/SellerApplicationForm"));
+const SellerApplicationForm = lazy(
+  () => import("./pages/seller/SellerApplicationForm"),
+);
 
 const AppContent = () => {
   const location = useLocation();
   return (
     <>
+      <ScrollToTop />
       <ScrollToTop />
       <MemberBenefitsBar />
       <SpotlightSearch />
@@ -111,6 +119,7 @@ const AppContent = () => {
               <Route path="/signup" element={<Signup />} />
               <Route path="/account/register" element={<Signup />} />
               <Route path="/seller/register" element={<Signup />} />
+              <Route path="/seller/signup" element={<Signup />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
@@ -147,7 +156,7 @@ const AppContent = () => {
                   </ProtectedRoute>
                 }
               />
-               <Route
+              <Route
                 path="/notifications"
                 element={
                   <ProtectedRoute
@@ -180,6 +189,17 @@ const AppContent = () => {
                     loginPath="/admin/login"
                   >
                     <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/analytics"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["admin"]}
+                    loginPath="/admin/login"
+                  >
+                    <AdminAnalytics />
                   </ProtectedRoute>
                 }
               />
@@ -226,6 +246,17 @@ const AppContent = () => {
                     loginPath="/admin/login"
                   >
                     <AdminNotifications />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/return-refund-requests"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["admin"]}
+                    loginPath="/admin/login"
+                  >
+                    <AdminReturnRequests />
                   </ProtectedRoute>
                 }
               />
@@ -422,9 +453,7 @@ const App = () => {
     <TooltipProvider>
       <Toaster />
       <ToasterSonner />
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
+      <AppContent />
     </TooltipProvider>
   );
 };

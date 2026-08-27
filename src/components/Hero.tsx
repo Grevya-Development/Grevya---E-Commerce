@@ -28,7 +28,7 @@ const staggerContainer = {
 
 const Hero = () => {
   return (
-    <section className="relative bg-gradient-mesh overflow-hidden py-10 md:py-16 lg:py-20 border-b border-[#A68D65]/10 select-none">
+    <section className="relative bg-gradient-mesh overflow-hidden pt-20 pb-10 md:pt-[5.5rem] md:pb-16 lg:pt-24 lg:pb-20 border-b border-[#A68D65]/10 select-none">
       {/* Slow floating decorative mesh background orbs */}
       <motion.div 
         animate={{ 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -19,11 +19,6 @@ const ProtectedRoute = ({
   const [sellerApplicationState, setSellerApplicationState] = useState<
     "checking" | "approved" | "pending" | "rejected" | "unavailable"
   >("checking");
-  const sellerApplicationCheck = useRef<{
-    userId: string;
-    request: Promise<"approved" | "pending" | "rejected" | "unavailable">;
-  } | null>(null);
-
   const isSellerRoute = allowedRoles?.includes("seller") ?? false;
 
   useEffect(() => {
@@ -84,11 +79,7 @@ const ProtectedRoute = ({
     };
 
     setSellerApplicationState("checking");
-    if (sellerApplicationCheck.current?.userId !== user.id) {
-      sellerApplicationCheck.current = { userId: user.id, request: checkApplication() };
-    }
-
-    void sellerApplicationCheck.current.request.then((nextState) => {
+    void checkApplication().then((nextState) => {
       if (!cancelled) setSellerApplicationState(nextState);
     });
 
@@ -113,6 +104,11 @@ const ProtectedRoute = ({
   }
 
   if (!user || user.is_anonymous) {
+    const redirectTo = loginPath || "/login";
+    return <Navigate to={redirectTo} replace state={{ from: location }} />;
+  }
+
+  if (!profile || profile.is_active === false) {
     const redirectTo = loginPath || "/login";
     return <Navigate to={redirectTo} replace state={{ from: location }} />;
   }

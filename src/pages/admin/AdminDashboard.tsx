@@ -10,6 +10,7 @@ import {
   ArrowUpRight,
   AlertTriangle,
   CheckCircle2,
+  Activity,
 } from "lucide-react";
 
 import AdminLayout from "@/layouts/AdminLayout";
@@ -128,15 +129,37 @@ export default function AdminDashboard() {
     <AdminLayout>
       <div className="space-y-8">
         {/* Header section */}
-        <div className="flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="font-serif text-3xl font-bold text-[#33381C]">
               Admin Control Panel
             </h1>
             <p className="text-neutral-500 mt-1 text-sm">
-              Operational governance, vendor requests, and marketplace performance metrics.
+              Operational governance, vendor requests, and marketplace
+              performance metrics.
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => navigate("/admin/analytics")}
+            aria-label="Open live marketplace analytics"
+            className="group inline-flex w-full items-center gap-3 rounded-2xl border border-[#33381C]/20 bg-white px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#33381C]/40 hover:shadow-md md:w-auto"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#E7E9DD] text-[#33381C] transition-colors group-hover:bg-[#33381C] group-hover:text-white">
+              <Activity size={18} />
+            </span>
+            <span className="min-w-0">
+              <span className="flex items-center gap-2 text-sm font-bold text-[#33381C]">
+                Live Analytics
+                <span className="rounded-full bg-[#E5F0E3] px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-[#3F6B4A]">LIVE</span>
+              </span>
+              <span className="mt-0.5 block text-xs text-neutral-500">Real-time marketplace insights</span>
+            </span>
+            <span className="relative ml-auto flex h-2.5 w-2.5 md:ml-1" aria-hidden="true">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            </span>
+          </button>
         </div>
 
         {/* Operational Alerts / Attention required */}
@@ -150,7 +173,11 @@ export default function AdminDashboard() {
                 Attention Required: Pending Vendor Request Requests
               </h3>
               <p className="text-neutral-500 text-xs">
-                There are currently <span className="font-bold text-[#33381C]">{stats.pendingProducts}</span> products awaiting catalog authorization.
+                There are currently{" "}
+                <span className="font-bold text-[#33381C]">
+                  {stats.pendingProducts}
+                </span>{" "}
+                products awaiting catalog authorization.
               </p>
             </div>
             <button
@@ -196,7 +223,7 @@ export default function AdminDashboard() {
                     <p className="text-neutral-500 text-xs font-bold uppercase tracking-wider">
                       Gross Marketplace Revenue
                     </p>
-                    <h3 className="text-3.5xl font-serif font-bold text-[#33381C]">
+                    <h3 className="text-4xl md:text-[2.2rem] font-serif font-bold text-[#33381C] leading-none">
                       {formatCurrency(stats.revenue)}
                     </h3>
                   </div>
@@ -214,7 +241,7 @@ export default function AdminDashboard() {
                     <p className="text-neutral-500 text-xs font-bold uppercase tracking-wider">
                       Completed Orders
                     </p>
-                    <h3 className="text-3.5xl font-serif font-bold text-[#33381C]">
+                    <h3 className="text-4xl md:text-[2.2rem] font-serif font-bold text-[#33381C] leading-none">
                       {stats.orders}
                     </h3>
                   </div>
@@ -240,7 +267,7 @@ export default function AdminDashboard() {
                     <p className="text-neutral-500 text-xs font-bold uppercase tracking-wider">
                       Total Accounts Registered
                     </p>
-                    <h3 className="text-3.5xl font-serif font-bold text-[#33381C]">
+                    <h3 className="text-4xl md:text-[2.2rem] font-serif font-bold text-[#33381C] leading-none">
                       {stats.users}
                     </h3>
                   </div>
@@ -258,7 +285,7 @@ export default function AdminDashboard() {
                     <p className="text-neutral-500 text-xs font-bold uppercase tracking-wider">
                       Registered Shop Sellers
                     </p>
-                    <h3 className="text-3.5xl font-serif font-bold text-[#33381C]">
+                    <h3 className="text-4xl md:text-[2.2rem] font-serif font-bold text-[#33381C] leading-none">
                       {stats.sellers}
                     </h3>
                   </div>
@@ -284,7 +311,7 @@ export default function AdminDashboard() {
                     <p className="text-neutral-500 text-xs font-bold uppercase tracking-wider">
                       Approved Catalog Products
                     </p>
-                    <h3 className="text-3.5xl font-serif font-bold text-[#33381C]">
+                    <h3 className="text-4xl md:text-[2.2rem] font-serif font-bold text-[#33381C] leading-none">
                       {stats.approvedProducts}
                     </h3>
                   </div>
@@ -302,7 +329,7 @@ export default function AdminDashboard() {
                     <p className="text-neutral-500 text-xs font-bold uppercase tracking-wider">
                       Pending Approval Requests
                     </p>
-                    <h3 className="text-3.5xl font-serif font-bold text-[#33381C]">
+                    <h3 className="text-4xl md:text-[2.2rem] font-serif font-bold text-[#33381C] leading-none">
                       {stats.pendingProducts}
                     </h3>
                   </div>

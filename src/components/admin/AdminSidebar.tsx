@@ -6,6 +6,7 @@ import {
   Bell,
   ClipboardCheck,
   Building2,
+  RotateCcw,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -37,6 +38,16 @@ const managementLinks = [
     label: "Customer Orders",
     icon: ShoppingCart,
     path: "/admin/orders",
+  },
+  {
+    label: "Return / Refund Requests",
+    icon: RotateCcw,
+    path: "/admin/return-refund-requests",
+  },
+  {
+    label: "Return / Refund Requests",
+    icon: RotateCcw,
+    path: "/admin/return-refund-requests",
   },
   {
     label: "Product Requests",
@@ -82,7 +93,10 @@ export default function AdminSidebar() {
                     }`
                   }
                 >
-                  <Icon size={15} className="group-hover:scale-105 transition-transform" />
+                  <Icon
+                    size={15}
+                    className="group-hover:scale-105 transition-transform"
+                  />
                   <span>{link.label}</span>
                 </NavLink>
               );
@@ -110,7 +124,10 @@ export default function AdminSidebar() {
                     }`
                   }
                 >
-                  <Icon size={15} className="group-hover:scale-105 transition-transform" />
+                  <Icon
+                    size={15}
+                    className="group-hover:scale-105 transition-transform"
+                  />
                   <span>{link.label}</span>
                 </NavLink>
               );

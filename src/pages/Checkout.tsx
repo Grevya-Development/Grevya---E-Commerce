@@ -5,8 +5,8 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import {
   Check,
-  CreditCard,
   IndianRupee,
+  CreditCard,
   Loader2,
   ShieldCheck,
   Truck,
@@ -16,7 +16,6 @@ import { toast } from "@/components/ui/use-toast";
 import { useCartStore } from "@/store/useCartStore";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
-import { openRazorpayCheckout, RazorpayResponse } from "@/lib/razorpay";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface PaymentMethod {
@@ -405,12 +404,13 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { user, profile, loading: authLoading } = useAuth();
   const [processing, setProcessing] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<string>("razorpay");
+  const [selectedPayment, setSelectedPayment] = useState<string>("cod");
   const [step, setStep] = useState(1); // 1 = Delivery, 2 = Payment, 3 = Review
   const [direction, setDirection] = useState(0);
   const [placedOrder, setPlacedOrder] = useState<{
     id: string;
     number: string;
+    sellerOrderCount: number;
   } | null>(null);
 
   const paginate = (newStep: number) => {
@@ -523,6 +523,16 @@ const Checkout = () => {
     }));
   }, [profile, user]);
 
+  /*
+   * Keep all payment choices visible in the checkout UI.
+   *
+   * IMPORTANT:
+   * Razorpay is NOT integrated yet. COD is the only payment method
+   * that can actually place an order at this stage.
+   *
+   * When Razorpay is integrated, the "razorpay" and "card" branches
+   * in handlePayment() should start the verified Razorpay checkout.
+   */
   const paymentMethods: PaymentMethod[] = [
     {
       id: "razorpay",
@@ -544,86 +554,332 @@ const Checkout = () => {
     },
   ];
 
-  const createOrder = async (
-    paymentStatus: string,
-    paymentReference?: RazorpayResponse,
-  ) => {
-    if (!user) throw new Error("Please sign in before checkout.");
+  const createOrder = async (paymentStatus: string) => {
+    if (!user) {
+      throw new Error("Please sign in before checkout.");
+    }
 
-    // Older persisted carts contain only a product id. The production schema
-    // owns SKU on product_variants, so resolve the single active variant before
-    // creating the order rather than inserting an order_item without its SKU.
-    console.log("========== CART ==========");
-    console.log(cartItems);
-    console.log("==========================");
+    if (cartItems.length === 0) {
+      throw new Error("Your cart is empty.");
+    }
+
+    /*
+     * ============================================================
+     * 1. Resolve SKUs / variants
+     * ============================================================
+     *
+     * Older persisted carts may contain only product IDs. The
+     * production schema keeps SKU on product_variants, so resolve
+     * the variant before creating order_items.
+     */
     const unresolvedProductIds = [
-      ...new Set(cartItems.filter((item) => !item.sku).map((item) => item.id)),
+      ...new Set(
+        cartItems
+          .filter((item) => !item.sku)
+          .map((item) => Number(item.id)),
+      ),
     ];
+
     const variantsByProductId = new Map<
       number,
       { id: string; sku: string }[]
     >();
 
     if (unresolvedProductIds.length > 0) {
-  const { data: variants, error: variantsError } = await supabase
-  .from("product_variants")
-  .select("*")
-  .order("product_id");
-  console.log("RAW VARIANTS");
-console.table(variants);
-  console.log(variants);
-  console.log("variantsError", variantsError);
-  console.log("variants", variants);
-  console.log("productIds", unresolvedProductIds);
+      const { data: variants, error: variantsError } = await supabase
+        .from("product_variants")
+        .select("id, product_id, sku")
+        .in("product_id", unresolvedProductIds)
+        .order("product_id");
 
-if (variantsError) throw variantsError;
+      if (variantsError) throw variantsError;
 
       (variants || []).forEach((variant: any) => {
         const productId = Number(variant.product_id);
-        const productVariants = variantsByProductId.get(productId) || [];
-        productVariants.push({ id: variant.id, sku: variant.sku });
+
+        if (!variant.id || !variant.sku) return;
+
+        const productVariants =
+          variantsByProductId.get(productId) || [];
+
+        productVariants.push({
+          id: variant.id,
+          sku: variant.sku,
+        });
+
         variantsByProductId.set(productId, productVariants);
       });
     }
 
+    /*
+     * ============================================================
+     * 2. Resolve product ownership
+     * ============================================================
+     *
+     * Products may expose seller ownership directly (seller_id,
+     * vendor_id, merchant_id, owner_id, etc.) or through a store.
+     *
+     * We intentionally read the complete product row here instead
+     * of selecting a possibly-missing schema column. This keeps
+     * checkout compatible with the existing database variations.
+     */
+    const productIds = [
+      ...new Set(cartItems.map((item) => Number(item.id))),
+    ];
+
+    const { data: productRows, error: productsError } = await supabase
+      .from("products")
+      .select("*")
+      .in("id", productIds);
+
+    if (productsError) {
+      throw productsError;
+    }
+
+    const productById = new Map<number, any>();
+
+    (productRows || []).forEach((product: any) => {
+      productById.set(Number(product.id), product);
+    });
+
+    const directSellerKeys = [
+      "seller_id",
+      "sellerId",
+      "vendor_id",
+      "vendorId",
+      "merchant_id",
+      "merchantId",
+      "owner_id",
+      "ownerId",
+    ];
+
+    const storeKeys = [
+      "store_id",
+      "storeId",
+      "shop_id",
+      "shopId",
+    ];
+
+    const getFirstValue = (
+      row: any,
+      keys: string[],
+    ): string | null => {
+      if (!row) return null;
+
+      for (const key of keys) {
+        const value = row[key];
+
+        if (
+          value !== undefined &&
+          value !== null &&
+          String(value).trim() !== ""
+        ) {
+          return String(value);
+        }
+      }
+
+      return null;
+    };
+
+    const sellerIdByProductId = new Map<number, string>();
+    const storeIdByProductId = new Map<number, string>();
+
+    productIds.forEach((productId) => {
+      const product = productById.get(productId);
+
+      if (!product) {
+        throw new Error(
+          `Product ${productId} could not be found. Please refresh your cart and try again.`,
+        );
+      }
+
+      const directSellerId = getFirstValue(
+        product,
+        directSellerKeys,
+      );
+
+      const storeId = getFirstValue(product, storeKeys);
+
+      if (directSellerId) {
+        sellerIdByProductId.set(productId, directSellerId);
+      }
+
+      if (storeId) {
+        storeIdByProductId.set(productId, storeId);
+      }
+    });
+
+    /*
+     * If a product does not have a direct seller ID but has a store,
+     * resolve the seller from the store row.
+     */
+    const unresolvedStoreIds = [
+      ...new Set(
+        productIds
+          .filter((productId) => !sellerIdByProductId.has(productId))
+          .map((productId) => storeIdByProductId.get(productId))
+          .filter(Boolean),
+      ),
+    ] as string[];
+
+    if (unresolvedStoreIds.length > 0) {
+      const { data: storeRows, error: storesError } = await supabase
+        .from("stores")
+        .select("*")
+        .in("id", unresolvedStoreIds);
+
+      if (storesError) {
+        throw new Error(
+          `Unable to resolve seller ownership from stores: ${storesError.message}`,
+        );
+      }
+
+      const sellerIdByStoreId = new Map<string, string>();
+
+      (storeRows || []).forEach((store: any) => {
+        const sellerId = getFirstValue(
+          store,
+          directSellerKeys,
+        );
+
+        if (sellerId) {
+          sellerIdByStoreId.set(String(store.id), sellerId);
+        }
+      });
+
+      productIds.forEach((productId) => {
+        if (sellerIdByProductId.has(productId)) return;
+
+        const storeId = storeIdByProductId.get(productId);
+
+        if (!storeId) return;
+
+        const sellerId = sellerIdByStoreId.get(storeId);
+
+        if (sellerId) {
+          sellerIdByProductId.set(productId, sellerId);
+        }
+      });
+    }
+
+    /*
+     * Every checkout item must have an identifiable seller.
+     * Without this check, a marketplace order could be assigned
+     * to the wrong seller.
+     */
+    const unresolvedSellerItems = cartItems.filter(
+      (item) => !sellerIdByProductId.has(Number(item.id)),
+    );
+
+    if (unresolvedSellerItems.length > 0) {
+      const names = unresolvedSellerItems
+        .map((item) => item.name)
+        .join(", ");
+
+      throw new Error(
+        `Seller ownership could not be determined for: ${names}. ` +
+          `Please make sure each product has a seller_id or store_id linked to a seller.`,
+      );
+    }
+
+    /*
+     * ============================================================
+     * 3. Build authoritative checkout line items
+     * ============================================================
+     */
     const orderLineItems = cartItems.map((item) => {
-      
-      
-      const matchingVariants = variantsByProductId.get(Number(item.id)) || [];
-      console.log("Matching Variants");
-console.log(matchingVariants);
+      const matchingVariants =
+        variantsByProductId.get(Number(item.id)) || [];
+
       const selectedVariant = item.variant_id
-        ? matchingVariants.find((variant) => variant.id === item.variant_id)
+        ? matchingVariants.find(
+            (variant) => variant.id === item.variant_id,
+          )
         : matchingVariants.length === 1
           ? matchingVariants[0]
           : undefined;
+
       const sku = item.sku || selectedVariant?.sku;
-      
 
       if (!sku) {
         throw new Error(
-          `No unambiguous active SKU is available for \"${item.name}\". Please refresh the product and add it to your cart again.`,
+          `No unambiguous active SKU is available for "${item.name}". ` +
+            `Please refresh the product and add it to your cart again.`,
+        );
+      }
+
+      const sellerId = sellerIdByProductId.get(Number(item.id));
+
+      if (!sellerId) {
+        throw new Error(
+          `Seller could not be determined for "${item.name}".`,
         );
       }
 
       return {
         ...item,
         sku,
-        variant_id: item.variant_id || selectedVariant?.id,
+        variant_id:
+          item.variant_id || selectedVariant?.id,
+        seller_id: sellerId,
       };
     });
 
-    const orderReference = `GI-${Date.now()}`;
-    const subtotal = getSubtotal();
+    /*
+     * ============================================================
+     * 4. Group cart items by seller
+     * ============================================================
+     */
+    const itemsBySeller = new Map<
+      string,
+      typeof orderLineItems
+    >();
 
+    orderLineItems.forEach((item) => {
+      const sellerItems = itemsBySeller.get(item.seller_id);
+
+      if (sellerItems) {
+        sellerItems.push(item);
+      } else {
+        itemsBySeller.set(item.seller_id, [item]);
+      }
+    });
+
+    if (itemsBySeller.size === 0) {
+      throw new Error(
+        "No seller orders could be created from this cart.",
+      );
+    }
+
+    /*
+     * ============================================================
+     * 5. Prepare shipping information
+     * ============================================================
+     */
     const spaceIndex = deliveryInfo.fullName.indexOf(" ");
+
     const firstName =
       spaceIndex !== -1
         ? deliveryInfo.fullName.substring(0, spaceIndex)
         : deliveryInfo.fullName;
+
     const lastName =
-      spaceIndex !== -1 ? deliveryInfo.fullName.substring(spaceIndex + 1) : "";
-    const computedAddress = `${deliveryInfo.addressLine1}${deliveryInfo.addressLine2 ? ", " + deliveryInfo.addressLine2 : ""}${deliveryInfo.landmark ? ", Landmark: " + deliveryInfo.landmark : ""}`;
+      spaceIndex !== -1
+        ? deliveryInfo.fullName.substring(spaceIndex + 1)
+        : "";
+
+    const computedAddress =
+      `${deliveryInfo.addressLine1}` +
+      `${
+        deliveryInfo.addressLine2
+          ? ", " + deliveryInfo.addressLine2
+          : ""
+      }` +
+      `${
+        deliveryInfo.landmark
+          ? ", Landmark: " + deliveryInfo.landmark
+          : ""
+      }`;
 
     const shippingPayload = {
       ...deliveryInfo,
@@ -632,82 +888,322 @@ console.log(matchingVariants);
       address: computedAddress,
     };
 
-    if (user && selectedAddressId === "new" && deliveryInfo.saveToAccount) {
+    /*
+     * Save the address if the customer requested it.
+     */
+    if (
+      selectedAddressId === "new" &&
+      deliveryInfo.saveToAccount
+    ) {
       try {
-        const addressPayload = normalizeAddressForDB(deliveryInfo, user.id);
+        const addressPayload = normalizeAddressForDB(
+          deliveryInfo,
+          user.id,
+        );
+
         if (deliveryInfo.isDefault) {
           await supabase
             .from("addresses")
             .update({ is_default: false })
             .eq("user_id", user.id);
         }
-        await safeInsertAddress(addressPayload);
-      } catch (addrErr) {
-        console.error("Failed to save address to user account:", addrErr);
+
+        const { error: addressError } =
+          await safeInsertAddress(addressPayload);
+
+        if (addressError) {
+          console.warn(
+            "Failed to save address to user account:",
+            addressError,
+          );
+        }
+      } catch (addressError) {
+        console.warn(
+          "Failed to save address to user account:",
+          addressError,
+        );
       }
     }
 
-    const orderPayload = {
-      user_id: user.id,
-      order_number: orderReference,
-      total_amount: total,
-      total: total,
-      status: paymentStatus === "paid" ? "confirmed" : "pending",
-      order_status: paymentStatus === "paid" ? "confirmed" : "pending",
-      payment_status: paymentStatus,
-      payment_method: selectedPayment,
-      payment_reference: paymentReference || null,
-      shipping_address: shippingPayload,
-      estimated_delivery: new Date(
-        Date.now() + 5 * 24 * 60 * 60 * 1000,
-      ).toISOString(),
-    };
+    /*
+     * ============================================================
+     * 6. Calculate checkout totals
+     * ============================================================
+     *
+     * Keep the existing Grevya shipping rule:
+     *   subtotal >= ₹500 -> free shipping
+     *   subtotal <  ₹500 -> ₹50 shipping
+     */
+    const checkoutSubtotal = orderLineItems.reduce(
+      (sum, item) =>
+        sum +
+        Number(item.price || 0) *
+          Number(item.quantity || 0),
+      0,
+    );
 
-    const { data: orderData, error: orderError } =
-      await safeInsertOrder(orderPayload);
-    if (orderError) throw orderError;
-    if (!orderData) throw new Error("Failed to create order record.");
+    const checkoutShipping =
+      checkoutSubtotal >= freeShippingThreshold
+        ? 0
+        : 50;
 
-    const orderItems = orderLineItems.map((item) => ({
-      order_id: orderData.id,
-      product_id: item.id,
-      variant_id: item.variant_id,
-      product_name: item.name,
-      product_image: item.image || (item as any).image_url,
-      sku: item.sku,
-      quantity: item.quantity,
-      price: item.price,
-    }));
+    /*
+     * ============================================================
+     * 7. Create one order per seller
+     * ============================================================
+     *
+     * Example:
+     *
+     * Cart:
+     *   Seller A -> ₹300
+     *   Seller A -> ₹100
+     *   Seller B -> ₹200
+     *
+     * Result:
+     *   Order GI-xxxx-1 -> Seller A
+     *   Order GI-xxxx-2 -> Seller B
+     *
+     * Shipping is allocated proportionally when applicable.
+     */
+    const checkoutReference = `GI-${Date.now()}`;
 
-    const { error: itemsError } = await safeInsertOrderItems(orderItems);
-    if (itemsError) throw itemsError;
+    const createdOrders: {
+      id: string;
+      number: string;
+      sellerId: string;
+    }[] = [];
+
+    const sellerEntries = Array.from(
+      itemsBySeller.entries(),
+    );
+
+    let allocatedShipping = 0;
+
+    for (
+      let sellerIndex = 0;
+      sellerIndex < sellerEntries.length;
+      sellerIndex++
+    ) {
+      const [sellerId, sellerItems] =
+        sellerEntries[sellerIndex];
+
+      const sellerSubtotal = sellerItems.reduce(
+        (sum, item) =>
+          sum +
+          Number(item.price || 0) *
+            Number(item.quantity || 0),
+        0,
+      );
+
+      let sellerShipping = 0;
+
+      if (
+        checkoutShipping > 0 &&
+        checkoutSubtotal > 0
+      ) {
+        if (
+          sellerIndex ===
+          sellerEntries.length - 1
+        ) {
+          /*
+           * Put the rounding remainder on the final seller so
+           * all seller shipping values add up exactly to the
+           * original checkout shipping charge.
+           */
+          sellerShipping = Number(
+            (
+              checkoutShipping -
+              allocatedShipping
+            ).toFixed(2),
+          );
+        } else {
+          sellerShipping = Number(
+            (
+              checkoutShipping *
+              (sellerSubtotal /
+                checkoutSubtotal)
+            ).toFixed(2),
+          );
+
+          allocatedShipping += sellerShipping;
+        }
+      }
+
+      const sellerTotal = Number(
+        (
+          sellerSubtotal +
+          sellerShipping
+        ).toFixed(2),
+      );
+
+      const sellerOrderNumber =
+        `${checkoutReference}-${sellerIndex + 1}`;
+
+      const orderPayload = {
+        user_id: user.id,
+        order_number: sellerOrderNumber,
+
+        subtotal: sellerSubtotal,
+        shipping: sellerShipping,
+
+        total_amount: sellerTotal,
+        total: sellerTotal,
+
+        status:
+          paymentStatus === "paid"
+            ? "confirmed"
+            : "pending",
+
+        order_status:
+          paymentStatus === "paid"
+            ? "confirmed"
+            : "pending",
+
+        payment_status: paymentStatus,
+        payment_method: selectedPayment,
+        payment_reference: null,
+
+        shipping_address: shippingPayload,
+
+        estimated_delivery: new Date(
+          Date.now() +
+            5 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+      };
+
+      const {
+        data: orderData,
+        error: orderError,
+      } = await safeInsertOrder(
+        orderPayload,
+      );
+
+      if (orderError) {
+        throw orderError;
+      }
+
+      if (!orderData) {
+        throw new Error(
+          `Failed to create seller order ${
+            sellerIndex + 1
+          }.`,
+        );
+      }
+
+      const orderItems =
+        sellerItems.map((item) => ({
+          order_id: orderData.id,
+          product_id: item.id,
+          variant_id: item.variant_id,
+          product_name: item.name,
+          product_image:
+            item.image ||
+            (item as any).image_url,
+          sku: item.sku,
+          quantity: item.quantity,
+          price: item.price,
+
+          /*
+           * If order_items has seller_id, it will be stored.
+           * If the existing schema does not have the column,
+           * safeInsertOrderItems removes it automatically.
+           */
+          seller_id: sellerId,
+        }));
+
+      const { error: itemsError } =
+        await safeInsertOrderItems(
+          orderItems,
+        );
+
+      if (itemsError) {
+        throw itemsError;
+      }
+
+      createdOrders.push({
+        id: orderData.id,
+        number: sellerOrderNumber,
+        sellerId,
+      });
+    }
+
+    /*
+     * ============================================================
+     * 8. One customer notification for the checkout
+     * ============================================================
+     */
+    const notificationMessage =
+      createdOrders.length === 1
+        ? `Order ${createdOrders[0].number} has been placed successfully!`
+        : `${createdOrders.length} seller orders have been placed successfully!`;
 
     const notifPayload = {
       user_id: user.id,
-      message: `Order ${orderReference} has been placed successfully!`,
+      message: notificationMessage,
       type: "order",
       title: "Order Placed",
       is_read: false,
       read: false,
     };
 
-    const { error: notifError } = await safeInsertNotification(notifPayload);
+    const { error: notifError } =
+      await safeInsertNotification(
+        notifPayload,
+      );
+
     if (notifError) {
-      console.warn("Failed to insert notification:", notifError);
+      console.warn(
+        "Failed to insert notification:",
+        notifError,
+      );
     }
 
+    /*
+     * ============================================================
+     * 9. Clear cart only after every seller order and its items
+     *    have been inserted successfully.
+     * ============================================================
+     */
     clearCart();
-    setPlacedOrder({ id: orderData.id, number: orderReference });
+
+    setPlacedOrder({
+      id: createdOrders[0].id,
+      number: checkoutReference,
+      sellerOrderCount:
+        createdOrders.length,
+    });
   };
 
-  const handlePayment = async (event: React.FormEvent) => {
+  const handlePayment = async (
+    event: React.FormEvent,
+  ) => {
     event.preventDefault();
+
     if (processing) return;
 
     if (cartItems.length === 0) {
       toast({
         title: "Cart empty",
-        description: "Add some items before checking out.",
+        description:
+          "Add some items before checking out.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    /*
+     * Razorpay/card UI is restored, but the actual Razorpay gateway
+     * has not been integrated yet.
+     *
+     * Do NOT create a paid/confirmed order from the browser.
+     * Until backend Razorpay order creation + signature verification
+     * exists, only COD is allowed to create an order.
+     */
+    if (selectedPayment !== "cod") {
+      toast({
+        title: "Razorpay not integrated yet",
+        description:
+          "Razorpay Secure Checkout and Card via Razorpay are visible, but online payment is not configured yet. Please select Cash on Delivery.",
         variant: "destructive",
       });
       return;
@@ -716,56 +1212,28 @@ console.log(matchingVariants);
     setProcessing(true);
 
     try {
-      if (selectedPayment === "cod") {
-        await createOrder("pending");
-        toast({
-          title: "Order placed",
-          description: "Your order is pending confirmation.",
-        });
-        return;
-      }
+      await createOrder("pending");
 
-      await openRazorpayCheckout({
-        amount: getSubtotal(),
-        name: deliveryInfo.fullName || "Grevya Customer",
-        email: deliveryInfo.email,
-        phone: deliveryInfo.phone,
-        orderReference: `GI-${Date.now()}`,
-        onSuccess: async (response) => {
-          try {
-            await createOrder("paid", response);
-            toast({
-              title: "Payment successful",
-              description: "Your order has been confirmed.",
-            });
-          } catch (error: any) {
-            toast({
-              title: "Payment captured, order sync failed",
-              description: error.message,
-              variant: "destructive",
-            });
-          } finally {
-            setProcessing(false);
-          }
-        },
-        onFailure: (reason) => {
-          toast({
-            title: "Payment not completed",
-            description: reason,
-            variant: "destructive",
-          });
-          setProcessing(false);
-        },
+      toast({
+        title: "Order placed",
+        description:
+          "Your seller orders have been created and are pending confirmation.",
       });
     } catch (error: any) {
+      console.error(
+        "Checkout failed:",
+        error,
+      );
+
       toast({
         title: "Order failed",
-        description: error.message || "Failed to process your order.",
+        description:
+          error?.message ||
+          "Failed to create your orders.",
         variant: "destructive",
       });
-      setProcessing(false);
     } finally {
-      if (selectedPayment === "cod") setProcessing(false);
+      setProcessing(false);
     }
   };
 
@@ -1379,13 +1847,18 @@ console.log(matchingVariants);
                             <h4 className="font-bold text-xs uppercase text-neutral-400 tracking-wider mb-2">
                               Payment Option
                             </h4>
-                            <p className="font-semibold text-neutral-800 text-sm capitalize">
-                              {selectedPayment.replace(/_/g, " ")}
+                            <p className="font-semibold text-neutral-800 text-sm">
+                              {paymentMethods.find(
+                                (method) => method.id === selectedPayment,
+                              )?.name || selectedPayment}
                             </p>
                             <p className="text-neutral-500 text-xs mt-1">
                               {selectedPayment === "cod"
                                 ? "Cash will be collected upon delivery of the items."
-                                : "Secure credit card/UPI transactions via Razorpay."}
+                                : "Online payment is not integrated yet. Select Cash on Delivery to place the order."}
+                            </p>
+                            <p className="text-neutral-500 text-xs mt-2">
+                              Products from different sellers will be created as separate seller orders.
                             </p>
                           </div>
 
@@ -1504,12 +1977,17 @@ console.log(matchingVariants);
                   {processing ? (
                     <>
                       <Loader2 className="h-5 w-5 animate-spin" />
-                      Securing Order...
+                      Placing Order...
+                    </>
+                  ) : selectedPayment === "cod" ? (
+                    <>
+                      <Lock className="h-4 w-4 mr-1.5" />
+                      Place COD Order
                     </>
                   ) : (
                     <>
                       <Lock className="h-4 w-4 mr-1.5" />
-                      Securely Place Order
+                      Continue to Payment
                     </>
                   )}
                 </Button>
@@ -1533,34 +2011,24 @@ console.log(matchingVariants);
                   <ShieldCheck className="h-4 w-4 text-[#A68D65]" />
                   <span>Secured 256-bit Checkout</span>
                 </div>
-                <div className="flex items-center justify-center gap-2.5 opacity-70">
-                  <img
-                    src="https://img.icons8.com/color/48/000000/visa.png"
-                    className="h-5 w-auto"
-                    alt="Visa"
-                  />
-                  <img
-                    src="https://img.icons8.com/color/48/000000/mastercard.png"
-                    className="h-5 w-auto"
-                    alt="Mastercard"
-                  />
-                  <img
-                    src="https://img.icons8.com/color/48/000000/rupay.png"
-                    className="h-5 w-auto"
-                    alt="RuPay"
-                  />
-                  <span className="text-[9px] font-bold text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
+                <div className="flex flex-wrap items-center justify-center gap-1.5">
+                  <span className="text-[9px] font-bold bg-[#33381C] text-[#F7EEE4] px-2.5 py-1 rounded uppercase">
+                    Razorpay
+                  </span>
+                  <span className="text-[9px] font-bold bg-[#33381C] text-[#F7EEE4] px-2.5 py-1 rounded uppercase">
+                    Cards
+                  </span>
+                  <span className="text-[9px] font-bold bg-[#33381C] text-[#F7EEE4] px-2.5 py-1 rounded uppercase">
                     UPI
                   </span>
-                  <span className="text-[9px] font-bold bg-[#33381C] text-[#F7EEE4] px-1.5 py-0.5 rounded uppercase">
+                  <span className="text-[9px] font-bold bg-[#33381C] text-[#F7EEE4] px-2.5 py-1 rounded uppercase">
                     COD
                   </span>
                 </div>
               </div>
 
               <p className="mt-4 text-center text-[9px] text-neutral-400">
-                Razorpay payment signature verification should be enabled with a
-                Supabase Edge Function before production launch.
+                Razorpay online payment is shown as an option, but gateway integration is not active yet. COD is currently the only payment method that can place an order.
               </p>
             </aside>
           </div>
@@ -1645,8 +2113,8 @@ console.log(matchingVariants);
                 transition={{ delay: 0.4 }}
                 className="text-neutral-500 text-sm mb-6"
               >
-                Thank you for shopping with Grevya Naturals. We've sent a
-                detailed confirmation to your email.
+                Thank you for shopping with Grevya Naturals. Your cart has
+                been split into the required seller orders and is pending confirmation.
               </motion.p>
 
               <motion.div
@@ -1657,13 +2125,32 @@ console.log(matchingVariants);
               >
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs uppercase font-bold text-neutral-400 tracking-wider">
-                    Order Reference
+                    Checkout Reference
                   </span>
                   <span className="font-mono font-bold text-[#33381C] text-sm">
                     {placedOrder.number}
                   </span>
                 </div>
+
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs uppercase font-bold text-neutral-400 tracking-wider">
+                    Seller Orders
+                  </span>
+                  <span className="font-semibold text-neutral-800 text-sm">
+                    {placedOrder.sellerOrderCount}
+                  </span>
+                </div>
+
                 <div className="flex justify-between items-center">
+                  <span className="text-xs uppercase font-bold text-neutral-400 tracking-wider">
+                    Payment
+                  </span>
+                  <span className="font-semibold text-neutral-800 text-sm">
+                    Cash on Delivery
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-[#A68D65]/10">
                   <span className="text-xs uppercase font-bold text-neutral-400 tracking-wider">
                     Estimated Delivery
                   </span>

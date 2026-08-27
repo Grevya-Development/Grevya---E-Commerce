@@ -1,10 +1,12 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Star, ShoppingCart, Heart, Eye, Leaf } from 'lucide-react';
-import { useCartStore } from '@/store/useCartStore';
-import { useWishlistStore } from '@/store/useWishlistStore';
-import { toast } from '@/components/ui/use-toast';
-import { motion, useMotionValue, useTransform } from 'framer-motion';
+import React from "react";
+import { Link } from "react-router-dom";
+import { Star, ShoppingCart, Heart, Eye, Leaf } from "lucide-react";
+import { useCartStore } from "@/store/useCartStore";
+import { useWishlistStore } from "@/store/useWishlistStore";
+import { useAuth } from "@/context/AuthContext";
+import { useNavigate, useLocation } from "react-router-dom";
+import { toast } from "@/components/ui/use-toast";
+import { motion, useMotionValue, useTransform } from "framer-motion";
 
 export interface ProductProps {
   id: number;
@@ -12,6 +14,7 @@ export interface ProductProps {
   variant_id?: string;
   /** Snapshot of the sellable variant's SKU, required when an order is created. */
   sku?: string;
+  stock?: number;
   name: string;
   price: number;
   rating: number;
@@ -25,7 +28,19 @@ export interface ProductProps {
 }
 
 const ProductCard = (props: ProductProps) => {
-  const { id, name, price, rating, image, category, featured = false, eco = true, slug, reviewCount, image_secondary } = props;
+  const {
+    id,
+    name,
+    price,
+    rating,
+    image,
+    category,
+    featured = false,
+    eco = true,
+    slug,
+    reviewCount,
+    image_secondary,
+  } = props;
   const addItem = useCartStore((state) => state.addItem);
   const { toggleWishlist, isInWishlist } = useWishlistStore();
   const isWishlisted = isInWishlist(id);
@@ -49,19 +64,53 @@ const ProductCard = (props: ProductProps) => {
     y.set(0);
   };
 
-  const addToCart = (e: React.MouseEvent) => {
+  const addToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem(props, 1);
+    const result = await addItem(props, 1);
+    if (!result.ok) {
+      toast({
+        title: "Stock limit reached",
+        description: result.availableStock
+          ? `Only ${result.availableStock} units are available.`
+          : "This product is out of stock.",
+        variant: "destructive",
+      });
+      return;
+    }
     toast({
       title: "Added to cart",
       description: `${name} added to your cart`,
     });
   };
 
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const handleWishlistToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // If auth state is still resolving, avoid toggling.
+    if (authLoading) {
+      toast({
+        title: "Please wait",
+        description: "Checking your authentication status.",
+      });
+      return;
+    }
+
+    // Require authentication to manage wishlist
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save products to your wishlist.",
+      });
+      navigate("/auth", { state: { from: location.pathname } });
+      return;
+    }
+
     const added = toggleWishlist(props);
     toast({
       title: added ? "Added to wishlist" : "Removed from wishlist",
@@ -72,10 +121,21 @@ const ProductCard = (props: ProductProps) => {
   const triggerQuickView = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    window.dispatchEvent(new CustomEvent('open-grevya-quickview', { detail: props }));
+    window.dispatchEvent(
+      new CustomEvent("open-grevya-quickview", { detail: props }),
+    );
   };
 
-  const hasRatings = (reviewCount ?? 0) > 0 && typeof rating === 'number';
+  const saveProductsScrollPosition = () => {
+    if (location.pathname !== "/products") return;
+
+    sessionStorage.setItem(
+      `products-scroll:${location.search}`,
+      JSON.stringify({ top: window.scrollY, left: window.scrollX }),
+    );
+  };
+
+  const hasRatings = (reviewCount ?? 0) > 0 && typeof rating === "number";
 
   return (
     <motion.div
@@ -87,24 +147,32 @@ const ProductCard = (props: ProductProps) => {
       style={{
         rotateX,
         rotateY,
-        transformStyle: 'preserve-3d',
-        willChange: 'transform'
+        transformStyle: "preserve-3d",
+        willChange: "transform",
       }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
+      transition={{
+        duration: 0.55,
+        ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
+      }}
     >
       {/* Image Container with locked aspect ratio */}
       <div className="relative aspect-[4/5] overflow-hidden bg-[#EAE2D5]/20 shrink-0 select-none">
-        
         {/* Product image with zoom transitions */}
-        <Link to={`/products/${category}/${slug}`} className="block w-full h-full">
+        <Link
+          to={`/products/${category}/${slug}`}
+          onClick={saveProductsScrollPosition}
+          className="block w-full h-full"
+        >
           <img
             src={image}
             alt={name}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-106"
-            style={{ transition: 'transform 850ms cubic-bezier(0.16, 1, 0.3, 1)' }}
+            style={{
+              transition: "transform 850ms cubic-bezier(0.16, 1, 0.3, 1)",
+            }}
           />
           {image_secondary && (
             <img
@@ -141,17 +209,23 @@ const ProductCard = (props: ProductProps) => {
             whileTap={{ scale: 0.8 }}
             className={`p-2 rounded-full shadow-md backdrop-blur-xs border transition-all duration-300 cursor-pointer ${
               isWishlisted
-                ? 'bg-[#33381C] text-[#F7EEE4] border-[#33381C]'
-                : 'bg-white/80 hover:bg-[#33381C] text-[#33381C] hover:text-[#F7EEE4] border-[#A68D65]/20'
+                ? "bg-[#33381C] text-[#F7EEE4] border-[#33381C]"
+                : "bg-white/80 hover:bg-[#33381C] text-[#33381C] hover:text-[#F7EEE4] border-[#A68D65]/20"
             }`}
             title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
             aria-label="Toggle wishlist"
           >
             <motion.div
-              animate={isWishlisted ? { scale: [1, 1.35, 0.95, 1.05, 1] } : { scale: 1 }}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
+              animate={
+                isWishlisted
+                  ? { scale: [1, 1.35, 0.95, 1.05, 1] }
+                  : { scale: 1 }
+              }
+              transition={{ duration: 0.5, ease: "easeInOut" }}
             >
-              <Heart className={`h-3.5 w-3.5 ${isWishlisted ? 'fill-current' : ''}`} />
+              <Heart
+                className={`h-3.5 w-3.5 ${isWishlisted ? "fill-current" : ""}`}
+              />
             </motion.div>
           </motion.button>
 
@@ -173,7 +247,12 @@ const ProductCard = (props: ProductProps) => {
         {/* Quick Add Shopping Cart overlay - Desktop hover only */}
         <motion.button
           onClick={addToCart}
-          whileHover={{ scale: 1.15, backgroundColor: '#33381C', color: '#F7EEE4', transition: { type: 'spring', stiffness: 400, damping: 10 } }}
+          whileHover={{
+            scale: 1.15,
+            backgroundColor: "#33381C",
+            color: "#F7EEE4",
+            transition: { type: "spring", stiffness: 400, damping: 10 },
+          }}
           whileTap={{ scale: 0.88 }}
           className="absolute bottom-2.5 right-2.5 z-20 p-2.5 rounded-full bg-white text-[#33381C] border border-[#A68D65]/20 shadow-md backdrop-blur-xs cursor-pointer sm:opacity-0 sm:translate-y-2 sm:group-hover:opacity-100 sm:group-hover:translate-y-0 transition-all duration-300 hidden sm:flex"
           title="Add to Cart"
@@ -185,7 +264,11 @@ const ProductCard = (props: ProductProps) => {
 
       {/* Details Container */}
       <div className="p-2.5 sm:p-3 md:p-4 flex flex-col flex-grow bg-white/40">
-        <Link to={`/products/${category}/${slug}`} className="block mb-auto">
+        <Link
+          to={`/products/${category}/${slug}`}
+          onClick={saveProductsScrollPosition}
+          className="block mb-auto"
+        >
           {/* Category */}
           <span className="text-[7.5px] md:text-[9px] font-bold uppercase tracking-wider text-[#A68D65] block mb-0.5">
             {category}
@@ -198,13 +281,28 @@ const ProductCard = (props: ProductProps) => {
           {/* Rating & Price row */}
           <div className="flex items-center justify-between mt-1.5 md:mt-2.5 pt-0.5">
             <div className="flex items-center min-w-0">
-              <div className="flex mr-0.5" aria-label={hasRatings ? `${rating.toFixed(1)} out of 5 stars` : 'No ratings'}>
+              <div
+                className="flex mr-0.5"
+                aria-label={
+                  hasRatings
+                    ? `${rating.toFixed(1)} out of 5 stars`
+                    : "No ratings"
+                }
+              >
                 {Array.from({ length: 5 }, (_, index) => (
                   <Star
                     key={index}
                     size={10}
-                    fill={hasRatings && index < Math.floor(rating) ? 'currentColor' : 'none'}
-                    className={hasRatings && index < Math.floor(rating) ? 'text-[#A68D65]' : 'text-[#A68D65]/45'}
+                    fill={
+                      hasRatings && index < Math.floor(rating)
+                        ? "currentColor"
+                        : "none"
+                    }
+                    className={
+                      hasRatings && index < Math.floor(rating)
+                        ? "text-[#A68D65]"
+                        : "text-[#A68D65]/45"
+                    }
                   />
                 ))}
               </div>

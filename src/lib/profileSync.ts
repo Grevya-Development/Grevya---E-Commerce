@@ -61,12 +61,15 @@
         data?.phone ||
         authUser.user_metadata?.phone ||
         null,
-role:
-  seed.role ||
-  authUser.user_metadata?.role ||
-  (pending as any).role ||
-  data?.role ||
-  "customer",      avatar_url:
+      // The database is the source of truth after a profile has been created.
+      // An admin may change a user's role without changing Auth user metadata.
+      role:
+        data?.role ||
+        seed.role ||
+        pending.role ||
+        authUser.user_metadata?.role ||
+        "customer",
+      avatar_url:
         data?.avatar_url ||
         authUser.user_metadata?.avatar_url ||
         authUser.user_metadata?.picture ||

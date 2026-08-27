@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Trash2, ShoppingBag, ArrowRight, Minus, Plus, ShieldCheck, ChevronRight, Leaf, Sparkles } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from '@/components/ui/use-toast';
 
 const Cart = () => {
   const cartItems = useCartStore((state) => state.items);
   const removeItem = useCartStore((state) => state.removeItem);
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const getSubtotal = useCartStore((state) => state.getSubtotal);
+  const validateCartStock = useCartStore((state) => state.validateCartStock);
 
   const subtotal = getSubtotal();
   const freeShippingThreshold = 500;
@@ -19,6 +21,16 @@ const Cart = () => {
   const total = subtotal + shipping;
   const progressToFreeShipping = Math.min((subtotal / freeShippingThreshold) * 100, 100);
   const remainingForFreeShipping = Math.max(freeShippingThreshold - subtotal, 0);
+  const changeQuantity = async (item: typeof cartItems[number], quantity: number) => {
+    const result = await updateQuantity(item.id, quantity, item.variant_id);
+    if (!result.ok) toast({ title: 'Stock limit reached', description: result.availableStock ? `Only ${result.availableStock} units are available.` : 'This product is out of stock.', variant: 'destructive' });
+  };
+
+  useEffect(() => {
+    void validateCartStock().then((valid) => {
+      if (!valid) toast({ title: 'Cart updated', description: 'Some quantities were adjusted to match current stock.', variant: 'destructive' });
+    });
+  }, [validateCartStock]);
 
   return (
     <div className="flex flex-col min-h-screen bg-cream/10">
@@ -46,7 +58,7 @@ const Cart = () => {
                       <AnimatePresence>
                         {cartItems.map((item) => (
                           <motion.li
-                            key={item.id}
+                            key={`${item.id}-${item.variant_id || 'default'}`}
                             initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, x: -50 }}
@@ -77,7 +89,7 @@ const Cart = () => {
                               <div className="flex flex-1 items-end justify-between text-sm mt-4">
                                 <div className="flex items-center border border-neutral-200 rounded-xl bg-neutral-50 p-1">
                                   <button
-                                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                    onClick={() => void changeQuantity(item, item.quantity - 1)}
                                     className="p-1.5 hover:bg-white rounded-lg text-neutral-500 hover:text-neutral-900 transition-colors"
                                   >
                                     <Minus size={14} />
@@ -86,7 +98,7 @@ const Cart = () => {
                                     {item.quantity}
                                   </span>
                                   <button
-                                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                    onClick={() => void changeQuantity(item, item.quantity + 1)}
                                     className="p-1.5 hover:bg-white rounded-lg text-neutral-500 hover:text-neutral-900 transition-colors"
                                   >
                                     <Plus size={14} />
@@ -96,7 +108,7 @@ const Cart = () => {
                                 <div className="flex">
                                   <button
                                     type="button"
-                                    onClick={() => removeItem(item.id)}
+                                    onClick={() => removeItem(item.id, item.variant_id)}
                                     className="font-semibold text-neutral-400 hover:text-red-500 transition-colors flex items-center gap-1.5 text-xs uppercase tracking-wider"
                                   >
                                     <Trash2 size={16} />

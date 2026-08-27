@@ -1,8 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Compass, BookOpen, Clock, ArrowRight } from 'lucide-react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  ChevronDown,
+  Compass,
+  BookOpen,
+  Clock,
+  ArrowRight,
+} from "lucide-react";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 interface PolicyLayoutProps {
   title: string;
@@ -17,7 +23,7 @@ interface SectionInfo {
 
 const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
   const [sections, setSections] = useState<SectionInfo[]>([]);
-  const [activeSectionId, setActiveSectionId] = useState<string>('');
+  const [activeSectionId, setActiveSectionId] = useState<string>("");
   const [readingProgress, setReadingProgress] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -26,12 +32,12 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
   useEffect(() => {
     if (!contentRef.current) return;
 
-    const h2s = contentRef.current.getElementsByTagName('h2');
+    const h2s = contentRef.current.getElementsByTagName("h2");
     const items: SectionInfo[] = [];
 
     Array.from(h2s).forEach((h2, idx) => {
-      const originalText = h2.textContent || '';
-      const cleanId = `section-${originalText.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${idx}`;
+      const originalText = h2.textContent || "";
+      const cleanId = `section-${originalText.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${idx}`;
       h2.id = cleanId;
       items.push({ id: cleanId, title: originalText });
     });
@@ -53,39 +59,43 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
 
     const observerOptions = {
       root: null,
-      rootMargin: '-15% 0px -70% 0px',
+      rootMargin: "-15% 0px -70% 0px",
       threshold: 0,
     };
 
-    const observer = new IntersectionObserver(observerCallback, observerOptions);
+    const observer = new IntersectionObserver(
+      observerCallback,
+      observerOptions,
+    );
     Array.from(h2s).forEach((h2) => observer.observe(h2));
 
     // Scroll progress handler
     const handleScroll = () => {
-      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollHeight =
+        document.documentElement.scrollHeight - window.innerHeight;
       if (scrollHeight > 0) {
         setReadingProgress((window.scrollY / scrollHeight) * 100);
       }
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
       observer.disconnect();
-      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener("scroll", handleScroll);
     };
   }, [children]);
 
   // Dynamically update active H2 style to slide and grow a forest green underline
   useEffect(() => {
     if (!contentRef.current) return;
-    const h2s = contentRef.current.getElementsByTagName('h2');
+    const h2s = contentRef.current.getElementsByTagName("h2");
     Array.from(h2s).forEach((h2) => {
       const isActive = h2.id === activeSectionId;
-      h2.className = `font-serif text-2xl md:text-3xl font-bold mt-12 mb-6 pb-3 border-b scroll-mt-28 flex items-center transition-all duration-500 ease-premium ${
-        isActive 
-          ? 'text-[#33381C] border-[#33381C] translate-x-1 shadow-[inset_0_-2px_0_0_#33381C] pl-3' 
-          : 'text-[#33381C]/75 border-[#A68D65]/15 pl-0'
+      h2.className = `font-serif text-2xl md:text-3xl font-bold mt-12 mb-6 pb-3 border-b scroll-mt-20 flex items-center transition-all duration-500 ease-premium ${
+        isActive
+          ? "text-[#33381C] border-[#33381C] translate-x-1 shadow-[inset_0_-2px_0_0_#33381C] pl-3"
+          : "text-[#33381C]/75 border-[#A68D65]/15 pl-0"
       }`;
     });
   }, [activeSectionId, sections]);
@@ -94,7 +104,7 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
   const handleScrollTo = (id: string) => {
     const el = document.getElementById(id);
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
       setIsMobileMenuOpen(false);
     }
   };
@@ -113,12 +123,20 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
 
       <main className="flex-grow pt-16 pb-28 relative">
         {/* Layered Blurred Ambient backgrounds */}
-        <div className="absolute top-16 left-1/4 w-[600px] h-[600px] bg-gradient-radial from-[#A68D65]/8 to-transparent rounded-full blur-[120px] pointer-events-none animate-pulse-orb" style={{ animationDuration: '24s' }} />
-        <div className="absolute top-1/3 right-1/4 w-[700px] h-[700px] bg-gradient-radial from-[#33381C]/5 to-transparent rounded-full blur-[140px] pointer-events-none animate-pulse-orb" style={{ animationDuration: '30s', animationDelay: '-6s' }} />
-        <div className="absolute bottom-16 left-1/3 w-[500px] h-[500px] bg-gradient-radial from-[#A68D65]/6 to-transparent rounded-full blur-[100px] pointer-events-none animate-pulse-orb" style={{ animationDuration: '28s', animationDelay: '-12s' }} />
+        <div
+          className="absolute top-16 left-1/4 w-[600px] h-[600px] bg-gradient-radial from-[#A68D65]/8 to-transparent rounded-full blur-[120px] pointer-events-none animate-pulse-orb"
+          style={{ animationDuration: "24s" }}
+        />
+        <div
+          className="absolute top-1/3 right-1/4 w-[700px] h-[700px] bg-gradient-radial from-[#33381C]/5 to-transparent rounded-full blur-[140px] pointer-events-none animate-pulse-orb"
+          style={{ animationDuration: "30s", animationDelay: "-6s" }}
+        />
+        <div
+          className="absolute bottom-16 left-1/3 w-[500px] h-[500px] bg-gradient-radial from-[#A68D65]/6 to-transparent rounded-full blur-[100px] pointer-events-none animate-pulse-orb"
+          style={{ animationDuration: "28s", animationDelay: "-12s" }}
+        />
 
         <div className="container mx-auto px-4 max-w-7xl relative z-10">
-          
           {/* Header Panel */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -149,11 +167,14 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
               >
                 <span className="flex items-center">
                   <Compass className="w-4 h-4 mr-2 text-[#A68D65]" />
-                  {sections.find((s) => s.id === activeSectionId)?.title || 'Navigate Sections'}
+                  {sections.find((s) => s.id === activeSectionId)?.title ||
+                    "Navigate Sections"}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-[#A68D65] transition-transform duration-300 ${isMobileMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`w-4 h-4 text-[#A68D65] transition-transform duration-300 ${isMobileMenuOpen ? "rotate-180" : ""}`}
+                />
               </button>
-              
+
               <AnimatePresence>
                 {isMobileMenuOpen && (
                   <motion.div
@@ -168,8 +189,8 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
                         onClick={() => handleScrollTo(sect.id)}
                         className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all block ${
                           activeSectionId === sect.id
-                            ? 'bg-[#33381C] text-[#F7EEE4]'
-                            : 'hover:bg-[#F7EEE4]/50 text-neutral-600'
+                            ? "bg-[#33381C] text-[#F7EEE4]"
+                            : "hover:bg-[#F7EEE4]/50 text-neutral-600"
                         }`}
                       >
                         {sect.title}
@@ -183,15 +204,18 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
 
           {/* DOUBLE-PANE MAIN LAYOUT */}
           <div className="grid lg:grid-cols-[260px_1fr] gap-12 lg:gap-16 items-start">
-            
             {/* LEFT COLUMN: STICKY TOC NAVIGATION */}
             {sections.length > 0 && (
-              <aside className="hidden lg:block sticky top-28 self-start">
-                <div className="liquid-glass rounded-3xl p-5.5 shadow-md space-y-4">
+              <aside className="hidden lg:block sticky top-20 self-start">
+                <div
+                  className="liquid-glass rounded-3xl p-5.5 shadow-md space-y-4 stable-scrollbar"
+                  style={{ maxHeight: "calc(100vh - 5rem)", overflowY: "auto" }}
+                >
                   <h3 className="text-[10px] font-extrabold text-neutral-400 uppercase tracking-widest flex items-center mb-1">
-                    <BookOpen className="w-3.5 h-3.5 mr-1.5 text-[#A68D65]" /> Document Sections
+                    <BookOpen className="w-3.5 h-3.5 mr-1.5 text-[#A68D65]" />{" "}
+                    Document Sections
                   </h3>
-                  <div className="flex flex-col space-y-1 relative">
+                  <div className="flex flex-col space-y-1 relative min-w-0">
                     {sections.map((sect) => {
                       const isActive = activeSectionId === sect.id;
                       return (
@@ -199,16 +223,20 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
                           key={sect.id}
                           onClick={() => handleScrollTo(sect.id)}
                           className={`relative text-left py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center group cursor-pointer ${
-                            isActive 
-                              ? 'text-[#33381C] bg-[#F7EEE4] shadow-xs' 
-                              : 'text-neutral-500 hover:text-[#33381C] hover:translate-x-1.5'
+                            isActive
+                              ? "text-[#33381C] bg-[#F7EEE4] shadow-xs"
+                              : "text-neutral-500 hover:text-[#33381C] hover:translate-x-1.5"
                           }`}
                         >
                           {isActive && (
                             <motion.div
                               layoutId="activeTOCIndicator"
                               className="absolute left-0 w-1 h-1/2 bg-[#33381C] rounded-full"
-                              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                              transition={{
+                                type: "spring",
+                                stiffness: 380,
+                                damping: 30,
+                              }}
                             />
                           )}
                           <span className="truncate">{sect.title}</span>
@@ -234,9 +262,7 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
             >
               {children}
             </motion.div>
-
           </div>
-
         </div>
       </main>
 

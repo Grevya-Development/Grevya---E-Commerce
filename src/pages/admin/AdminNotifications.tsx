@@ -1,23 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import type { DateRange } from "react-day-picker";
 import {
   AlertCircle,
+  AlertTriangle,
   Bell,
+  CalendarDays,
   CheckCircle2,
+  ChevronRight,
   Circle,
+  Clock3,
+  CreditCard,
   Filter,
   Inbox,
-  MailCheck,
-  MailOpen,
+  Package,
   RefreshCw,
   Search,
   Send,
+  Settings,
+  ShoppingCart,
+  Store,
   Trash2,
   UserCheck,
+  UserRound,
   Users,
   X,
+  XCircle,
 } from "lucide-react";
 
 import AdminLayout from "@/layouts/AdminLayout";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -31,9 +44,30 @@ interface Notification {
   created_at: string;
 }
 
+type NotificationRecord = Partial<Notification> & { read?: boolean };
+type ProfileRecord = {
+  id?: string | null;
+  role?: string | null;
+  full_name?: string | null;
+  username?: string | null;
+  email?: string | null;
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null) {
+    const details = error as Record<string, unknown>;
+    return [details.message, details.details, details.hint, details.code]
+      .filter((value): value is string => typeof value === "string" && Boolean(value))
+      .join(" — ") || "The notification could not be updated.";
+  }
+  return String(error);
+};
+
 type RecipientTarget = "sellers" | "users" | "individual";
 type ReadFilter = "all" | "read" | "unread";
-type DateFilter = "all" | "today" | "week" | "month";
+type DateFilter = "all" | "today" | "week" | "month" | "custom";
+type SortOrder = "newest" | "oldest";
 
 const DEFAULT_TYPES = ["general", "order", "system", "alert", "info"];
 
@@ -72,6 +106,45 @@ const formatTime = (date: string) =>
     minute: "2-digit",
   });
 
+const formatDateRange = (range: DateRange | undefined) => {
+  if (!range?.from) return "Select date range";
+
+  const options: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
+  const from = range.from.toLocaleDateString("en-IN", options);
+  const to = range.to?.toLocaleDateString("en-IN", options);
+  return to ? `${from} – ${to}` : `${from} – Select end date`;
+};
+
+const formatRelativeTime = (date: string) => {
+  const difference = Date.now() - new Date(date).getTime();
+  const minutes = Math.floor(difference / 60_000);
+
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  if (hours < 48) return "Yesterday";
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
+};
+
+const getNotificationPresentation = (type: string) => {
+  const normalized = type.toLowerCase();
+
+  if (normalized.includes("order")) return { icon: ShoppingCart, label: "Order", className: "bg-amber-50 text-amber-700 ring-amber-100" };
+  if (normalized.includes("product")) return { icon: Package, label: "Product", className: "bg-violet-50 text-violet-700 ring-violet-100" };
+  if (normalized.includes("seller")) return { icon: Store, label: "Seller", className: "bg-orange-50 text-orange-700 ring-orange-100" };
+  if (normalized.includes("user") || normalized.includes("customer")) return { icon: UserRound, label: "User", className: "bg-sky-50 text-sky-700 ring-sky-100" };
+  if (normalized.includes("payment")) return { icon: CreditCard, label: "Payment", className: "bg-emerald-50 text-emerald-700 ring-emerald-100" };
+  if (normalized.includes("alert") || normalized.includes("warning")) return { icon: AlertTriangle, label: "Alert", className: "bg-rose-50 text-rose-700 ring-rose-100" };
+  if (normalized.includes("error")) return { icon: XCircle, label: "Error", className: "bg-rose-50 text-rose-700 ring-rose-100" };
+  if (normalized.includes("system")) return { icon: Settings, label: "System", className: "bg-slate-100 text-slate-700 ring-slate-200" };
+  if (normalized.includes("success")) return { icon: CheckCircle2, label: "Success", className: "bg-emerald-50 text-emerald-700 ring-emerald-100" };
+  return { icon: Bell, label: "General", className: "bg-[#f1f3e8] text-[#59632f] ring-[#e1e7cd]" };
+};
+
 export default function AdminNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +153,9 @@ export default function AdminNotifications() {
   const [filterType, setFilterType] = useState("all");
   const [filterRead, setFilterRead] = useState<ReadFilter>("all");
   const [filterDate, setFilterDate] = useState<DateFilter>("all");
+  const [customDateRange, setCustomDateRange] = useState<DateRange>();
+  const [isCustomCalendarOpen, setIsCustomCalendarOpen] = useState(false);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [showSendModal, setShowSendModal] = useState(false);
   const [selectedNotification, setSelectedNotification] =
     useState<Notification | null>(null);
@@ -90,26 +166,37 @@ export default function AdminNotifications() {
   const [recipientId, setRecipientId] = useState("");
   const [sendLoading, setSendLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [markAllLoading, setMarkAllLoading] = useState(false);
   const [recipientCounts, setRecipientCounts] = useState({
     sellers: 0,
     users: 0,
   });
+  const [recipientNames, setRecipientNames] = useState<Record<string, string>>({});
 
   const fetchRecipientCounts = async () => {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, role");
+        .select("id, role, full_name, username, email");
       if (error) throw error;
-      const list = Array.isArray(data) ? data : [];
-      const sellers = list.filter((p: any) => p.role === "seller").length;
+      const list = (Array.isArray(data) ? data : []) as ProfileRecord[];
+      const sellers = list.filter((p) => p.role === "seller").length;
       const users = list.filter(
-        (p: any) => p.role === "customer" || p.role === "user",
+        (p) => p.role === "customer" || p.role === "user",
       ).length;
       setRecipientCounts({ sellers, users });
+      setRecipientNames(
+        Object.fromEntries(
+          list.flatMap((profile) => {
+            const displayName = profile.full_name || profile.username || profile.email;
+            return profile.id && displayName ? [[profile.id, displayName]] : [];
+          }),
+        ),
+      );
     } catch (err) {
       console.error("Failed to fetch recipient counts:", err);
       setRecipientCounts({ sellers: 0, users: 0 });
+      setRecipientNames({});
     }
   };
 
@@ -123,8 +210,17 @@ export default function AdminNotifications() {
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      const items = (data || []).map((n: any) => ({
+      const items = ((data || []) as NotificationRecord[]).map((n) => ({
         ...n,
+        // Older notification rows can have nullable fields. Normalize them
+        // before rendering so one incomplete row cannot break the page.
+        id: typeof n.id === "string" ? n.id : "",
+        user_id: typeof n.user_id === "string" ? n.user_id : "Unknown user",
+        title: typeof n.title === "string" ? n.title : "Notification",
+        message: typeof n.message === "string" ? n.message : "",
+        type: typeof n.type === "string" && n.type ? n.type : "general",
+        created_at:
+          typeof n.created_at === "string" ? n.created_at : new Date(0).toISOString(),
         is_read:
           typeof n.is_read === "boolean"
             ? n.is_read
@@ -133,12 +229,12 @@ export default function AdminNotifications() {
               : false,
       }));
       setNotifications(items as Notification[]);
-    } catch (err: any) {
-      setError(err.message || String(err));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
       setNotifications([]);
       toast({
         title: "Failed to load notifications",
-        description: err.message || String(err),
+        description: "Please try again in a moment.",
       });
     } finally {
       setLoading(false);
@@ -148,6 +244,36 @@ export default function AdminNotifications() {
   useEffect(() => {
     fetchNotifications();
     fetchRecipientCounts();
+  }, []);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-notifications-live")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        (payload) => {
+          const notification = payload.new as Partial<Notification>;
+          if (!notification.id) return;
+          setNotifications((previous) => [
+            {
+              id: notification.id,
+              user_id: notification.user_id || "Unknown user",
+              title: notification.title || "Notification",
+              message: notification.message || "",
+              type: notification.type || "general",
+              is_read: notification.is_read ?? false,
+              created_at: notification.created_at || new Date().toISOString(),
+            },
+            ...previous.filter((item) => item.id !== notification.id),
+          ]);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const notificationTypes = useMemo(
@@ -191,7 +317,7 @@ export default function AdminNotifications() {
       filtered = filtered.filter((notification) => !notification.is_read);
     }
 
-    if (filterDate !== "all") {
+    if (filterDate !== "all" && filterDate !== "custom") {
       const now = new Date();
       const start = new Date(now);
 
@@ -208,8 +334,24 @@ export default function AdminNotifications() {
       );
     }
 
-    return filtered;
-  }, [filterDate, filterRead, filterType, notifications, search]);
+    if (filterDate === "custom" && customDateRange?.from) {
+      const start = new Date(customDateRange.from);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(customDateRange.to ?? customDateRange.from);
+      end.setHours(23, 59, 59, 999);
+
+      filtered = filtered.filter((notification) => {
+        const date = new Date(notification.created_at);
+        return date >= start && date <= end;
+      });
+    }
+
+    return [...filtered].sort((a, b) => {
+      const difference =
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return sortOrder === "newest" ? difference : -difference;
+    });
+  }, [customDateRange, filterDate, filterRead, filterType, notifications, search, sortOrder]);
 
   const stats = useMemo(() => {
     const unread = notifications.filter(
@@ -235,7 +377,11 @@ export default function AdminNotifications() {
     search.trim() ||
     filterType !== "all" ||
     filterRead !== "all" ||
-    filterDate !== "all";
+    filterDate !== "all" ||
+    Boolean(customDateRange?.from);
+  const selectedPresentation = selectedNotification
+    ? getNotificationPresentation(selectedNotification.type)
+    : null;
 
   const estimatedRecipients =
     sendTo === "sellers"
@@ -251,6 +397,9 @@ export default function AdminNotifications() {
     setFilterType("all");
     setFilterRead("all");
     setFilterDate("all");
+    setCustomDateRange(undefined);
+    setIsCustomCalendarOpen(false);
+    setSortOrder("newest");
   };
 
   const resetSendForm = () => {
@@ -266,27 +415,52 @@ export default function AdminNotifications() {
     resetSendForm();
   };
 
+  const updateReadStatus = async (ids: string[], value: boolean) => {
+    const { error: modernError } = await supabase
+      .from("notifications")
+      .update({ is_read: value })
+      .in("id", ids);
+
+    if (!modernError) return;
+    if (!getErrorMessage(modernError).toLowerCase().includes("is_read")) {
+      throw modernError;
+    }
+
+    const { error: legacyError } = await supabase
+      .from("notifications")
+      .update({ read: value })
+      .in("id", ids);
+    if (legacyError) throw legacyError;
+  };
+
   const toggleNotificationRead = async (id: string, isRead: boolean) => {
     setActionLoadingId(id);
+    setNotifications((previous) =>
+      previous.map((notification) =>
+        notification.id === id
+          ? { ...notification, is_read: !isRead }
+          : notification,
+      ),
+    );
+    setSelectedNotification((previous) =>
+      previous?.id === id ? { ...previous, is_read: !isRead } : previous,
+    );
     try {
-      const { data, error } = await supabase
-        .from("notifications")
-        .update({ is_read: !isRead })
-        .eq("id", id)
-        .select()
-        .maybeSingle();
-      if (error) throw error;
-      setNotifications((prev) =>
-        prev.map((notification) =>
+      await updateReadStatus([id], !isRead);
+    } catch (err: unknown) {
+      setNotifications((previous) =>
+        previous.map((notification) =>
           notification.id === id
-            ? { ...notification, is_read: !isRead }
+            ? { ...notification, is_read: isRead }
             : notification,
         ),
       );
-    } catch (err: any) {
+      setSelectedNotification((previous) =>
+        previous?.id === id ? { ...previous, is_read: isRead } : previous,
+      );
       toast({
         title: "Could not update notification",
-        description: err.message || String(err),
+        description: getErrorMessage(err),
       });
     } finally {
       setActionLoadingId(null);
@@ -298,20 +472,16 @@ export default function AdminNotifications() {
     if (!notification.is_read) {
       setActionLoadingId(notification.id);
       try {
-        const { error } = await supabase
-          .from("notifications")
-          .update({ is_read: true })
-          .eq("id", notification.id);
-        if (error) throw error;
+        await updateReadStatus([notification.id], true);
         setNotifications((prev) =>
           prev.map((n) =>
             n.id === notification.id ? { ...n, is_read: true } : n,
           ),
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         toast({
           title: "Could not mark as read",
-          description: err.message || String(err),
+          description: getErrorMessage(err),
         });
       } finally {
         setActionLoadingId(null);
@@ -330,11 +500,7 @@ export default function AdminNotifications() {
     }
 
     try {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .in("id", unreadIds);
-      if (error) throw error;
+      await updateReadStatus(unreadIds, true);
       setNotifications((prev) =>
         prev.map((notification) =>
           unreadIds.includes(notification.id)
@@ -346,11 +512,46 @@ export default function AdminNotifications() {
         title: "Notifications updated",
         description: `${unreadIds.length} notification(s) marked as read.`,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: "Could not mark notifications as read",
-        description: err.message || String(err),
+        description: getErrorMessage(err),
       });
+    }
+  };
+
+  const markAllAsRead = async () => {
+    const unreadIds = notifications
+      .filter((notification) => !notification.is_read)
+      .map((notification) => notification.id);
+
+    if (!unreadIds.length) {
+      toast({ title: "You're all caught up" });
+      return;
+    }
+
+    setMarkAllLoading(true);
+    try {
+      await updateReadStatus(unreadIds, true);
+      setNotifications((previous) =>
+        previous.map((notification) =>
+          unreadIds.includes(notification.id)
+            ? { ...notification, is_read: true }
+            : notification,
+        ),
+      );
+      toast({
+        title: "All notifications marked as read",
+        description: `${unreadIds.length} notification(s) updated.`,
+      });
+    } catch (err: unknown) {
+      console.error("Mark all as read failed:", err);
+      toast({
+        title: "Could not mark all notifications as read",
+        description: "Please try again in a moment.",
+      });
+    } finally {
+      setMarkAllLoading(false);
     }
   };
 
@@ -372,10 +573,10 @@ export default function AdminNotifications() {
         prev.filter((notification) => notification.id !== id),
       );
       toast({ title: "Notification deleted" });
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: "Could not delete notification",
-        description: err.message || String(err),
+        description: getErrorMessage(err),
       });
     } finally {
       setActionLoadingId(null);
@@ -438,7 +639,7 @@ export default function AdminNotifications() {
           .select("id")
           .eq("role", role);
         if (listErr) throw listErr;
-        const ids = (profiles || []).map((p: any) => p.id).filter(Boolean);
+        const ids = (profiles || []).map((p: ProfileRecord) => p.id).filter((id): id is string => Boolean(id));
         if (ids.length === 0) throw new Error("No recipients found");
         const payload = ids.map((id) => ({
           user_id: id,
@@ -460,7 +661,7 @@ export default function AdminNotifications() {
           .from("profiles")
           .select("id");
         if (listErr) throw listErr;
-        const ids = (profiles || []).map((p: any) => p.id).filter(Boolean);
+        const ids = (profiles || []).map((p: ProfileRecord) => p.id).filter((id): id is string => Boolean(id));
         if (ids.length === 0) throw new Error("No recipients found");
         const payload = ids.map((id) => ({
           user_id: id,
@@ -481,10 +682,10 @@ export default function AdminNotifications() {
       closeSendModal();
       await fetchNotifications();
       await fetchRecipientCounts();
-    } catch (sendError: any) {
+    } catch (sendError: unknown) {
       toast({
         title: "Error sending notification",
-        description: sendError.message || "Please try again in a moment.",
+        description: getErrorMessage(sendError) || "Please try again in a moment.",
       });
     } finally {
       setSendLoading(false);
@@ -493,28 +694,40 @@ export default function AdminNotifications() {
 
   return (
     <AdminLayout>
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-              <Bell size={14} />
-              Admin Messaging
+      <div className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
+        <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#303a18] text-[#f7f4ea] shadow-sm">
+              <Bell size={22} />
             </div>
-            <h1 className="text-3xl font-bold text-green-900">Notifications</h1>
-            <p className="mt-2 max-w-2xl text-sm text-gray-600">
-              Send announcements, review delivery history, and keep user alerts
-              tidy from one workspace.
-            </p>
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#687244]">
+                <span className="relative flex size-2"><span className="absolute inline-flex size-2 animate-ping rounded-full bg-emerald-500 opacity-60" /><span className="relative inline-flex size-2 rounded-full bg-emerald-600" /></span>
+                Live
+              </div>
+              <h1 className="font-serif text-3xl font-bold text-[#283111] sm:text-4xl">Notifications</h1>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">Stay updated with important activity across your marketplace.</p>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={markAllAsRead}
+              disabled={loading || markAllLoading || stats.unread === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#dce2c7] bg-[#f5f7ee] px-4 py-3 text-sm font-semibold text-[#455221] transition hover:bg-[#eaf0da] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <CheckCircle2 size={17} />
+              {markAllLoading ? "Marking as read..." : "Mark all as read"}
+            </button>
             <button
               type="button"
               onClick={() => {
                 fetchNotifications();
                 fetchRecipientCounts();
               }}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              aria-label="Refresh notifications"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               <RefreshCw size={17} />
               Refresh
@@ -522,7 +735,7 @@ export default function AdminNotifications() {
             <button
               type="button"
               onClick={() => setShowSendModal(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#303a18] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#435125]"
             >
               <Send size={17} />
               Send Notification
@@ -530,37 +743,25 @@ export default function AdminNotifications() {
           </div>
         </div>
 
-        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mb-7 grid grid-cols-3 divide-x divide-[#e7e8de] overflow-hidden rounded-2xl border border-[#e7e8de] bg-white shadow-[0_8px_30px_rgba(48,58,24,0.05)]">
           {[
+            {
+              label: "Unread",
+              value: stats.unread,
+              icon: Bell,
+              color: "text-[#56642c] bg-[#f0f3e5]",
+            },
             {
               label: "Total",
               value: stats.total,
               icon: Inbox,
-              color: "text-green-700 bg-green-50",
-            },
-            {
-              label: "Unread",
-              value: stats.unread,
-              icon: MailOpen,
-              color: "text-amber-700 bg-amber-50",
-            },
-            {
-              label: "Read",
-              value: stats.read,
-              icon: MailCheck,
-              color: "text-blue-700 bg-blue-50",
-            },
-            {
-              label: "Sent Today",
-              value: stats.sentToday,
-              icon: Send,
-              color: "text-rose-700 bg-rose-50",
-            },
-            {
-              label: "Recipients",
-              value: stats.recipients,
-              icon: Users,
               color: "text-slate-700 bg-slate-100",
+            },
+            {
+              label: "Today",
+              value: stats.sentToday,
+              icon: Clock3,
+              color: "text-amber-700 bg-amber-50",
             },
           ].map((stat) => {
             const Icon = stat.icon;
@@ -568,19 +769,19 @@ export default function AdminNotifications() {
             return (
               <div
                 key={stat.label}
-                className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+                className="min-w-0 px-4 py-4 sm:px-6"
               >
                 <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                       {stat.label}
                     </p>
-                    <p className="mt-2 text-3xl font-semibold text-slate-950">
+                    <p className="mt-1 text-2xl font-semibold text-[#293110] sm:text-3xl">
                       {stat.value}
                     </p>
                   </div>
-                  <div className={`rounded-lg p-3 ${stat.color}`}>
-                    <Icon size={22} />
+                  <div className={`hidden rounded-xl p-2.5 sm:block ${stat.color}`}>
+                    <Icon size={19} />
                   </div>
                 </div>
               </div>
@@ -588,8 +789,8 @@ export default function AdminNotifications() {
           })}
         </div>
 
-        <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_160px_160px_160px_auto_auto]">
+        <div className="mb-6 rounded-2xl border border-[#e7e8de] bg-white p-3 shadow-[0_8px_30px_rgba(48,58,24,0.04)] sm:p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <label className="relative block">
               <Search
                 size={17}
@@ -599,10 +800,19 @@ export default function AdminNotifications() {
                 type="text"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search title, message, type, or email"
-                className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                aria-label="Search notifications"
+                placeholder="Search notifications..."
+                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-[#aab77a] focus:bg-white focus:ring-2 focus:ring-[#edf1dd] lg:w-72"
               />
             </label>
+
+            <div className="flex shrink-0 rounded-xl bg-slate-100 p-1" role="group" aria-label="Notification status filter">
+              {(["all", "unread", "read"] as ReadFilter[]).map((status) => (
+                <button key={status} type="button" onClick={() => setFilterRead(status)} className={`rounded-lg px-3 py-2 text-sm font-semibold capitalize transition ${filterRead === status ? "bg-white text-[#364019] shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                  {status}
+                </button>
+              ))}
+            </div>
 
             <select
               value={filterType}
@@ -617,35 +827,68 @@ export default function AdminNotifications() {
               ))}
             </select>
 
-            <select
-              value={filterRead}
-              onChange={(event) =>
-                setFilterRead(event.target.value as ReadFilter)
-              }
-              className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+            <Popover
+              open={filterDate === "custom" && isCustomCalendarOpen}
+              onOpenChange={setIsCustomCalendarOpen}
             >
-              <option value="all">All Status</option>
-              <option value="read">Read</option>
-              <option value="unread">Unread</option>
-            </select>
+              <PopoverAnchor asChild>
+                <select
+                  value={filterDate}
+                  onChange={(event) => {
+                    const value = event.target.value as DateFilter;
+                    setFilterDate(value);
+                    setIsCustomCalendarOpen(value === "custom");
+                    if (value !== "custom") setCustomDateRange(undefined);
+                  }}
+                  className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                >
+                  <option value="all">All Dates</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">Last 30 Days</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </PopoverAnchor>
+              <PopoverContent align="start" className="w-auto p-0">
+                <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
+                  <CalendarDays size={16} className="text-slate-500" />
+                  {formatDateRange(customDateRange)}
+                </div>
+                <Calendar
+                  mode="range"
+                  selected={customDateRange}
+                  onSelect={setCustomDateRange}
+                  numberOfMonths={1}
+                  initialFocus
+                />
+                {customDateRange?.from && (
+                  <div className="flex justify-end border-t border-slate-100 p-2">
+                    <button
+                      type="button"
+                      onClick={() => setCustomDateRange(undefined)}
+                      className="rounded-md px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
+                    >
+                      Clear dates
+                    </button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
 
             <select
-              value={filterDate}
-              onChange={(event) =>
-                setFilterDate(event.target.value as DateFilter)
-              }
-              className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+              value={sortOrder}
+              onChange={(event) => setSortOrder(event.target.value as SortOrder)}
+              aria-label="Sort notifications"
+              className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"
             >
-              <option value="all">All Dates</option>
-              <option value="today">Today</option>
-              <option value="week">Last 7 Days</option>
-              <option value="month">Last 30 Days</option>
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
             </select>
 
             <button
               type="button"
               onClick={markFilteredAsRead}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
             >
               <CheckCircle2 size={17} />
               Mark Read
@@ -655,7 +898,7 @@ export default function AdminNotifications() {
               type="button"
               onClick={resetFilters}
               disabled={!hasActiveFilters}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Filter size={17} />
               Reset
@@ -663,25 +906,26 @@ export default function AdminNotifications() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-2 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="overflow-hidden rounded-2xl border border-[#e7e8de] bg-white shadow-[0_12px_36px_rgba(48,58,24,0.05)]">
+          <div className="flex flex-col gap-2 border-b border-[#e7e8de] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-slate-950">
-                Notification History
+                Recent activity
               </h2>
               <p className="text-sm text-slate-500">
-                Showing {filteredNotifications.length} of {notifications.length}
+                Showing {filteredNotifications.length} of {notifications.length} notifications
               </p>
             </div>
             {error && (
               <div className="inline-flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
                 <AlertCircle size={16} />
-                {error}
+                Unable to load notifications. Please try again.
+                <button type="button" onClick={fetchNotifications} className="font-semibold underline underline-offset-2 hover:text-rose-900">Try again</button>
               </div>
             )}
           </div>
 
-          <div className="hidden overflow-x-auto lg:block">
+          <div className="hidden overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
@@ -816,54 +1060,46 @@ export default function AdminNotifications() {
             </table>
           </div>
 
-          <div className="divide-y divide-slate-100 lg:hidden">
+          <div className="divide-y divide-[#edf0e4]">
             {loading ? (
-              <p className="px-5 py-10 text-center text-sm text-slate-500">
-                Loading notifications...
-              </p>
+              <div className="space-y-1 p-3" aria-label="Loading notifications">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <div key={index} className="flex animate-pulse items-center gap-4 rounded-xl p-3 sm:p-4">
+                    <div className="size-11 shrink-0 rounded-xl bg-slate-100" />
+                    <div className="min-w-0 flex-1 space-y-2"><div className="h-4 w-2/5 rounded bg-slate-100" /><div className="h-3 w-4/5 rounded bg-slate-100" /></div>
+                    <div className="h-3 w-14 rounded bg-slate-100" />
+                  </div>
+                ))}
+              </div>
             ) : filteredNotifications.length === 0 ? (
-              <p className="px-5 py-10 text-center text-sm text-slate-500">
-                No notifications match the current filters.
-              </p>
+              <div className="px-5 py-16 text-center">
+                <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-[#f1f3e8] text-[#657139]"><Bell size={25} /></div>
+                <h3 className="mt-4 font-serif text-xl font-bold text-[#303a18]">{hasActiveFilters ? "Nothing matches your filters" : "You're all caught up"}</h3>
+                <p className="mt-2 text-sm text-slate-500">{hasActiveFilters ? "Try changing your search or filter." : "No new notifications to review."}</p>
+                {hasActiveFilters && <button type="button" onClick={resetFilters} className="mt-5 text-sm font-semibold text-[#56642c] hover:text-[#303a18]">Clear filters</button>}
+              </div>
             ) : (
               filteredNotifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`p-5 ${!notification.is_read ? "bg-emerald-50/40" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openNotificationDetail(notification)}
+                  onKeyDown={(event) => event.key === "Enter" && openNotificationDetail(notification)}
+                  className={`group relative flex cursor-pointer gap-3 p-4 transition hover:bg-[#fafbf7] focus:outline-none focus-visible:bg-[#fafbf7] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#9daa6f] sm:gap-4 sm:p-5 ${!notification.is_read ? "bg-[#f8faef]" : ""}`}
                 >
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => openNotificationDetail(notification)}
-                        className="text-left font-semibold text-slate-950"
-                      >
-                        {notification.title}
-                      </button>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {notification.message}
-                      </p>
+                  {(() => { const presentation = getNotificationPresentation(notification.type); const Icon = presentation.icon; return <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ring-1 ${presentation.className}`}><Icon size={20} /></div>; })()}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2"><p className={`truncate text-sm sm:text-base ${notification.is_read ? "font-semibold text-slate-700" : "font-bold text-[#27300f]"}`}>{notification.title}</p>{!notification.is_read && <span className="size-2 shrink-0 rounded-full bg-[#6a7936]" aria-label="Unread" />}</div>
+                        <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600">{notification.message}</p>
+                      </div>
+                      <span className="shrink-0 text-xs font-medium text-slate-400">{formatRelativeTime(notification.created_at)}</span>
                     </div>
-                    <span
-                      className={`inline-flex shrink-0 rounded-full border px-3 py-1 text-xs font-semibold capitalize ${getTypeStyles(
-                        notification.type,
-                      )}`}
-                    >
-                      {notification.type}
-                    </span>
+                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500"><span className="capitalize">{notification.type}</span><span aria-hidden="true">•</span><span className="font-mono">{notification.user_id.slice(0, 8)}…</span></div>
                   </div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
-                    <span className="font-mono">
-                      {notification.user_id.slice(0, 8)}...
-                    </span>
-                    <span>
-                      {formatDate(notification.created_at)} at{" "}
-                      {formatTime(notification.created_at)}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 flex gap-2">
+                  <div className="flex shrink-0 items-center gap-1 self-center">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -874,14 +1110,14 @@ export default function AdminNotifications() {
                         );
                       }}
                       disabled={actionLoadingId === notification.id}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                      aria-label={notification.is_read ? "Mark notification as unread" : "Mark notification as read"}
+                      className="inline-flex items-center justify-center rounded-lg p-2 text-slate-500 transition hover:bg-white hover:text-[#56642c] disabled:opacity-50"
                     >
                       {notification.is_read ? (
                         <Circle size={16} />
                       ) : (
                         <CheckCircle2 size={16} />
                       )}
-                      {notification.is_read ? "Mark Unread" : "Mark Read"}
                     </button>
                     <button
                       type="button"
@@ -890,10 +1126,12 @@ export default function AdminNotifications() {
                         deleteNotification(notification.id);
                       }}
                       disabled={actionLoadingId === notification.id}
-                      className="inline-flex items-center justify-center rounded-lg border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                      aria-label="Delete notification"
+                      className="inline-flex items-center justify-center rounded-lg p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={17} />
                     </button>
+                    <ChevronRight size={18} className="hidden text-slate-300 sm:block" aria-hidden="true" />
                   </div>
                 </div>
               ))
@@ -901,65 +1139,73 @@ export default function AdminNotifications() {
           </div>
         </div>
 
-        {selectedNotification && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
-              <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-                <div>
-                  <h2 className="text-xl font-bold text-green-900">
-                    Notification
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-500">Detail</p>
+        {selectedNotification && selectedPresentation && createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="notification-detail-title"
+              className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white shadow-2xl shadow-slate-950/30"
+            >
+              <div className="relative overflow-hidden bg-[#f6f8ee] px-6 py-6 sm:px-8">
+                <div className="absolute -right-12 -top-14 size-40 rounded-full bg-[#dce5bc]/60 blur-2xl" aria-hidden="true" />
+                <div className="relative flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-center gap-4">
+                    <div className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ring-1 ${selectedPresentation.className}`}>
+                      <selectedPresentation.icon size={22} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#687244]">Notification detail</p>
+                      <h2 id="notification-detail-title" className="mt-1 truncate font-serif text-2xl font-bold text-[#283111]">
+                        {selectedNotification.title}
+                      </h2>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedNotification(null)}
+                    aria-label="Close notification detail"
+                    className="rounded-xl p-2 text-slate-500 transition hover:bg-white hover:text-slate-900"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedNotification(null)}
-                  className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                >
-                  <X size={18} />
-                </button>
               </div>
 
-              <div className="space-y-4 px-6 py-5">
+              <div className="space-y-6 px-6 py-6 sm:px-8">
                 <div>
-                  <p className="text-sm text-slate-500">Title</p>
-                  <p className="font-semibold text-slate-900 mt-1">
-                    {selectedNotification.title}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-slate-500">Message</p>
-                  <p className="mt-1 text-slate-700 whitespace-pre-wrap">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Message</p>
+                  <p className="mt-2 whitespace-pre-wrap text-[15px] leading-7 text-slate-700">
                     {selectedNotification.message}
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-slate-500">Recipient</p>
-                    <p className="font-mono mt-1 text-sm text-slate-700">
-                      {selectedNotification.user_id}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Recipient</p>
+                    <p className="mt-2 truncate text-sm font-semibold text-slate-800">
+                      {recipientNames[selectedNotification.user_id] || "Recipient unavailable"}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Type</p>
-                    <p className="mt-1 text-sm text-slate-700 capitalize">
-                      {selectedNotification.type}
-                    </p>
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Category</p>
+                    <div className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
+                      <span className={`size-2 rounded-full ${selectedPresentation.className.split(" ")[0] || "bg-slate-400"}`} />
+                      {selectedPresentation.label}
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-sm text-slate-500">Created</p>
-                  <p className="mt-1 text-sm text-slate-700">
+                <div className="border-t border-slate-100 pt-5">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Received</p>
+                  <p className="mt-2 text-sm font-medium text-slate-700">
                     {formatDate(selectedNotification.created_at)}{" "}
                     {formatTime(selectedNotification.created_at)}
                   </p>
                 </div>
               </div>
 
-              <div className="flex gap-3 border-t border-slate-200 px-6 py-4 justify-end">
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4 sm:px-8">
                 <button
                   onClick={() => {
                     if (selectedNotification) {
@@ -969,7 +1215,7 @@ export default function AdminNotifications() {
                       );
                     }
                   }}
-                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-[#b5c180] hover:bg-[#f6f8ee]"
                 >
                   {selectedNotification.is_read ? "Mark Unread" : "Mark Read"}
                 </button>
@@ -980,17 +1226,18 @@ export default function AdminNotifications() {
                       setSelectedNotification(null);
                     }
                   }}
-                  className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white"
+                  className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700"
                 >
                   Delete
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
 
-        {showSendModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+        {showSendModal && createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
             <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
               <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
                 <div>
@@ -1166,7 +1413,8 @@ export default function AdminNotifications() {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
     </AdminLayout>
