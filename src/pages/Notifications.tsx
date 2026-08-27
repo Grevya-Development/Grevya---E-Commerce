@@ -1,10 +1,19 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Bell, BellOff, Loader2, Trash2, CheckCircle2, AlertCircle, Shield } from "lucide-react";
+import {
+  Bell,
+  BellOff,
+  Loader2,
+  Trash2,
+  CheckCircle2,
+  AlertCircle,
+  Shield,
+} from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -17,7 +26,14 @@ interface Notification {
   created_at: string;
 }
 
+const returnRefundOrderId = (message: string) =>
+  message.match(/\[return_refund_order:([^\]]+)\]/)?.[1] || null;
+
+const visibleNotificationMessage = (message: string) =>
+  message.replace(/\s*\[return_refund_order:[^\]]+\]/, "");
+
 export default function Notifications() {
+  const navigate = useNavigate();
   const { user, profile, loading: authLoading } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,7 +115,9 @@ export default function Notifications() {
         },
         (payload) => {
           setNotifications((current) =>
-            current.filter((notification) => notification.id !== payload.old.id),
+            current.filter(
+              (notification) => notification.id !== payload.old.id,
+            ),
           );
         },
       )
@@ -119,7 +137,7 @@ export default function Notifications() {
 
       if (error) throw error;
       setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
       );
       toast({
         title: "Notification read",
@@ -132,6 +150,12 @@ export default function Notifications() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.read) await handleMarkAsRead(notification.id);
+    const orderId = returnRefundOrderId(notification.message);
+    if (orderId) navigate(`/orders/${orderId}`);
   };
 
   const handleDelete = async (id: string) => {
@@ -198,7 +222,6 @@ export default function Notifications() {
 
       <main className="flex-grow max-w-4xl w-full mx-auto px-4 py-10 md:py-16">
         <div className="bg-white rounded-[2rem] border border-[#A68D65]/20 shadow-2xl p-6 sm:p-10 relative overflow-hidden">
-          
           <div className="absolute top-0 right-0 w-64 h-64 bg-[#33381C]/5 rounded-full blur-3xl -z-10 pointer-events-none" />
 
           {/* Header */}
@@ -252,7 +275,8 @@ export default function Notifications() {
                         All Clear!
                       </h3>
                       <p className="text-neutral-500 text-[11px] leading-normal font-medium">
-                        You do not have any new notifications in your inbox right now.
+                        You do not have any new notifications in your inbox
+                        right now.
                       </p>
                     </div>
                   </motion.div>
@@ -269,34 +293,54 @@ export default function Notifications() {
                           ? "border-[#A68D65]/10 bg-white"
                           : "border-[#33381C]/20 bg-[#F7EEE4]/20 shadow-xs"
                       }`}
+                      onClick={() => handleNotificationClick(notif)}
+                      role={
+                        returnRefundOrderId(notif.message)
+                          ? "button"
+                          : undefined
+                      }
+                      tabIndex={
+                        returnRefundOrderId(notif.message) ? 0 : undefined
+                      }
                     >
                       {getIcon(notif.type)}
 
                       <div className="flex-grow space-y-1.5">
-                        <p className={`text-xs text-neutral-850 leading-relaxed ${notif.read ? 'font-medium' : 'font-bold'}`}>
-                          {notif.message}
+                        <p
+                          className={`text-xs text-neutral-850 leading-relaxed ${notif.read ? "font-medium" : "font-bold"}`}
+                        >
+                          {visibleNotificationMessage(notif.message)}
                         </p>
                         <span className="block text-[9px] text-neutral-400 font-semibold uppercase tracking-wider">
-                          {new Date(notif.created_at).toLocaleDateString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {new Date(notif.created_at).toLocaleDateString(
+                            undefined,
+                            {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            },
+                          )}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
                         {!notif.read && (
                           <button
-                            onClick={() => handleMarkAsRead(notif.id)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleMarkAsRead(notif.id);
+                            }}
                             className="text-[9px] font-bold text-[#33381C] hover:underline px-2.5 py-1 rounded bg-[#33381C]/5 hover:bg-[#33381C]/10 transition-colors"
                           >
                             Mark Read
                           </button>
                         )}
                         <button
-                          onClick={() => handleDelete(notif.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleDelete(notif.id);
+                          }}
                           className="p-2 text-neutral-400 hover:text-red-600 rounded-xl hover:bg-neutral-50 transition-colors"
                           title="Delete Alert"
                         >
@@ -309,7 +353,6 @@ export default function Notifications() {
               </AnimatePresence>
             </div>
           )}
-
         </div>
       </main>
 

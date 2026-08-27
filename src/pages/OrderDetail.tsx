@@ -71,6 +71,54 @@ const OrderDetail = () => {
     };
   }, [id, user]);
 
+  const submitClaim = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!user || !order || !claimDescription.trim()) return;
+    setClaimSubmitting(true);
+    setClaimError(null);
+
+    const claimId = crypto.randomUUID();
+
+    const evidenceUrls: string[] = [];
+    for (const file of claimFiles) {
+      const path = `${user.id}/${claimId}/${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("return-refund-evidence")
+        .upload(path, file, { upsert: false });
+      if (uploadError) {
+        setClaimError(`Upload failed for ${file.name}: ${uploadError.message}`);
+        setClaimSubmitting(false);
+        return;
+      }
+      evidenceUrls.push(path);
+    }
+
+    const { data: claim, error: insertError } = await supabase
+      .from("return_refund_claims")
+      .insert({
+        id: claimId,
+        order_id: order.id,
+        customer_id: user.id,
+        issue_type: claimType,
+        description: claimDescription.trim(),
+        evidence_urls: evidenceUrls,
+      })
+      .select("id,issue_type,status,resolution,admin_notes,created_at")
+      .single();
+
+    if (insertError || !claim) {
+      setClaimError(
+        insertError?.message || "We could not submit your request.",
+      );
+    } else {
+      setClaims((current) => [claim as Claim, ...current]);
+      setClaimOpen(false);
+      setClaimDescription("");
+      setClaimFiles([]);
+    }
+    setClaimSubmitting(false);
+  };
+
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
@@ -191,6 +239,139 @@ const OrderDetail = () => {
         </div>
       </main>
       <Footer />
+      <Dialog open={claimOpen} onOpenChange={setClaimOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto border-[#E7E0D4] bg-[#FBF7F0] sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl text-[#33381C]">
+              Request return or refund
+            </DialogTitle>
+            <DialogDescription>
+              We will review your order and reply with the next steps.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitClaim} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label className="text-sm font-semibold text-[#777D70]">
+                Order ID
+                <input
+                  readOnly
+                  value={order?.id || ""}
+                  className="mt-2 w-full rounded-xl border border-[#DDE3DA] bg-[#F3F4EF] px-3 py-2.5 text-sm text-[#4D5528]"
+                />
+              </label>
+              <label className="text-sm font-semibold text-[#777D70]">
+                Customer name
+                <input
+                  readOnly
+                  value={profile?.full_name || profile?.username || "Customer"}
+                  className="mt-2 w-full rounded-xl border border-[#DDE3DA] bg-[#F3F4EF] px-3 py-2.5 text-sm text-[#4D5528]"
+                />
+              </label>
+              <label className="text-sm font-semibold text-[#777D70]">
+                Email
+                <input
+                  readOnly
+                  value={profile?.email || user?.email || ""}
+                  className="mt-2 w-full rounded-xl border border-[#DDE3DA] bg-[#F3F4EF] px-3 py-2.5 text-sm text-[#4D5528]"
+                />
+              </label>
+            </div>
+            <label className="block text-sm font-semibold text-[#777D70]">
+              Issue type
+              <select
+                value={claimType}
+                onChange={(event) => setClaimType(event.target.value)}
+                className="mt-2 w-full rounded-xl border border-[#DDE3DA] bg-white px-3 py-2.5 text-sm text-[#343A20]"
+              >
+                {issueTypes.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm font-semibold text-[#777D70]">
+              Description
+              <Textarea
+                required
+                value={claimDescription}
+                onChange={(event) => setClaimDescription(event.target.value)}
+                placeholder="Tell us what happened with your order..."
+                className="mt-2 min-h-28 bg-white"
+              />
+            </label>
+            <label className="block text-sm font-semibold text-[#777D70]">
+              Photo or video evidence
+              <input
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                onChange={(event) => {
+                  const selectedFiles = Array.from(event.target.files || []);
+                  setClaimFiles((currentFiles) => {
+                    const combinedFiles = [...currentFiles, ...selectedFiles];
+                    return combinedFiles
+                      .filter(
+                        (file, index, allFiles) =>
+                          allFiles.findIndex(
+                            (candidate) =>
+                              candidate.name === file.name &&
+                              candidate.size === file.size &&
+                              candidate.lastModified === file.lastModified,
+                          ) === index,
+                      )
+                      .slice(0, 5);
+                  });
+                  event.currentTarget.value = "";
+                }}
+                className="mt-2 block w-full rounded-xl border border-dashed border-[#A68D65]/40 bg-white p-3 text-sm text-[#777D70]"
+              />
+              <span className="mt-1 block text-xs font-normal text-[#8A877C]">
+                Up to 5 photos or videos.
+              </span>
+              {claimFiles.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {claimFiles.map((file) => (
+                    <div
+                      key={`${file.name}-${file.lastModified}`}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-green-50 px-3 py-1.5 text-xs font-medium text-green-800"
+                    >
+                      <span className="truncate">{file.name}</span>
+                      <button
+                        type="button"
+                        title={`Remove ${file.name}`}
+                        aria-label={`Remove ${file.name}`}
+                        onClick={() =>
+                          setClaimFiles((currentFiles) =>
+                            currentFiles.filter(
+                              (currentFile) => currentFile !== file,
+                            ),
+                          )
+                        }
+                        className="shrink-0 rounded-full p-1 text-green-900 transition hover:bg-green-100"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </label>
+            {claimError && (
+              <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
+                {claimError}
+              </p>
+            )}
+            <Button
+              type="submit"
+              disabled={claimSubmitting || !claimDescription.trim()}
+              className="w-full bg-[#33381C] hover:bg-[#262A14]"
+            >
+              {claimSubmitting ? "Submitting request..." : "Submit request"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
