@@ -14,6 +14,7 @@ import SpotlightSearch from "@/components/SpotlightSearch";
 import QuickViewModal from "@/components/QuickViewModal";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import ScrollToTop from "@/components/ScrollToTop";
+import ScrollToTop from "@/components/ScrollToTop";
 
 // Lazy-loaded pages
 const Index = lazy(() => import("./pages/Index"));
@@ -77,6 +78,7 @@ const AppContent = () => {
   const location = useLocation();
   return (
     <>
+      <ScrollToTop />
       <ScrollToTop />
       <MemberBenefitsBar />
       <SpotlightSearch />

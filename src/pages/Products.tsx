@@ -251,6 +251,8 @@ const Products = () => {
           image: item.image_url,
           rating: reviewStatsByProductId.get(item.id)?.averageRating ?? 0,
           reviewCount: reviewStatsByProductId.get(item.id)?.reviewCount ?? 0,
+          rating: reviewStatsByProductId.get(item.id)?.averageRating ?? 0,
+          reviewCount: reviewStatsByProductId.get(item.id)?.reviewCount ?? 0,
         }));
 
         productsCache = formatted;
@@ -534,6 +536,7 @@ const Products = () => {
                           image={product.image}
                           category={product.category}
                           rating={product.rating}
+                          reviewCount={product.reviewCount}
                           reviewCount={product.reviewCount}
                           slug={slug}
                         />
