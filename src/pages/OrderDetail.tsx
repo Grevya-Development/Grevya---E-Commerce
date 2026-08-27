@@ -239,8 +239,6 @@ const OrderDetail = () => {
         </div>
       </main>
       <Footer />
-<<<<<<< HEAD
-=======
       <Dialog open={claimOpen} onOpenChange={setClaimOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto border-[#E7E0D4] bg-[#FBF7F0] sm:max-w-xl">
           <DialogHeader>
@@ -374,7 +372,6 @@ const OrderDetail = () => {
           </form>
         </DialogContent>
       </Dialog>
->>>>>>> a0f7ae4 (fix: fix admin order page functionality)
     </div>
   );
 };
