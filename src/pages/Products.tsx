@@ -332,28 +332,18 @@ const Products = () => {
 );
 
         productsCache = formatted;
-        setProducts(formatted);
-      } catch (err: any) {
-        console.error("FETCH ERROR:", err);
-        setError(err.message || "Something went wrong");
-      } finally {
-        setProducts(catalogProducts);
-        setLoading(false);
-
-        void fetchReviewStats(catalogProducts)
-          .then((productsWithReviewStats) => {
-            if (isCurrent) setProducts(productsWithReviewStats);
-          })
-          .catch((reviewError) => {
-            console.error("REVIEW STATS FETCH ERROR:", reviewError);
-          });
+        if (isCurrent) {
+          setProducts(formatted);
+        }
       } catch (err: unknown) {
         if (isCurrent) {
           console.error("FETCH ERROR:", err);
           setError(err instanceof Error ? err.message : "Something went wrong");
         }
       } finally {
-        if (isCurrent) setLoading(false);
+        if (isCurrent) {
+          setLoading(false);
+        }
       }
     };
 
