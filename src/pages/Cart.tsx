@@ -1,17 +1,27 @@
-import React, { useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import { Button } from '@/components/ui/button';
-import { Trash2, ShoppingBag, ArrowRight, Minus, Plus, ShieldCheck, ChevronRight, Leaf, Sparkles } from 'lucide-react';
-import { useCartStore } from '@/store/useCartStore';
-import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from '@/components/ui/use-toast';
+import React, { useEffect } from "react";
+import { Link } from "react-router-dom";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import { Button } from "@/components/ui/button";
+import {
+  Trash2,
+  ShoppingBag,
+  ArrowRight,
+  Minus,
+  Plus,
+  ShieldCheck,
+  ChevronRight,
+  Leaf,
+  Sparkles,
+} from "lucide-react";
+import { useCartStore } from "@/store/useCartStore";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "@/components/ui/use-toast";
 
 const Cart = () => {
   const cartItems = useCartStore((state) => state.items);
   const removeItem = useCartStore((state) => state.removeItem);
-  const updateQuantity = useCartStore((state) => state.updateQuantity);
+  const adjustQuantity = useCartStore((state) => state.adjustQuantity);
   const getSubtotal = useCartStore((state) => state.getSubtotal);
   const validateCartStock = useCartStore((state) => state.validateCartStock);
 
@@ -19,16 +29,43 @@ const Cart = () => {
   const freeShippingThreshold = 500;
   const shipping = subtotal >= freeShippingThreshold ? 0 : 50;
   const total = subtotal + shipping;
-  const progressToFreeShipping = Math.min((subtotal / freeShippingThreshold) * 100, 100);
-  const remainingForFreeShipping = Math.max(freeShippingThreshold - subtotal, 0);
-  const changeQuantity = async (item: typeof cartItems[number], quantity: number) => {
-    const result = await updateQuantity(item.id, quantity, item.variant_id);
-    if (!result.ok) toast({ title: 'Stock limit reached', description: result.availableStock ? `Only ${result.availableStock} units are available.` : 'This product is out of stock.', variant: 'destructive' });
+  const progressToFreeShipping = Math.min(
+    (subtotal / freeShippingThreshold) * 100,
+    100,
+  );
+  const remainingForFreeShipping = Math.max(
+    freeShippingThreshold - subtotal,
+    0,
+  );
+  const changeQuantity = async (
+    item: (typeof cartItems)[number],
+    delta: number,
+  ) => {
+    const result = await adjustQuantity(item.id, delta, item.variant_id);
+    if (!result.ok && delta > 0) {
+      toast({
+        title: "Stock limit reached",
+        description: result.availableStock
+          ? `Only ${result.availableStock} units are available.`
+          : "This product is out of stock.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const isAtStockLimit = (item: (typeof cartItems)[number]) => {
+    const itemStock = item.stock ?? 9999;
+    return item.quantity >= itemStock;
   };
 
   useEffect(() => {
     void validateCartStock().then((valid) => {
-      if (!valid) toast({ title: 'Cart updated', description: 'Some quantities were adjusted to match current stock.', variant: 'destructive' });
+      if (!valid)
+        toast({
+          title: "Cart updated",
+          description: "Some quantities were adjusted to match current stock.",
+          variant: "destructive",
+        });
     });
   }, [validateCartStock]);
 
@@ -37,19 +74,21 @@ const Cart = () => {
       <Navbar />
       <main className="flex-grow py-12">
         <div className="container mx-auto px-4 max-w-6xl">
-          
           {/* Breadcrumbs */}
           <div className="flex items-center gap-1.5 text-xs text-neutral-400 font-semibold uppercase tracking-wider mb-6">
-            <Link to="/" className="hover:text-green-700 transition-colors">Home</Link>
+            <Link to="/" className="hover:text-green-700 transition-colors">
+              Home
+            </Link>
             <ChevronRight size={12} />
             <span className="text-neutral-800">Your Cart</span>
           </div>
 
-          <h1 className="text-4xl font-extrabold text-neutral-900 tracking-tight mb-8">Shopping Bag</h1>
+          <h1 className="text-4xl font-extrabold text-neutral-900 tracking-tight mb-8">
+            Shopping Bag
+          </h1>
 
           {cartItems.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-              
               {/* Items List */}
               <div className="lg:col-span-2 space-y-4">
                 <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 sm:p-8">
@@ -58,7 +97,7 @@ const Cart = () => {
                       <AnimatePresence>
                         {cartItems.map((item) => (
                           <motion.li
-                            key={`${item.id}-${item.variant_id || 'default'}`}
+                            key={`${item.id}-${item.variant_id || "default"}`}
                             initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, x: -50 }}
@@ -77,19 +116,28 @@ const Cart = () => {
                               <div>
                                 <div className="flex justify-between text-base font-bold text-neutral-900">
                                   <h3>
-                                    <Link to={`/products/${item.category}/${item.slug}`} className="hover:text-green-700 transition-colors line-clamp-1">
+                                    <Link
+                                      to={`/products/${item.category}/${item.slug}`}
+                                      className="hover:text-green-700 transition-colors line-clamp-1"
+                                    >
                                       {item.name}
                                     </Link>
                                   </h3>
-                                  <p className="ml-4 text-green-800 tracking-tight">₹{(item.price * item.quantity).toFixed(2)}</p>
+                                  <p className="ml-4 text-green-800 tracking-tight">
+                                    ₹{(item.price * item.quantity).toFixed(2)}
+                                  </p>
                                 </div>
-                                <p className="mt-1 text-xs text-neutral-400 font-semibold uppercase tracking-wider capitalize">{item.category}</p>
+                                <p className="mt-1 text-xs text-neutral-400 font-semibold uppercase tracking-wider capitalize">
+                                  {item.category}
+                                </p>
                               </div>
-                              
+
                               <div className="flex flex-1 items-end justify-between text-sm mt-4">
                                 <div className="flex items-center border border-neutral-200 rounded-xl bg-neutral-50 p-1">
                                   <button
-                                    onClick={() => void changeQuantity(item, item.quantity - 1)}
+                                    onClick={() =>
+                                      void changeQuantity(item, -1)
+                                    }
                                     className="p-1.5 hover:bg-white rounded-lg text-neutral-500 hover:text-neutral-900 transition-colors"
                                   >
                                     <Minus size={14} />
@@ -98,8 +146,14 @@ const Cart = () => {
                                     {item.quantity}
                                   </span>
                                   <button
-                                    onClick={() => void changeQuantity(item, item.quantity + 1)}
-                                    className="p-1.5 hover:bg-white rounded-lg text-neutral-500 hover:text-neutral-900 transition-colors"
+                                    onClick={() => void changeQuantity(item, 1)}
+                                    disabled={isAtStockLimit(item)}
+                                    className="p-1.5 hover:bg-white rounded-lg text-neutral-500 hover:text-neutral-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    aria-label={
+                                      isAtStockLimit(item)
+                                        ? "Stock limit reached"
+                                        : "Increase quantity"
+                                    }
                                   >
                                     <Plus size={14} />
                                   </button>
@@ -108,7 +162,9 @@ const Cart = () => {
                                 <div className="flex">
                                   <button
                                     type="button"
-                                    onClick={() => removeItem(item.id, item.variant_id)}
+                                    onClick={() =>
+                                      removeItem(item.id, item.variant_id)
+                                    }
                                     className="font-semibold text-neutral-400 hover:text-red-500 transition-colors flex items-center gap-1.5 text-xs uppercase tracking-wider"
                                   >
                                     <Trash2 size={16} />
@@ -127,7 +183,6 @@ const Cart = () => {
 
               {/* Summary Sidebar */}
               <div className="space-y-6">
-                
                 {/* Shipping Progress bar */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-neutral-100/50">
                   {shipping === 0 ? (
@@ -137,10 +192,17 @@ const Cart = () => {
                   ) : (
                     <div className="space-y-2">
                       <p className="text-xs text-neutral-500 font-medium">
-                        Add <strong className="text-green-800">₹{remainingForFreeShipping.toFixed(2)}</strong> more for Free Shipping
+                        Add{" "}
+                        <strong className="text-green-800">
+                          ₹{remainingForFreeShipping.toFixed(2)}
+                        </strong>{" "}
+                        more for Free Shipping
                       </p>
                       <div className="w-full bg-neutral-100 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-green-700 h-full rounded-full transition-all duration-500" style={{ width: `${progressToFreeShipping}%` }}></div>
+                        <div
+                          className="bg-green-700 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${progressToFreeShipping}%` }}
+                        ></div>
                       </div>
                     </div>
                   )}
@@ -148,34 +210,49 @@ const Cart = () => {
 
                 {/* Final Breakdown */}
                 <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 space-y-6">
-                  <h2 className="text-lg font-bold text-neutral-900">Summary</h2>
-                  
+                  <h2 className="text-lg font-bold text-neutral-900">
+                    Summary
+                  </h2>
+
                   <div className="space-y-3.5 border-b border-neutral-100 pb-4">
                     <div className="flex justify-between text-sm text-neutral-500 font-medium">
                       <span>Subtotal</span>
-                      <span className="font-bold text-neutral-800">₹{subtotal.toFixed(2)}</span>
+                      <span className="font-bold text-neutral-800">
+                        ₹{subtotal.toFixed(2)}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm text-neutral-500 font-medium">
                       <span>Shipping</span>
                       <span className="font-bold text-neutral-800">
-                        {shipping === 0 ? 'Free' : `₹${shipping.toFixed(2)}`}
+                        {shipping === 0 ? "Free" : `₹${shipping.toFixed(2)}`}
                       </span>
                     </div>
                   </div>
 
                   <div className="flex justify-between items-center">
-                    <span className="text-base font-bold text-neutral-900">Total Price</span>
-                    <span className="text-2xl font-extrabold text-green-800 tracking-tight">₹{total.toFixed(2)}</span>
+                    <span className="text-base font-bold text-neutral-900">
+                      Total Price
+                    </span>
+                    <span className="text-2xl font-extrabold text-green-800 tracking-tight">
+                      ₹{total.toFixed(2)}
+                    </span>
                   </div>
 
                   <div className="space-y-3">
-                    <Button asChild className="w-full h-12 rounded-xl text-base font-bold bg-green-800 hover:bg-green-900 shadow-md">
+                    <Button
+                      asChild
+                      className="w-full h-12 rounded-xl text-base font-bold bg-green-800 hover:bg-green-900 shadow-md"
+                    >
                       <Link to="/checkout">
                         Proceed to Checkout
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
                     </Button>
-                    <Button asChild variant="outline" className="w-full h-12 rounded-xl border-neutral-200 text-neutral-700 hover:bg-neutral-50 font-bold">
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full h-12 rounded-xl border-neutral-200 text-neutral-700 hover:bg-neutral-50 font-bold"
+                    >
                       <Link to="/products">Continue Shopping</Link>
                     </Button>
                   </div>
@@ -185,22 +262,23 @@ const Cart = () => {
                     SSL Secure Transaction Guarantee
                   </div>
                 </div>
-
               </div>
-
             </div>
           ) : (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, ease: 'easeOut' }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
               className="text-center py-20 rounded-[2.5rem] bg-white/60 backdrop-blur-md border border-[#A68D65]/20 shadow-sm p-8 sm:p-12 max-w-lg mx-auto relative overflow-hidden group"
             >
               {/* Floating Leaf Particles in background */}
               <div className="absolute top-4 left-6 text-[#A68D65]/10 animate-bounce-subtle pointer-events-none">
                 <Leaf className="w-10 h-10 rotate-12" />
               </div>
-              <div className="absolute bottom-6 right-8 text-[#A68D65]/10 animate-bounce-subtle pointer-events-none" style={{ animationDelay: '1.5s' }}>
+              <div
+                className="absolute bottom-6 right-8 text-[#A68D65]/10 animate-bounce-subtle pointer-events-none"
+                style={{ animationDelay: "1.5s" }}
+              >
                 <Leaf className="w-8 h-8 -rotate-45" />
               </div>
 
@@ -208,7 +286,11 @@ const Cart = () => {
               <div className="relative mx-auto w-24 h-24 mb-6 flex items-center justify-center">
                 <motion.div
                   animate={{ scale: [1, 1.08, 1] }}
-                  transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                  transition={{
+                    repeat: Infinity,
+                    duration: 4,
+                    ease: "easeInOut",
+                  }}
                   className="absolute inset-0 bg-[#33381C]/5 rounded-full blur-xl"
                 />
                 <div className="w-20 h-20 bg-[#F7EEE4] border border-[#A68D65]/20 rounded-full flex items-center justify-center text-[#33381C] shadow-xs">
@@ -219,12 +301,18 @@ const Cart = () => {
                 </div>
               </div>
 
-              <h2 className="font-serif text-3xl font-bold text-[#33381C] mb-3">Your Bag is Empty</h2>
+              <h2 className="font-serif text-3xl font-bold text-[#33381C] mb-3">
+                Your Bag is Empty
+              </h2>
               <p className="text-neutral-500 text-sm max-w-sm mx-auto mb-8 font-medium leading-relaxed">
-                Explore our collections of hand-crafted, eco-friendly organic tableware and lifestyle products.
+                Explore our collections of hand-crafted, eco-friendly organic
+                tableware and lifestyle products.
               </p>
-              
-              <Button asChild className="h-12 rounded-xl bg-[#33381C] hover:bg-[#252814] text-white font-bold px-8 shadow-md hover:shadow-lg transition-all cursor-pointer">
+
+              <Button
+                asChild
+                className="h-12 rounded-xl bg-[#33381C] hover:bg-[#252814] text-white font-bold px-8 shadow-md hover:shadow-lg transition-all cursor-pointer"
+              >
                 <Link to="/products">
                   Shop Our Collection
                   <ArrowRight className="ml-2 w-4 h-4" />
@@ -232,7 +320,6 @@ const Cart = () => {
               </Button>
             </motion.div>
           )}
-
         </div>
       </main>
       <Footer />

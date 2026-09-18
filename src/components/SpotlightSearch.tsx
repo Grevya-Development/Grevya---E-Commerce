@@ -20,6 +20,7 @@ export default function SpotlightSearch() {
   const [filteredProducts, setFilteredProducts] = useState<SpotlightProduct[]>([]);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [hoveredIndex, setHoveredIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -50,7 +51,7 @@ export default function SpotlightSearch() {
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('open-grevya-search', handleOpenSearch);
-    
+
     // Load recent searches
     const recents = localStorage.getItem('grevya-recent-searches');
     if (recents) {
@@ -88,6 +89,7 @@ export default function SpotlightSearch() {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 80);
       setSelectedIndex(-1);
+      setHoveredIndex(-1);
     } else {
       setQuery('');
     }
@@ -104,6 +106,7 @@ export default function SpotlightSearch() {
 
     setFilteredProducts(matches); // Limit to top 5 relevant hits
     setSelectedIndex(-1);
+    setHoveredIndex(-1);
   }, [query, products]);
 
   // Handle keyboard navigation inside search overlay
@@ -185,6 +188,7 @@ export default function SpotlightSearch() {
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
+                  onFocus={() => setHoveredIndex(-1)}
                   onKeyDown={handleSearchKeyDown}
                   placeholder="Search premium oils, face serums, natural soaps..."
                   className="w-full ml-3.5 bg-transparent border-none outline-none text-sm text-[#1D1E19] placeholder-neutral-400 focus:ring-0 focus:outline-none"
@@ -258,17 +262,22 @@ export default function SpotlightSearch() {
                     Products found ({filteredProducts.length})
                   </h3>
                   <div className="flex flex-col space-y-1.5">
-                    {filteredProducts.map((p, idx) => (
-                      <div
-                        key={p.id}
-                        onClick={() => handleProductSelect(p)}
-                        onMouseEnter={() => setSelectedIndex(idx)}
-                        className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-all ${
-                          idx === selectedIndex
-                            ? 'bg-[#33381C] text-[#F7EEE4] translate-x-1.5'
-                            : 'hover:bg-[#EAE2D5]/50 text-[#1D1E19]'
-                        }`}
-                      >
+                    {filteredProducts.map((p, idx) => {
+                      const isHighlighted = idx === (hoveredIndex === -1 ? selectedIndex : hoveredIndex);
+                      const isKeyboardSelected = idx === selectedIndex;
+
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => handleProductSelect(p)}
+                          onMouseEnter={() => setHoveredIndex(idx)}
+                          onMouseLeave={() => setHoveredIndex(-1)}
+                          className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-all ${
+                            isHighlighted
+                              ? 'bg-[#33381C] text-[#F7EEE4] translate-x-1.5'
+                              : 'hover:bg-[#EAE2D5]/50 text-[#1D1E19]'
+                          }`}
+                        >
                         <div className="flex items-center space-x-3.5">
                           <img
                             src={p.image}
@@ -277,19 +286,20 @@ export default function SpotlightSearch() {
                           />
                           <div>
                             <p className="font-semibold text-sm line-clamp-1">{p.name}</p>
-                            <p className={`text-xs ${idx === selectedIndex ? 'text-[#F7EEE4]/70' : 'text-[#33381C]/60'}`}>
+                            <p className={`text-xs ${isHighlighted ? 'text-[#F7EEE4]/70' : 'text-[#33381C]/60'}`}>
                               {p.category}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-3 pr-2">
                           <span className="font-bold text-sm">₹{p.price.toFixed(2)}</span>
-                          {idx === selectedIndex && (
+                          {isKeyboardSelected && hoveredIndex === -1 && (
                             <CornerDownLeft className="h-3.5 w-3.5 opacity-60" />
                           )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div className="mt-4 pt-3 border-t border-[#A68D65]/10 flex items-center justify-between text-xs text-[#33381C]/60">
                     <span>Use ↑↓ to navigate, Enter to select</span>

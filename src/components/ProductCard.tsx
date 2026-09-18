@@ -162,6 +162,7 @@ const ProductCard = (props: ProductProps) => {
         {/* Product image with zoom transitions */}
         <Link
           to={`/products/${category}/${slug}`}
+          state={{ productId: id }}
           onClick={saveProductsScrollPosition}
           className="block w-full h-full"
         >
@@ -266,6 +267,7 @@ const ProductCard = (props: ProductProps) => {
       <div className="p-2.5 sm:p-3 md:p-4 flex flex-col flex-grow bg-white/40">
         <Link
           to={`/products/${category}/${slug}`}
+          state={{ productId: id }}
           onClick={saveProductsScrollPosition}
           className="block mb-auto"
         >

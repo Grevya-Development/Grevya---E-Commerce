@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Eye,
@@ -164,7 +164,9 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
     return "/account";
   };
 
-  const from = (location.state as any)?.from?.pathname || defaultRedirect();
+  const from =
+    (location.state as { from?: { pathname?: string } } | null)?.from
+      ?.pathname || defaultRedirect();
 
   // Multi-role experience routing support
   const [selectedRole, setSelectedRole] = useState<
@@ -199,85 +201,88 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   const pageCopy = copy[mode];
 
   // If already logged in, validate roles directly
+  const validateActiveUserSession = useCallback(
+    async (authenticatedUserId?: string) => {
+      const userId = authenticatedUserId || user?.id;
+      if (!userId) return false;
+      setLoading(true);
+      try {
+        const { data: profileRow, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+
+        if (!profileRow) {
+          await supabase.auth.signOut();
+          throw new Error(
+            "Your account could not be verified. Please contact the administrator.",
+          );
+        }
+
+        if (profileRow.is_active === false) {
+          await supabase.auth.signOut();
+          throw new Error(
+            "Your account has been blocked. Please contact the administrator.",
+          );
+        }
+
+        const actualRole = profileRow.role || "customer";
+
+        const availableRoles = [actualRole];
+        if (actualRole === "admin") {
+          availableRoles.push("seller", "customer");
+        } else if (actualRole === "seller") {
+          availableRoles.push("customer");
+        }
+        setUserRoles(availableRoles);
+
+        const target = selectedRole || expectedRole || "customer";
+
+        if (availableRoles.includes(target)) {
+          if (target === "seller") {
+            const { data: sellerApplication, error: sellerApplicationError } =
+              await supabase
+                .from("seller_applications")
+                .select("status")
+                .eq("user_id", userId)
+                .maybeSingle();
+
+            if (sellerApplicationError) throw sellerApplicationError;
+
+            if (!sellerApplication || sellerApplication.status === "rejected") {
+              navigate("/seller/application", { replace: true });
+            } else if (sellerApplication.status === "approved") {
+              navigate("/seller/dashboard", { replace: true });
+            } else {
+              navigate("/seller/onboarding", { replace: true });
+            }
+          } else {
+            navigate(defaultRedirect(target), { replace: true });
+          }
+        } else if (availableRoles.length > 1) {
+          setMultipleRolesChooser(true);
+        } else {
+          setValidationError({ expected: target, actual: actualRole });
+        }
+        return true;
+      } catch (err) {
+        console.error("Session verification failed:", err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [defaultRedirect, expectedRole, navigate, selectedRole, user?.id],
+  );
+
   useEffect(() => {
     if (user && !authLoading) {
       void validateActiveUserSession().catch(() => undefined);
     }
-  }, [user, authLoading]);
-
-  const validateActiveUserSession = async (authenticatedUserId?: string) => {
-    const userId = authenticatedUserId || user?.id;
-    if (!userId) return false;
-    setLoading(true);
-    try {
-      const { data: profileRow, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (profileError) throw profileError;
-
-      if (!profileRow) {
-        await supabase.auth.signOut();
-        throw new Error(
-          "Your account could not be verified. Please contact the administrator.",
-        );
-      }
-
-      if (profileRow.is_active === false) {
-        await supabase.auth.signOut();
-        throw new Error(
-          "Your account has been blocked. Please contact the administrator.",
-        );
-      }
-
-      const actualRole = profileRow.role || "customer";
-
-      const availableRoles = [actualRole];
-      if (actualRole === "admin") {
-        availableRoles.push("seller", "customer");
-      } else if (actualRole === "seller") {
-        availableRoles.push("customer");
-      }
-      setUserRoles(availableRoles);
-
-      const target = selectedRole || expectedRole || "customer";
-
-      if (availableRoles.includes(target)) {
-        if (target === "seller") {
-          const { data: sellerApplication, error: sellerApplicationError } =
-            await supabase
-              .from("seller_applications")
-              .select("status")
-              .eq("user_id", userId)
-              .maybeSingle();
-
-          if (sellerApplicationError) throw sellerApplicationError;
-
-          if (!sellerApplication || sellerApplication.status === "rejected") {
-            navigate("/seller/application", { replace: true });
-          } else if (sellerApplication.status === "approved") {
-            navigate("/seller/dashboard", { replace: true });
-          } else {
-            navigate("/seller/onboarding", { replace: true });
-          }
-        } else {
-          navigate(defaultRedirect(target), { replace: true });
-        }
-      } else if (availableRoles.length > 1) {
-        setMultipleRolesChooser(true);
-      } else {
-        setValidationError({ expected: target, actual: actualRole });
-      }
-      return true;
-    } catch (err) {
-      console.error("Session verification failed:", err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [authLoading, user, validateActiveUserSession]);
 
   const handleRoleSelection = (role: "customer" | "seller") => {
     setSelectedRole(role);
@@ -334,10 +339,12 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
 
     try {
       await startOAuthSignIn(provider);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Authentication failed";
       toast({
         title: "Sign-in failed",
-        description: friendlyAuthError(error.message),
+        description: friendlyAuthError(message),
         variant: "destructive",
       });
       setLoading(false);
@@ -364,7 +371,18 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
           normalizedEmail,
           password,
         );
-        await validateActiveUserSession(authenticatedUser?.id);
+
+        const { data: refreshedSessionData } = await supabase.auth.getSession();
+        const activeUserId =
+          refreshedSessionData.session?.user?.id ?? authenticatedUser?.id;
+
+        if (!activeUserId) {
+          throw new Error(
+            "Your session could not be restored after signing in. Please try again.",
+          );
+        }
+
+        await validateActiveUserSession(activeUserId);
       }
 
       if (mode === "signup") {
@@ -407,12 +425,14 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
         });
         navigate("/account");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setPassword("");
       setConfirmPassword("");
+      const message =
+        error instanceof Error ? error.message : "Authentication failed";
       toast({
         title: "Authentication Error",
-        description: friendlyAuthError(error.message),
+        description: friendlyAuthError(message),
         variant: "destructive",
       });
     } finally {

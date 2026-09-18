@@ -7,7 +7,7 @@ import {
 } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import ProductCard from "@/components/ProductCard";
+import ProductCard, { type ProductProps } from "@/components/ProductCard";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Filter, SlidersHorizontal, ChevronRight, Compass } from "lucide-react";
@@ -43,7 +43,125 @@ const itemVariants = {
   },
 };
 
-let productsCache: any[] | null = null;
+type CatalogProduct = Omit<ProductProps, "slug"> & {
+  description?: string | null;
+  subcategory?: string | null;
+  tags?: string[] | string | null;
+  keywords?: string[] | string | null;
+};
+
+let productsCache: CatalogProduct[] | null = null;
+let productsRequest: Promise<CatalogProduct[]> | null = null;
+let reviewStatsRequest: Promise<CatalogProduct[]> | null = null;
+
+const collectionCardDetails: Record<
+  string,
+  { image: string; tag: string; desc: string }
+> = {
+  "Natural Personal Care": {
+    image: productImages.natural.henna,
+    tag: "Pure Botanical",
+    desc: "Oils, henna, scrubs & face wash",
+  },
+  "Organic Pantry": {
+    image: productImages.natural.coconutOil,
+    tag: "Wood Pressed",
+    desc: "Virgin oils & organic powder extracts",
+  },
+  "Eco Home": {
+    image: productImages.backgrounds.sustainability,
+    tag: "Eco Decor",
+    desc: "Seagrass baskets, rugs & soy candles",
+  },
+  "Areca Tableware": {
+    image: productImages.areca.plates,
+    tag: "Compostable",
+    desc: "Areca leaf plates, bowls & platters",
+  },
+  Wellness: {
+    image:
+      "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?q=80&w=600&auto=format&fit=crop",
+    tag: "Daily Vitality",
+    desc: "Essential oils & adaptogen herbs",
+  },
+  "Reusable Essentials": {
+    image:
+      "https://images.unsplash.com/photo-1607613009820-a29f7bb81c04?q=80&w=600&auto=format&fit=crop",
+    tag: "Zero Waste",
+    desc: "Bamboo toothbrushes, canvas bags & straws",
+  },
+};
+
+const defaultCollectionCardDetails = {
+  image: productImages.backgrounds.nature,
+  tag: "Curated Collection",
+  desc: "Explore thoughtfully sourced essentials",
+};
+
+const fetchCatalogProducts = async () => {
+  if (productsCache) return productsCache;
+
+  if (!productsRequest) {
+    productsRequest = supabase
+      .from("products")
+      .select("*")
+      .eq("product_status", "approved")
+      .eq("is_hidden", false)
+      .order("id", { ascending: true })
+      .then(({ data, error }) => {
+        if (error) throw error;
+
+        const formatted: CatalogProduct[] = (data || []).map((item) => ({
+          ...item,
+          image: item.image_url,
+          rating: 0,
+          reviewCount: 0,
+        }));
+
+        productsCache = formatted;
+        return formatted;
+      })
+      .catch((error) => {
+        productsRequest = null;
+        throw error;
+      });
+  }
+
+  return productsRequest;
+};
+
+const fetchReviewStats = async (catalogProducts: CatalogProduct[]) => {
+  if (reviewStatsRequest) return reviewStatsRequest;
+
+  reviewStatsRequest = (async () => {
+    const productIds = catalogProducts.map((product) => product.id);
+    if (productIds.length === 0) return catalogProducts;
+
+    const { data: reviewRows, error } = await supabase
+      .from("reviews")
+      .select("product_id, rating")
+      .in("product_id", productIds);
+
+    if (error) throw error;
+
+    const reviewStatsByProductId = getReviewStatsByProductId(
+      (reviewRows || []) as ReviewRatingRow[],
+    );
+    const productsWithReviewStats = catalogProducts.map((product) => ({
+      ...product,
+      rating: reviewStatsByProductId.get(product.id)?.averageRating ?? 0,
+      reviewCount: reviewStatsByProductId.get(product.id)?.reviewCount ?? 0,
+    }));
+
+    productsCache = productsWithReviewStats;
+    return productsWithReviewStats;
+  })().catch((error) => {
+    reviewStatsRequest = null;
+    throw error;
+  });
+
+  return reviewStatsRequest;
+};
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -52,7 +170,9 @@ const Products = () => {
   const categoryFilter = searchParams.get("category") || "all";
   const searchQuery = searchParams.get("q") || "";
 
-  const [products, setProducts] = useState<any[]>(() => productsCache ?? []);
+  const [products, setProducts] = useState<CatalogProduct[]>(
+    () => productsCache ?? [],
+  );
   const [loading, setLoading] = useState(() => productsCache === null);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<string>("featured");
@@ -136,7 +256,7 @@ const Products = () => {
     ...Array.from(new Set(products.map((p) => p.category).filter(Boolean))),
   ];
 
-  // Curated category cards
+  // Cards use the same current category values as the sidebar and filters.
   const categoryCards = [
     {
       id: "all",
@@ -145,83 +265,23 @@ const Products = () => {
       tag: "Seasonal Picks",
       desc: "Explore everything natural",
     },
-    {
-      id: "Personal Care",
-      name: "Personal Care",
-      image: productImages.natural.henna,
-      tag: "Pure Botanical",
-      desc: "Oils, henna, scrubs & face wash",
-    },
-    {
-      id: "Natural Products",
-      name: "Natural Products",
-      image: productImages.natural.coconutOil,
-      tag: "Wood Pressed",
-      desc: "Virgin oils & organic powder extracts",
-    },
-    {
-      id: "Home & Living",
-      name: "Home & Living",
-      image: productImages.backgrounds.sustainability,
-      tag: "Eco Decor",
-      desc: "Seagrass baskets, rugs & soy candles",
-    },
-    {
-      id: "Areca Products",
-      name: "Areca Products",
-      image: productImages.areca.plates,
-      tag: "Compostable",
-      desc: "Areca leaf plates, bowls & platters",
-    },
-    {
-      id: "Wellness",
-      name: "Wellness",
-      image:
-        "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?q=80&w=600&auto=format&fit=crop",
-      tag: "Daily Vitality",
-      desc: "Essential oils & adaptogen herbs",
-    },
-    {
-      id: "Organic Essentials",
-      name: "Organic Essentials",
-      image:
-        "https://images.unsplash.com/photo-1615485290382-441e4d049cb5?q=80&w=600&auto=format&fit=crop",
-      tag: "Kitchen Pantry",
-      desc: "Curcumin turmeric, forest honey & spices",
-    },
-    {
-      id: "Organic Pantry",
-      name: "Organic Pantry",
-      image:
-        "https://pureandsure.in/cdn/shop/files/WhatsAppImage2025-08-06at1.37.26PM_1200x1200.jpg?v=1754468550",
-      tag: "Kitchen Pantry",
-      desc: "Curcumin turmeric, forest honey & spices",
-    },
-    {
-      id: "Kitchen & Dining",
-      name: "Kitchen & Dining",
-      image:
-        "https://images.unsplash.com/photo-1531234799389-d8793a28f317?q=80&w=600&auto=format&fit=crop",
-      tag: "Earth Table",
-      desc: "Neem wood spatulas, clay water pots & brassware",
-    },
-    {
-      id: "Eco Lifestyle",
-      name: "Eco Lifestyle",
-      image:
-        "https://images.unsplash.com/photo-1607613009820-a29f7bb81c04?q=80&w=600&auto=format&fit=crop",
-      tag: "Zero Waste",
-      desc: "Bamboo toothbrushes, canvas bags & straws",
-    },
+    ...categories
+      .filter((category) => category !== "all")
+      .map((category) => ({
+        id: category,
+        name: category,
+        ...(collectionCardDetails[category] ?? defaultCollectionCardDetails),
+      })),
   ];
 
   useEffect(() => {
-    if (productsCache) return;
+    let isCurrent = true;
 
-    const fetchProducts = async () => {
+    const loadProducts = async () => {
       try {
-        setLoading(true);
         setError(null);
+        const catalogProducts = await fetchCatalogProducts();
+        if (!isCurrent) return;
 
         const { data, error: fetchError } = await supabase
           .from("products")
@@ -277,20 +337,44 @@ const Products = () => {
         console.error("FETCH ERROR:", err);
         setError(err.message || "Something went wrong");
       } finally {
+        setProducts(catalogProducts);
         setLoading(false);
+
+        void fetchReviewStats(catalogProducts)
+          .then((productsWithReviewStats) => {
+            if (isCurrent) setProducts(productsWithReviewStats);
+          })
+          .catch((reviewError) => {
+            console.error("REVIEW STATS FETCH ERROR:", reviewError);
+          });
+      } catch (err: unknown) {
+        if (isCurrent) {
+          console.error("FETCH ERROR:", err);
+          setError(err instanceof Error ? err.message : "Something went wrong");
+        }
+      } finally {
+        if (isCurrent) setLoading(false);
       }
     };
 
-    fetchProducts();
+    loadProducts();
+
+    return () => {
+      isCurrent = false;
+    };
   }, []);
 
   const handleCategorySelect = (category: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+
     if (category === "all") {
-      searchParams.delete("category");
+      nextParams.delete("category");
     } else {
-      searchParams.set("category", category);
+      nextParams.set("category", category);
     }
-    setSearchParams(searchParams);
+
+    nextParams.delete("q");
+    setSearchParams(nextParams, { replace: true });
     setShowMobileFilters(false);
   };
 
@@ -382,10 +466,16 @@ const Products = () => {
           {/* Controls Bar */}
           <div className="sticky top-20 z-20 flex items-center justify-between border border-[#A68D65]/15 bg-white/90 backdrop-blur-md px-4 py-2.5 rounded-2xl mb-6 shadow-md select-none transition-all duration-300 md:relative md:top-0 md:bg-white md:shadow-xs">
             <div className="flex items-center gap-1.5 text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
-              <span className="font-extrabold text-[#33381C] text-xs md:text-sm">
-                {filteredProducts.length}
-              </span>{" "}
-              items
+              {loading ? (
+                <span>Loading items…</span>
+              ) : (
+                <>
+                  <span className="font-extrabold text-[#33381C] text-xs md:text-sm">
+                    {filteredProducts.length}
+                  </span>{" "}
+                  items
+                </>
+              )}
             </div>
 
             <div className="flex items-center gap-3">

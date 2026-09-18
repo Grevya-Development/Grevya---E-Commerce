@@ -78,7 +78,6 @@ const AppContent = () => {
   return (
     <>
       <ScrollToTop />
-      <ScrollToTop />
       <MemberBenefitsBar />
       <SpotlightSearch />
       <QuickViewModal />
