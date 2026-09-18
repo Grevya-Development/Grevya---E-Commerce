@@ -18,6 +18,7 @@ import {
   type ReviewRatingRow,
 } from "@/lib/reviewStats";
 import { searchProducts } from "@/lib/productSearch";
+import { getProductStockDetails } from "@/lib/stock";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -246,14 +247,29 @@ const Products = () => {
           (reviewRows || []) as ReviewRatingRow[],
         );
 
-        const formatted = (data || []).map((item) => ({
-          ...item,
-          image: item.image_url,
-          rating: reviewStatsByProductId.get(item.id)?.averageRating ?? 0,
-          reviewCount: reviewStatsByProductId.get(item.id)?.reviewCount ?? 0,
-          rating: reviewStatsByProductId.get(item.id)?.averageRating ?? 0,
-          reviewCount: reviewStatsByProductId.get(item.id)?.reviewCount ?? 0,
-        }));
+       const formatted = await Promise.all(
+  (data || []).map(async (item) => {
+    const stockDetails = await getProductStockDetails(item.id);
+
+    // Use the same variant that ProductDetail will select.
+    const selectedVariant =
+      stockDetails.variants.length > 0
+        ? stockDetails.variants[0]
+        : undefined;
+
+    return {
+      ...item,
+      image: item.image_url,
+      variant_id: selectedVariant?.id,
+      sku: selectedVariant?.sku,
+      stock: selectedVariant?.stock ?? stockDetails.productStock,
+      rating:
+        reviewStatsByProductId.get(item.id)?.averageRating ?? 0,
+      reviewCount:
+        reviewStatsByProductId.get(item.id)?.reviewCount ?? 0,
+    };
+  }),
+);
 
         productsCache = formatted;
         setProducts(formatted);
@@ -536,7 +552,6 @@ const Products = () => {
                           image={product.image}
                           category={product.category}
                           rating={product.rating}
-                          reviewCount={product.reviewCount}
                           reviewCount={product.reviewCount}
                           slug={slug}
                         />
