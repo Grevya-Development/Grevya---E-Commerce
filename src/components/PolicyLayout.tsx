@@ -92,7 +92,7 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
     const h2s = contentRef.current.getElementsByTagName("h2");
     Array.from(h2s).forEach((h2) => {
       const isActive = h2.id === activeSectionId;
-      h2.className = `font-serif text-2xl md:text-3xl font-bold mt-12 mb-6 pb-3 border-b scroll-mt-20 flex items-center transition-all duration-500 ease-premium ${
+      h2.className = `font-serif text-2xl md:text-3xl font-bold mt-12 mb-6 pb-3 border-b scroll-mt-28 flex items-center transition-all duration-500 ease-premium ${
         isActive
           ? "text-[#33381C] border-[#33381C] translate-x-1 shadow-[inset_0_-2px_0_0_#33381C] pl-3"
           : "text-[#33381C]/75 border-[#A68D65]/15 pl-0"
@@ -110,7 +110,7 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#FBF9F6] text-[#1D1E19] overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-[#FBF9F6] text-[#1D1E19]">
       <Navbar />
 
       {/* READING PROGRESS INDICATOR BAR */}
@@ -123,18 +123,20 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
 
       <main className="flex-grow pt-16 pb-28 relative">
         {/* Layered Blurred Ambient backgrounds */}
-        <div
-          className="absolute top-16 left-1/4 w-[600px] h-[600px] bg-gradient-radial from-[#A68D65]/8 to-transparent rounded-full blur-[120px] pointer-events-none animate-pulse-orb"
-          style={{ animationDuration: "24s" }}
-        />
-        <div
-          className="absolute top-1/3 right-1/4 w-[700px] h-[700px] bg-gradient-radial from-[#33381C]/5 to-transparent rounded-full blur-[140px] pointer-events-none animate-pulse-orb"
-          style={{ animationDuration: "30s", animationDelay: "-6s" }}
-        />
-        <div
-          className="absolute bottom-16 left-1/3 w-[500px] h-[500px] bg-gradient-radial from-[#A68D65]/6 to-transparent rounded-full blur-[100px] pointer-events-none animate-pulse-orb"
-          style={{ animationDuration: "28s", animationDelay: "-12s" }}
-        />
+        <div className="absolute inset-0 overflow-x-clip pointer-events-none">
+          <div
+            className="absolute top-16 left-1/4 w-[600px] h-[600px] bg-gradient-radial from-[#A68D65]/8 to-transparent rounded-full blur-[120px] animate-pulse-orb"
+            style={{ animationDuration: "24s" }}
+          />
+          <div
+            className="absolute top-1/3 right-1/4 w-[700px] h-[700px] bg-gradient-radial from-[#33381C]/5 to-transparent rounded-full blur-[140px] animate-pulse-orb"
+            style={{ animationDuration: "30s", animationDelay: "-6s" }}
+          />
+          <div
+            className="absolute bottom-16 left-1/3 w-[500px] h-[500px] bg-gradient-radial from-[#A68D65]/6 to-transparent rounded-full blur-[100px] animate-pulse-orb"
+            style={{ animationDuration: "28s", animationDelay: "-12s" }}
+          />
+        </div>
 
         <div className="container mx-auto px-4 max-w-7xl relative z-10">
           {/* Header Panel */}
@@ -206,46 +208,45 @@ const PolicyLayout = ({ title, updated, children }: PolicyLayoutProps) => {
           <div className="grid lg:grid-cols-[260px_1fr] gap-12 lg:gap-16 items-start">
             {/* LEFT COLUMN: STICKY TOC NAVIGATION */}
             {sections.length > 0 && (
-              <aside className="hidden lg:block sticky top-20 self-start">
-                <div
-                  className="liquid-glass rounded-3xl p-5.5 shadow-md space-y-4 stable-scrollbar"
-                  style={{ maxHeight: "calc(100vh - 5rem)", overflowY: "auto" }}
-                >
-                  <h3 className="text-[10px] font-extrabold text-neutral-400 uppercase tracking-widest flex items-center mb-1">
-                    <BookOpen className="w-3.5 h-3.5 mr-1.5 text-[#A68D65]" />{" "}
-                    Document Sections
-                  </h3>
-                  <div className="flex flex-col space-y-1 relative min-w-0">
-                    {sections.map((sect) => {
-                      const isActive = activeSectionId === sect.id;
-                      return (
-                        <button
-                          key={sect.id}
-                          onClick={() => handleScrollTo(sect.id)}
-                          className={`relative text-left py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center group cursor-pointer ${
-                            isActive
-                              ? "text-[#33381C] bg-[#F7EEE4] shadow-xs"
-                              : "text-neutral-500 hover:text-[#33381C] hover:translate-x-1.5"
-                          }`}
-                        >
-                          {isActive && (
-                            <motion.div
-                              layoutId="activeTOCIndicator"
-                              className="absolute left-0 w-1 h-1/2 bg-[#33381C] rounded-full"
-                              transition={{
-                                type: "spring",
-                                stiffness: 380,
-                                damping: 30,
-                              }}
-                            />
-                          )}
-                          <span className="truncate">{sect.title}</span>
-                          {!isActive && (
-                            <ArrowRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 text-[#A68D65] transition-all transform translate-x-[-4px] group-hover:translate-x-0" />
-                          )}
-                        </button>
-                      );
-                    })}
+              <aside className="hidden lg:block self-stretch">
+                <div className="sticky top-[7rem]">
+                  <div className="max-h-[calc(100vh-7rem)] overflow-y-auto liquid-glass rounded-3xl p-5.5 shadow-md space-y-4 stable-scrollbar">
+                    <h3 className="text-[10px] font-extrabold text-neutral-400 uppercase tracking-widest flex items-center mb-1">
+                      <BookOpen className="w-3.5 h-3.5 mr-1.5 text-[#A68D65]" />{" "}
+                      Document Sections
+                    </h3>
+                    <div className="flex flex-col space-y-1 relative min-w-0">
+                      {sections.map((sect) => {
+                        const isActive = activeSectionId === sect.id;
+                        return (
+                          <button
+                            key={sect.id}
+                            onClick={() => handleScrollTo(sect.id)}
+                            className={`relative text-left py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center group cursor-pointer ${
+                              isActive
+                                ? "text-[#33381C] bg-[#F7EEE4] shadow-xs"
+                                : "text-neutral-500 hover:text-[#33381C] hover:translate-x-1.5"
+                            }`}
+                          >
+                            {isActive && (
+                              <motion.div
+                                layoutId="activeTOCIndicator"
+                                className="absolute left-0 w-1 h-1/2 bg-[#33381C] rounded-full"
+                                transition={{
+                                  type: "spring",
+                                  stiffness: 380,
+                                  damping: 30,
+                                }}
+                              />
+                            )}
+                            <span className="truncate">{sect.title}</span>
+                            {!isActive && (
+                              <ArrowRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 text-[#A68D65] transition-all transform translate-x-[-4px] group-hover:translate-x-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </aside>
