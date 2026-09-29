@@ -161,6 +161,34 @@ export default function SellerDashboard() {
       } else {
         const items = (orderItems as OrderItem[]) || [];
 
+        const orderIds = Array.from(
+          new Set(items.map((item) => item.order_id).filter(Boolean)),
+        ) as string[];
+        const { data: currentOrders, error: currentOrdersError } =
+          orderIds.length > 0
+            ? await supabase
+                .from("orders")
+                .select("id, status, updated_at")
+                .in("id", orderIds)
+            : { data: [], error: null };
+
+        if (currentOrdersError) throw currentOrdersError;
+
+        const currentOrderById = new Map(
+          (currentOrders || []).map((order) => [order.id, order]),
+        );
+        const currentItems = items.map((item) => {
+          const currentOrder = item.order_id
+            ? currentOrderById.get(item.order_id)
+            : undefined;
+
+          return {
+            ...item,
+            order_status: currentOrder?.status || item.order_status,
+            updated_at: currentOrder?.updated_at || item.updated_at,
+          };
+        });
+
         // Count unique orders containing seller's products
         const uniqueOrders = new Set(items.map((i) => i.order_id).filter(Boolean));
         setTotalOrders(uniqueOrders.size);
@@ -177,7 +205,12 @@ export default function SellerDashboard() {
           (a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
-        setRecentOrders(sorted.slice(0, 5));
+        const currentItemsById = new Map(currentItems.map((item) => [item.id, item]));
+        setRecentOrders(
+          sorted
+            .map((item) => currentItemsById.get(item.id) || item)
+            .slice(0, 5),
+        );
       }
     } catch (err: any) {
       setError(err.message || "Failed to load dashboard data");
