@@ -125,6 +125,20 @@ export const verifyEmailVerificationCode = async (email: string, code: string) =
   return data;
 };
 
+export const resendSignupConfirmation = (email: string) => {
+  const normalizedEmail = normalizeEmail(email);
+
+  return withLock(`resend-signup:${normalizedEmail}`, async () => {
+    const { data, error } = await supabase.auth.resend({
+      type: "signup",
+      email: normalizedEmail,
+    });
+
+    if (error) throw error;
+    return data;
+  });
+};
+
 /**
  * Start OAuth flow by redirecting to an external provider.
  * This project currently uses email/password auth; OAuth is not enabled in the Supabase client.

@@ -137,7 +137,7 @@ const fieldVariants = {
 };
 
 const AuthPage = ({ mode }: { mode: AuthMode }) => {
-  const { user, loading: authLoading, refreshProfile } = useAuth();
+  const { user, loading: authLoading, profileLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const path = location.pathname.toLowerCase();
@@ -279,10 +279,10 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   );
 
   useEffect(() => {
-    if (user && !authLoading) {
+    if (user && !authLoading && !profileLoading && !loading) {
       void validateActiveUserSession().catch(() => undefined);
     }
-  }, [authLoading, user, validateActiveUserSession]);
+  }, [authLoading, loading, profileLoading, user, validateActiveUserSession]);
 
   const handleRoleSelection = (role: "customer" | "seller") => {
     setSelectedRole(role);

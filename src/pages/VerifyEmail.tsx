@@ -6,7 +6,7 @@ import { toast } from '@/components/ui/use-toast';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { motion } from 'framer-motion';
-import { requestPasswordReset, verifyEmailVerificationCode } from '@/lib/authService';
+import { resendSignupConfirmation, verifyEmailVerificationCode } from '@/lib/authService';
 
 const VerifyEmail = () => {
   const location = useLocation();
@@ -94,7 +94,7 @@ const VerifyEmail = () => {
 
     setResending(true);
     try {
-      await requestPasswordReset(email);
+      await resendSignupConfirmation(email);
 
       const cooldownTime = Date.now() + 60 * 1000;
       setCooldownSeconds(60);
