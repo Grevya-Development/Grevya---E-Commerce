@@ -110,7 +110,7 @@ const VerifyEmail = () => {
         description: error.message || 'Something went wrong while requesting a new code.',
         variant: 'destructive',
       });
-    } finally {
+    } finally { 
       setResending(false);
     }
   };

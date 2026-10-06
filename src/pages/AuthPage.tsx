@@ -17,6 +17,7 @@ import {
   Building,
   User,
   AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/lib/supabaseClient";
@@ -56,12 +57,12 @@ const copy = {
   },
   forgot: {
     title: "Reset Password",
-    subtitle: "Enter email to receive your recovery authorization code.",
-    submit: "Send Reset Code",
+    subtitle: "Enter your email address to request a password reset link.",
+    submit: "Send Reset Link",
   },
   reset: {
     title: "Set Password",
-    subtitle: "Configure a secure password for your credentials.",
+    subtitle: "Choose a new password for your account.",
     submit: "Save Password",
   },
 };
@@ -157,12 +158,15 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   };
 
   const expectedRole = getExpectedRole();
-  const defaultRedirect = (role?: string) => {
-    const activeRole = role || expectedRole;
-    if (activeRole === "admin") return "/admin/dashboard";
-    if (activeRole === "seller") return "/seller/dashboard";
-    return "/account";
-  };
+  const defaultRedirect = useCallback(
+    (role?: string) => {
+      const activeRole = role || expectedRole;
+      if (activeRole === "admin") return "/admin/dashboard";
+      if (activeRole === "seller") return "/seller/dashboard";
+      return "/account";
+    },
+    [expectedRole],
+  );
 
   const from =
     (location.state as { from?: { pathname?: string } } | null)?.from
@@ -186,6 +190,10 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const inFlightRef = useRef(false);
+  const [resetRequestSent, setResetRequestSent] = useState(false);
+  const [recoveryState, setRecoveryState] = useState<
+    "checking" | "ready" | "invalid"
+  >("checking");
 
   // Role validation conflict state
   const [validationError, setValidationError] = useState<{
@@ -197,8 +205,70 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
 
   const isLogin = mode === "login";
   const isSignup = mode === "signup";
+  const isForgot = mode === "forgot";
   const needsPassword = mode !== "forgot";
   const pageCopy = copy[mode];
+  const requiresRoleSelection = mode !== "reset" && !selectedRole;
+  const justResetPassword = Boolean(
+    (location.state as { passwordReset?: boolean } | null)?.passwordReset,
+  );
+
+  useEffect(() => {
+    if (mode !== "reset") return;
+
+    let active = true;
+    const recoveryParams = new URLSearchParams(
+      `${location.search}&${location.hash.replace(/^#/, "")}`,
+    );
+    const urlError =
+      recoveryParams.get("error_description") ||
+      recoveryParams.get("error_code") ||
+      recoveryParams.get("error");
+
+    if (urlError) {
+      setRecoveryState("invalid");
+      return () => {
+        active = false;
+      };
+    }
+
+    setRecoveryState("checking");
+    let recoveryEventReceived = false;
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (active && event === "PASSWORD_RECOVERY" && session) {
+        recoveryEventReceived = true;
+        setRecoveryState("ready");
+      }
+    });
+
+    const hasRecoveryCallback =
+      recoveryParams.get("type") === "recovery" ||
+      recoveryParams.has("code") ||
+      recoveryParams.has("access_token");
+
+    void supabase.auth
+      .getSession()
+      .then(({ data: sessionData, error }) => {
+        if (!active) return;
+        if (error) throw error;
+
+        setRecoveryState(
+          (hasRecoveryCallback || recoveryEventReceived) && sessionData.session
+            ? "ready"
+            : "invalid",
+        );
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        console.error("[AuthPage] Could not verify password recovery link:", error);
+        setRecoveryState("invalid");
+      });
+
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, [location.hash, location.search, mode]);
 
   // If already logged in, validate roles directly
   const validateActiveUserSession = useCallback(
@@ -279,14 +349,37 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
   );
 
   useEffect(() => {
-    if (user && !authLoading && !profileLoading && !loading) {
+    if (
+      (isLogin || isSignup) &&
+      !justResetPassword &&
+      user &&
+      !authLoading &&
+      !profileLoading &&
+      !loading
+    ) {
       void validateActiveUserSession().catch(() => undefined);
     }
-  }, [authLoading, loading, profileLoading, user, validateActiveUserSession]);
+  }, [
+    authLoading,
+    isLogin,
+    isSignup,
+    justResetPassword,
+    loading,
+    profileLoading,
+    user,
+    validateActiveUserSession,
+  ]);
 
   const handleRoleSelection = (role: "customer" | "seller") => {
-    setSelectedRole(role);
     setErrors({});
+    setResetRequestSent(false);
+
+    if (mode === "forgot") {
+      setSelectedRole(role);
+      return;
+    }
+
+    setSelectedRole(role);
     // Navigate to the role-scoped route so the URL matches the selected experience
     if (role === "seller") {
       navigate(mode === "signup" ? "/seller/signup" : "/seller/login", {
@@ -324,7 +417,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
       if (passwordError) nextErrors.password = passwordError;
     }
 
-    if (isSignup && password !== confirmPassword) {
+    if ((isSignup || mode === "reset") && password !== confirmPassword) {
       nextErrors.confirmPassword = "Passwords do not match.";
     }
 
@@ -411,19 +504,26 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
 
       if (mode === "forgot") {
         await requestPasswordReset(normalizedEmail);
-        toast({
-          title: "Reset Code Sent",
-          description: "Please check your email address.",
-        });
+        setResetRequestSent(true);
       }
 
       if (mode === "reset") {
         await updateAuthPassword(password);
         toast({
           title: "Password Updated",
-          description: "Authentication details saved successfully.",
+          description: "Your password has been changed. Please sign in.",
         });
-        navigate("/account");
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (signOutError) {
+          console.error(
+            "[AuthPage] Password changed, but recovery session sign-out failed:",
+            signOutError,
+          );
+        }
+        navigate("/login", {
+          replace: true,
+          state: { passwordReset: true },
+        });
       }
     } catch (error: unknown) {
       setPassword("");
@@ -432,7 +532,14 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
         error instanceof Error ? error.message : "Authentication failed";
       toast({
         title: "Authentication Error",
-        description: friendlyAuthError(message),
+        description:
+          mode === "forgot"
+            ? /rate limit/i.test(message)
+              ? friendlyAuthError(message)
+              : /network|fetch/i.test(message)
+                ? "We could not reach the password reset service. Check your connection and try again."
+                : "We couldn't process the reset request right now. Please try again shortly."
+            : friendlyAuthError(message),
         variant: "destructive",
       });
     } finally {
@@ -625,7 +732,9 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
             )}
 
             {/* Role Selection Screen */}
-            {!selectedRole && !validationError && !multipleRolesChooser && (
+            {requiresRoleSelection &&
+              !validationError &&
+              !multipleRolesChooser && (
               <div className="space-y-6 animate-fade-in">
                 <div>
                   <h2 className="text-2xl font-serif font-bold text-[#1d1e19]">
@@ -679,7 +788,9 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
             )}
 
             {/* Actual Auth forms */}
-            {selectedRole && !validationError && !multipleRolesChooser && (
+            {(selectedRole || mode === "reset") &&
+              !validationError &&
+              !multipleRolesChooser && (
               <AnimatePresence mode="wait">
                 <motion.div
                   key={mode}
@@ -689,17 +800,21 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                   transition={{ duration: 0.25 }}
                 >
                   <div className="mb-6">
-                    <div className="flex items-center gap-2 mb-2">
-                      <button
-                        onClick={() => {
-                          if (expectedRole) return; // If direct link, block going back to selection
-                          setSelectedRole(undefined);
-                        }}
-                        className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-neutral-100 hover:bg-[#33381C]/5 text-[#33381C] ${expectedRole ? "opacity-70 pointer-events-none" : ""}`}
-                      >
-                        {selectedRole} portal
-                      </button>
-                    </div>
+                    {selectedRole && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <button
+                          onClick={() => {
+                            if (expectedRole) return;
+                            setSelectedRole(undefined);
+                            setResetRequestSent(false);
+                            setErrors({});
+                          }}
+                          className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-neutral-100 hover:bg-[#33381C]/5 text-[#33381C] ${expectedRole ? "opacity-70 pointer-events-none" : ""}`}
+                        >
+                          {selectedRole} portal
+                        </button>
+                      </div>
+                    )}
                     <h2 className="text-2xl font-serif font-bold text-[#1D1E19]">
                       {pageCopy.title}
                     </h2>
@@ -770,6 +885,48 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                     </>
                   )}
 
+                  {mode === "reset" && recoveryState === "checking" && (
+                    <div
+                      className="flex items-center gap-2 rounded-xl bg-[#F7EEE4]/60 p-4 text-sm text-[#33381C]"
+                      role="status"
+                    >
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Verifying your password reset link...
+                    </div>
+                  )}
+
+                  {mode === "reset" && recoveryState === "invalid" && (
+                    <div
+                      className="space-y-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+                      role="alert"
+                    >
+                      <p>
+                        This password reset link is invalid or has expired.
+                        Request a new link to continue.
+                      </p>
+                      <Link
+                        className="font-bold underline"
+                        to="/forgot-password"
+                      >
+                        Request another reset link
+                      </Link>
+                    </div>
+                  )}
+
+                  {mode === "forgot" && resetRequestSent && (
+                    <div
+                      className="mb-4 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-900"
+                      role="status"
+                    >
+                      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                      <p>
+                        If an account exists for this email address, a password
+                        reset link has been sent.
+                      </p>
+                    </div>
+                  )}
+
+                  {(mode !== "reset" || recoveryState === "ready") && (
                   <form className="space-y-4" onSubmit={handleSubmit}>
                     {isSignup && (
                       <FloatingInput
@@ -788,7 +945,10 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                         label="Email Address"
                         type="email"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          setResetRequestSent(false);
+                        }}
                         error={errors.email}
                         required
                       />
@@ -816,6 +976,11 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                           onChange={(e) => setPassword(e.target.value)}
                           error={errors.password}
                           minLength={isLogin ? 1 : 8}
+                          autoComplete={
+                            mode === "reset" || isSignup
+                              ? "new-password"
+                              : "current-password"
+                          }
                           required
                         />
                         <button
@@ -855,13 +1020,41 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                       />
                     )}
 
+                    {mode === "reset" && (
+                      <FloatingInput
+                        id="confirmPassword"
+                        label="Confirm New Password"
+                        type={showPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        error={errors.confirmPassword}
+                        autoComplete="new-password"
+                        required
+                      />
+                    )}
+
                     <Button
                       type="submit"
+                      disabled={
+                        loading ||
+                        (isForgot && resetRequestSent) ||
+                        (mode === "reset" && recoveryState !== "ready")
+                      }
                       className="h-12 w-full rounded-xl bg-[#33381C] hover:bg-[#262A14] text-white font-bold shadow-md hover:shadow-lg mt-4 cursor-pointer"
                     >
-                      {pageCopy.submit}
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {mode === "forgot" ? "Sending..." : "Saving..."}
+                        </>
+                      ) : isForgot && resetRequestSent ? (
+                        "Reset Link Sent"
+                      ) : (
+                        pageCopy.submit
+                      )}
                     </Button>
                   </form>
+                  )}
 
                   <div className="mt-6 text-center text-xs border-t border-[#A68D65]/10 pt-4 font-medium flex flex-col gap-3">
                     {isLogin && selectedRole !== "admin" && (

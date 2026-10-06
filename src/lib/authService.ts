@@ -1,12 +1,13 @@
 import { supabase } from "@/lib/supabaseClient";
 import { authDebug } from "@/lib/authDiagnostics";
 import {
+  getAuthRedirectUrl,
   normalizeEmail,
   normalizePhone,
 } from "@/lib/authValidation";
 import { rememberPendingProfile } from "@/lib/profileSync";
 
-const locks = new Map<string, Promise<any>>();
+const locks = new Map<string, Promise<unknown>>();
 
 const withLock = async <T>(key: string, action: () => Promise<T>) => {
   const existing = locks.get(key);
@@ -153,7 +154,10 @@ export const startOAuthSignIn = async (_provider: "google" | "apple") => {
 export const requestPasswordReset = (email: string) => {
   const normalizedEmail = normalizeEmail(email);
   return withLock(`forgot:${normalizedEmail}`, async () => {
-    const { data, error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+    const { data, error } = await supabase.auth.resetPasswordForEmail(
+      normalizedEmail,
+      { redirectTo: getAuthRedirectUrl("/reset-password") },
+    );
 
     if (error) {
       throw error;
