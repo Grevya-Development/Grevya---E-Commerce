@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Star, ShoppingCart, Plus, Minus, Shield, Sparkles, Leaf } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import { useCartStore } from '@/store/useCartStore';
+import { getAvailableStock, getProductStockDetails } from '@/lib/stock';
 import { toast } from '@/components/ui/use-toast';
 import { ProductProps } from './ProductCard';
 
@@ -12,32 +13,64 @@ export default function QuickViewModal() {
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [availableStock, setAvailableStock] = useState<number | null>(null);
+  const [isStockLoading, setIsStockLoading] = useState(false);
+  const quickViewRequestId = useRef(0);
   const addItem = useCartStore((state) => state.addItem);
 
   useEffect(() => {
     const handleOpenQuickView = async (e: CustomEvent<ProductProps>) => {
       const p = e.detail;
+      const requestId = ++quickViewRequestId.current;
       setProduct(p);
       setQuantity(1);
+      setAvailableStock(null);
+      setIsStockLoading(true);
       setDescription('');
       setIsOpen(true);
-      
+
       // Fetch full description/details from Supabase
       if (p?.id) {
         setIsLoading(true);
         try {
+          const stockDetails = await getProductStockDetails(p.id);
+          if (requestId === quickViewRequestId.current) {
+            const selectedVariant = p.variant_id
+              ? stockDetails.variants.find((variant) => variant.id === p.variant_id)
+              : stockDetails.variants[0];
+            const stock = stockDetails.variants.length > 0
+              ? selectedVariant?.stock ?? 0
+              : stockDetails.productStock;
+            const resolvedProduct: ProductProps = {
+              ...p,
+              variant_id: selectedVariant?.id ?? p.variant_id,
+              sku: selectedVariant?.sku ?? p.sku,
+              stock,
+            };
+            setProduct(resolvedProduct);
+            setAvailableStock(stock);
+            setQuantity(stock > 0 ? 1 : 0);
+          }
+
           const { data, error } = await supabase
             .from('products')
             .select('description')
             .eq('id', p.id)
             .single();
           if (error) throw error;
-          setDescription(data?.description || 'No description available for this premium organic product.');
+          if (requestId === quickViewRequestId.current) {
+            setDescription(data?.description || 'No description available for this premium organic product.');
+          }
         } catch (err) {
-          console.error('Error fetching product description for QuickView:', err);
-          setDescription('Pure, cold-pressed natural ingredients sourced directly from organic farms. Experience premium wellness.');
+          console.error('Error fetching product details for QuickView:', err);
+          if (requestId === quickViewRequestId.current) {
+            setDescription('Pure, cold-pressed natural ingredients sourced directly from organic farms. Experience premium wellness.');
+          }
         } finally {
-          setIsLoading(false);
+          if (requestId === quickViewRequestId.current) {
+            setIsLoading(false);
+            setIsStockLoading(false);
+          }
         }
       }
     };
@@ -47,15 +80,60 @@ export default function QuickViewModal() {
   }, []);
 
   const handleAddToCart = async () => {
-    if (!product) return;
-    const result = await addItem(product, quantity);
+    if (!product || isStockLoading || availableStock === null) return;
+
+    let currentStock: number;
+    try {
+      currentStock = await getAvailableStock(product.id, product.variant_id);
+    } catch (err) {
+      console.error('Error validating QuickView stock:', err);
+      toast({
+        title: 'Unable to check stock',
+        description: 'Please try again before adding this product to your cart.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setAvailableStock(currentStock);
+    if (currentStock < 1) {
+      setQuantity(0);
+      toast({
+        title: 'Stock limit reached',
+        description: 'This product is out of stock.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const validatedQuantity = Math.min(Math.max(quantity, 1), currentStock);
+    setQuantity(validatedQuantity);
+
+    let result: Awaited<ReturnType<typeof addItem>>;
+    try {
+      result = await addItem(product, validatedQuantity);
+    } catch (err) {
+      console.error('Error adding QuickView product to cart:', err);
+      toast({
+        title: 'Unable to add to cart',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (!result.ok) {
+      setAvailableStock(result.availableStock);
+      setQuantity(
+        result.availableStock > 0
+          ? Math.min(validatedQuantity, result.availableStock)
+          : 0,
+      );
       toast({ title: 'Stock limit reached', description: result.availableStock ? `Only ${result.availableStock} units are available.` : 'This product is out of stock.', variant: 'destructive' });
       return;
     }
     toast({
       title: "Added to cart",
-      description: `${quantity} × ${product.name} added to your cart`,
+      description: `${validatedQuantity} × ${product.name} added to your cart`,
     });
     setIsOpen(false);
   };
@@ -171,7 +249,13 @@ export default function QuickViewModal() {
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center border border-[#A68D65]/35 rounded-xl bg-white overflow-hidden shadow-sm">
                     <button
-                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                      onClick={() => {
+                        if (availableStock === null || availableStock < 1) return;
+                        setQuantity((q) =>
+                          Math.min(Math.max(1, q - 1), availableStock),
+                        );
+                      }}
+                      disabled={isStockLoading || availableStock === null || availableStock < 1}
                       className="px-3.5 py-2 hover:bg-[#A68D65]/10 text-[#33381C] transition-colors"
                       aria-label="Decrease quantity"
                     >
@@ -181,22 +265,42 @@ export default function QuickViewModal() {
                       {quantity}
                     </span>
                     <button
-                      onClick={() => setQuantity((q) => q + 1)}
+                      onClick={() => {
+                        if (availableStock === null || availableStock < 1) return;
+                        setQuantity((q) => Math.min(q + 1, availableStock));
+                      }}
+                      disabled={
+                        isStockLoading ||
+                        availableStock === null ||
+                        availableStock < 1 ||
+                        quantity >= availableStock
+                      }
                       className="px-3.5 py-2 hover:bg-[#A68D65]/10 text-[#33381C] transition-colors"
                       aria-label="Increase quantity"
                     >
                       <Plus className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  <span className="text-xs text-[#1D1E19]/50">In Stock / Ready to Ship</span>
+                  <span className="text-xs text-[#1D1E19]/50">
+                    {isStockLoading
+                      ? 'Checking availability...'
+                      : availableStock === null
+                        ? 'Stock unavailable'
+                        : availableStock < 1
+                          ? 'Out of Stock'
+                          : 'In Stock / Ready to Ship'}
+                  </span>
                 </div>
 
                 <button
                   onClick={handleAddToCart}
+                  disabled={isStockLoading || availableStock === null || availableStock < 1}
                   className="w-full flex items-center justify-center rounded-xl bg-[#33381C] hover:bg-[#262A14] text-[#F7EEE4] py-3.5 font-semibold transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
                 >
                   <ShoppingCart className="h-4 w-4 mr-2" />
-                  Add to Cart • ₹{(product.price * quantity).toFixed(2)}
+                  {availableStock === 0
+                    ? 'Out of Stock'
+                    : `Add to Cart • ₹${(product.price * quantity).toFixed(2)}`}
                 </button>
               </div>
             </div>

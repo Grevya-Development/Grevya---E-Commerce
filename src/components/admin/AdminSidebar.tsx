@@ -45,11 +45,6 @@ const managementLinks = [
     path: "/admin/return-refund-requests",
   },
   {
-    label: "Return / Refund Requests",
-    icon: RotateCcw,
-    path: "/admin/return-refund-requests",
-  },
-  {
     label: "Product Requests",
     icon: ClipboardCheck,
     path: "/admin/product-requests",

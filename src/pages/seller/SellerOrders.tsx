@@ -19,6 +19,7 @@ import {
 import SellerLayout from "@/layouts/SellerLayout";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
+import { sendOrderShippedEmail } from "@/lib/orderService";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1071,6 +1072,10 @@ export default function SellerOrders() {
         throw updateError;
       }
 
+      if (updatePayload.status === "shipped") {
+        await sendOrderShippedEmail(selectedOrder.id);
+      }
+
 
       /* -----------------------------------------------------
          UPDATE LOCAL STATE
@@ -1209,6 +1214,10 @@ export default function SellerOrders() {
 
       if (updateError) {
         throw updateError;
+      }
+
+      if (normalized === "shipped") {
+        await sendOrderShippedEmail(selectedOrder.id);
       }
 
 
