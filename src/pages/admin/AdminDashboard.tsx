@@ -164,13 +164,13 @@ export default function AdminDashboard() {
 
         {/* Operational Alerts / Attention required */}
         {!loading && stats.pendingProducts > 0 && (
-          <div className="flex items-start gap-4 p-5 bg-amber-50/50 border border-amber-200/60 rounded-3xl animate-fade-in">
-            <div className="p-3 bg-amber-100 rounded-2xl text-amber-700">
+          <div className="flex flex-col items-start gap-4 p-5 bg-amber-50/50 border border-amber-200/60 rounded-3xl animate-fade-in sm:flex-row sm:items-center">
+            <div className="shrink-0 p-3 bg-amber-100 rounded-2xl text-amber-700">
               <AlertTriangle size={20} />
             </div>
-            <div className="flex-1 space-y-1">
+            <div className="min-w-0 flex-1 space-y-1">
               <h3 className="font-serif font-bold text-neutral-800 text-sm">
-                Attention Required: Pending Vendor Request Requests
+                Attention Required: Pending Product Requests
               </h3>
               <p className="text-neutral-500 text-xs">
                 There are currently{" "}
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
             </div>
             <button
               onClick={() => navigate("/admin/product-requests")}
-              className="flex items-center gap-1.5 text-xs font-bold text-[#33381C] hover:text-[#33381C]/80 border border-[#33381C]/25 bg-white px-4.5 py-2 rounded-2xl transition-all shadow-2xs self-center"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-bold text-[#33381C] hover:text-[#33381C]/80 border border-[#33381C]/25 bg-white px-4 py-2 rounded-2xl transition-all shadow-2xs sm:self-center"
             >
               <span>Review Requests</span>
               <ArrowUpRight size={14} />

@@ -903,7 +903,7 @@ export default function AdminSellerApplications() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
             {filteredApplications.map((application) => {
               const bank = application.bank_details || {};
 
@@ -971,18 +971,20 @@ export default function AdminSellerApplications() {
                     <Button
                       variant="outline"
                       onClick={() => void fetchApplicationDetails(application)}
-                      className="flex-1 border-[#D8E3F4] bg-[#F3F7FD] text-[#41658F] hover:bg-[#E9F0FA]"
+                      size="sm"
+                      className="min-w-0 flex-1 gap-1.5 px-2 border-[#D8E3F4] bg-[#F3F7FD] text-[#41658F] hover:bg-[#E9F0FA]"
                     >
-                      <Eye className="mr-2 h-4 w-4" />
+                      <Eye className="h-4 w-4" />
                       View
                     </Button>
 
                     <Button
                       onClick={() => void approveApplication(application)}
                       disabled={actionLoading === application.id}
-                      className="flex-1 bg-[#59632F] text-white hover:bg-[#33381C]"
+                      size="sm"
+                      className="min-w-0 flex-1 gap-1.5 px-2 bg-[#59632F] text-white hover:bg-[#33381C]"
                     >
-                      <CheckCircle className="mr-2 h-4 w-4" />
+                      <CheckCircle className="h-4 w-4" />
                       Approve
                     </Button>
 
@@ -990,8 +992,10 @@ export default function AdminSellerApplications() {
                       variant="destructive"
                       onClick={() => openRejectDialog(application)}
                       disabled={actionLoading === application.id}
+                      size="sm"
+                      className="min-w-0 flex-1 gap-1.5 px-2"
                     >
-                      <XCircle className="mr-2 h-4 w-4" />
+                      <XCircle className="h-4 w-4" />
                       Reject
                     </Button>
                   </div>

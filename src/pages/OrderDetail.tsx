@@ -16,6 +16,25 @@ const statuses = [
   "out_for_delivery",
   "delivered",
 ];
+
+const deduplicateHistory = <
+  T extends { status: string; created_at: string; notes?: string | null },
+>(
+  entries: T[],
+): T[] => {
+  const uniqueEntries = new Map<string, T>();
+
+  entries.forEach((entry) => {
+    const key = JSON.stringify([entry.status, entry.created_at]);
+    const existing = uniqueEntries.get(key);
+    if (!existing || (!existing.notes && entry.notes)) {
+      uniqueEntries.set(key, entry);
+    }
+  });
+
+  return Array.from(uniqueEntries.values());
+};
+
 const OrderDetail = () => {
   const { id } = useParams();
   const { user } = useAuth();
@@ -49,7 +68,7 @@ const OrderDetail = () => {
         if (!error && data) {
           setOrder({
             ...data,
-            history: historyData || [],
+            history: deduplicateHistory(historyData || []),
           });
         }
       } catch (err) {

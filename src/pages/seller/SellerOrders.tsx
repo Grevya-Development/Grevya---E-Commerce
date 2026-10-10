@@ -78,7 +78,7 @@ interface Profile {
 }
 
 interface StatusHistoryItem {
-  id: number;
+  id: string;
   order_id: string;
   status: string;
   created_at: string;
@@ -168,6 +168,16 @@ const formatStatus = (status?: string | null) => {
     .replace(/_/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
+
+const deduplicateConsecutiveStatuses = (
+  entries: StatusHistoryItem[],
+): StatusHistoryItem[] =>
+  entries.filter(
+    (entry, index) =>
+      index === 0 ||
+      normalizeStatus(entry.status) !==
+        normalizeStatus(entries[index - 1].status),
+  );
 
 
 const getNextStatus = (status?: string | null) => {
@@ -945,8 +955,9 @@ export default function SellerOrders() {
 
 
       setStatusHistory(
-        (data as StatusHistoryItem[]) ||
-          [],
+        deduplicateConsecutiveStatuses(
+          (data as StatusHistoryItem[]) || [],
+        ),
       );
 
       setStatusHistoryOpen(true);

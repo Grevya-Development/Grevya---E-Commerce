@@ -378,7 +378,8 @@ export default function AdminNotifications() {
     filterType !== "all" ||
     filterRead !== "all" ||
     filterDate !== "all" ||
-    Boolean(customDateRange?.from);
+    Boolean(customDateRange?.from) ||
+    sortOrder !== "newest";
   const selectedPresentation = selectedNotification
     ? getNotificationPresentation(selectedNotification.type)
     : null;
@@ -790,8 +791,8 @@ export default function AdminNotifications() {
         </div>
 
         <div className="mb-6 rounded-2xl border border-[#e7e8de] bg-white p-3 shadow-[0_8px_30px_rgba(48,58,24,0.04)] sm:p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <label className="relative block">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="relative block min-w-0 flex-[1_1_16rem]">
               <Search
                 size={17}
                 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -802,7 +803,7 @@ export default function AdminNotifications() {
                 onChange={(event) => setSearch(event.target.value)}
                 aria-label="Search notifications"
                 placeholder="Search notifications..."
-                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-[#aab77a] focus:bg-white focus:ring-2 focus:ring-[#edf1dd] lg:w-72"
+                className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-sm text-slate-900 outline-none transition focus:border-[#aab77a] focus:bg-white focus:ring-2 focus:ring-[#edf1dd]"
               />
             </label>
 
@@ -817,7 +818,7 @@ export default function AdminNotifications() {
             <select
               value={filterType}
               onChange={(event) => setFilterType(event.target.value)}
-              className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+              className="h-11 min-w-0 max-w-full flex-[1_1_8rem] rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100 sm:flex-none"
             >
               <option value="all">All Types</option>
               {notificationTypes.map((type) => (
@@ -840,7 +841,7 @@ export default function AdminNotifications() {
                     setIsCustomCalendarOpen(value === "custom");
                     if (value !== "custom") setCustomDateRange(undefined);
                   }}
-                  className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                  className="h-11 min-w-0 max-w-full flex-[1_1_8rem] rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100 sm:flex-none"
                 >
                   <option value="all">All Dates</option>
                   <option value="today">Today</option>
@@ -879,7 +880,7 @@ export default function AdminNotifications() {
               value={sortOrder}
               onChange={(event) => setSortOrder(event.target.value as SortOrder)}
               aria-label="Sort notifications"
-              className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+              className="h-11 min-w-0 max-w-full flex-[1_1_8rem] rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100 sm:flex-none"
             >
               <option value="newest">Newest</option>
               <option value="oldest">Oldest</option>
@@ -888,7 +889,7 @@ export default function AdminNotifications() {
             <button
               type="button"
               onClick={markFilteredAsRead}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+              className="inline-flex h-11 max-w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
             >
               <CheckCircle2 size={17} />
               Mark Read
@@ -898,7 +899,7 @@ export default function AdminNotifications() {
               type="button"
               onClick={resetFilters}
               disabled={!hasActiveFilters}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-11 max-w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Filter size={17} />
               Reset

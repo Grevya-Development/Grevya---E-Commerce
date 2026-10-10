@@ -334,6 +334,18 @@ const AppContent = () => {
               />
 
               <Route
+                path="/seller/analytics"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["seller"]}
+                    loginPath="/seller/login"
+                  >
+                    <SellerDashboard />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/seller/add-product"
                 element={
                   <ProtectedRoute
