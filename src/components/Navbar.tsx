@@ -476,7 +476,7 @@ const Navbar = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <NotificationBell />
+            {windowWidth >= 768 && <NotificationBell />}
 
             {!isAdminOrSeller && (
               <Link to="/cart" className="relative animate-fade-in">
@@ -497,7 +497,7 @@ const Navbar = () => {
           </div>
 
           <div className="flex md:hidden items-center space-x-3">
-            <NotificationBell />
+            {windowWidth < 768 && <NotificationBell />}
 
             {!isAdminOrSeller && (
               <Link to="/cart" className="relative">
