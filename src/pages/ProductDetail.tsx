@@ -24,6 +24,8 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { getProductStockDetails, SellableVariant } from "@/lib/stock";
 import { useComparisonStore } from "@/store/useComparisonStore";
+import { useRecentlyViewedStore } from "@/store/useRecentlyViewedStore";
+import RecentlyViewedProducts from "@/components/RecentlyViewedProducts";
 
 interface Review {
   id: string;
@@ -68,6 +70,9 @@ const ProductDetail = () => {
   const addComparisonProduct = useComparisonStore((state) => state.addProduct);
   const removeComparisonProduct = useComparisonStore(
     (state) => state.removeProduct,
+  );
+  const recordProductView = useRecentlyViewedStore(
+    (state) => state.recordProductView,
   );
 
   const [product, setProduct] = useState<ProductDetailRecord | null>(null);
@@ -171,6 +176,7 @@ const ProductDetail = () => {
           return;
         }
 
+        recordProductView(matchedProduct.id);
         setProduct(matchedProduct);
         setLoading(false);
 
@@ -200,7 +206,7 @@ const ProductDetail = () => {
     };
 
     if (slug) fetchProduct();
-  }, [category, productIdFromState, slug]);
+  }, [category, productIdFromState, recordProductView, slug]);
 
   useEffect(() => {
     let cancelled = false;
@@ -642,6 +648,8 @@ const ProductDetail = () => {
               </div>
             </motion.div>
           </div>
+
+          <RecentlyViewedProducts excludeProductId={product.id} />
 
           {/* Reviews Section */}
           <div className="mt-24 pt-16 border-t border-neutral-200">
