@@ -12,6 +12,8 @@ import {
   ShieldCheck,
   RefreshCw,
   Lock,
+  ArrowLeftRight,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
@@ -21,6 +23,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { getProductStockDetails, SellableVariant } from "@/lib/stock";
+import { useComparisonStore } from "@/store/useComparisonStore";
 
 interface Review {
   id: string;
@@ -62,8 +65,15 @@ const ProductDetail = () => {
   const [quantity, setQuantity] = useState(1);
   const addItem = useCartStore((state) => state.addItem);
   const cartItems = useCartStore((state) => state.items);
+  const addComparisonProduct = useComparisonStore((state) => state.addProduct);
+  const removeComparisonProduct = useComparisonStore(
+    (state) => state.removeProduct,
+  );
 
   const [product, setProduct] = useState<ProductDetailRecord | null>(null);
+  const isCompared = useComparisonStore((state) =>
+    state.selectedIds.includes(product?.id ?? -1),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [variants, setVariants] = useState<SellableVariant[]>([]);
@@ -292,6 +302,38 @@ const ProductDetail = () => {
     }
   };
 
+  const toggleComparison = () => {
+    if (!product) return;
+    if (isCompared) {
+      removeComparisonProduct(product.id);
+      toast({
+        title: "Removed from comparison",
+        description: `${product.name} has been removed from your comparison.`,
+      });
+      return;
+    }
+
+    const result = addComparisonProduct(product.id);
+    if (result === "limit-reached") {
+      toast({
+        title: "Comparison is full",
+        description:
+          "You can compare up to 3 products. Remove one to add another.",
+        variant: "destructive",
+      });
+    } else if (result === "already-selected") {
+      toast({
+        title: "Already selected",
+        description: `${product.name} is already in your comparison.`,
+      });
+    } else {
+      toast({
+        title: "Added to comparison",
+        description: `${product.name} added. Select up to 3 products to compare.`,
+      });
+    }
+  };
+
   const submitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
@@ -481,6 +523,27 @@ const ProductDetail = () => {
               <p className="text-4xl md:text-5xl font-extrabold text-green-800 mb-8 tracking-tighter">
                 ₹{product.price}
               </p>
+
+              <button
+                type="button"
+                onClick={toggleComparison}
+                aria-pressed={isCompared}
+                aria-label={`${isCompared ? "Remove" : "Add"} ${
+                  product.name
+                } ${isCompared ? "from" : "to"} comparison`}
+                className={`mb-8 inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-800 ${
+                  isCompared
+                    ? "border-green-800 bg-green-50 text-green-900"
+                    : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+                }`}
+              >
+                {isCompared ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <ArrowLeftRight className="h-4 w-4" />
+                )}
+                {isCompared ? "Added to comparison" : "Compare this product"}
+              </button>
 
               <div className="prose prose-lg text-neutral-600 mb-10 leading-relaxed max-w-none">
                 <p>{product.description}</p>
