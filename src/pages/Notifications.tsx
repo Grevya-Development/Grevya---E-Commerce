@@ -66,11 +66,13 @@ export default function Notifications() {
     // not yet been enabled in Supabase. Postgres Changes remains the instant
     // path below; this is a reliable no-refresh fallback.
     const refreshInterval = window.setInterval(() => {
-      fetchNotifications();
-    }, 2_000);
+      if (document.visibilityState === "visible") {
+        fetchNotifications();
+      }
+    }, 30_000);
 
     return () => window.clearInterval(refreshInterval);
-  }, [authLoading, profile]);
+  }, [authLoading, profile?.id]);
 
   useEffect(() => {
     if (!profile?.id) return;

@@ -14,13 +14,14 @@ import SpotlightSearch from "@/components/SpotlightSearch";
 import QuickViewModal from "@/components/QuickViewModal";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import ScrollToTop from "@/components/ScrollToTop";
-import ScrollToTop from "@/components/ScrollToTop";
+import ComparisonSelectionBar from "@/components/ComparisonSelectionBar";
 
 // Lazy-loaded pages
 const Index = lazy(() => import("./pages/Index"));
 const About = lazy(() => import("./pages/About"));
 const Products = lazy(() => import("./pages/Products"));
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
+const ProductComparison = lazy(() => import("./pages/ProductComparison"));
 const Cart = lazy(() => import("./pages/Cart"));
 const Contact = lazy(() => import("./pages/Contact"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -79,7 +80,6 @@ const AppContent = () => {
   return (
     <>
       <ScrollToTop />
-      <ScrollToTop />
       <MemberBenefitsBar />
       <SpotlightSearch />
       <QuickViewModal />
@@ -108,6 +108,7 @@ const AppContent = () => {
                 path="/products/:category/:slug"
                 element={<ProductDetail />}
               />
+              <Route path="/compare" element={<ProductComparison />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
@@ -336,6 +337,18 @@ const AppContent = () => {
               />
 
               <Route
+                path="/seller/analytics"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["seller"]}
+                    loginPath="/seller/login"
+                  >
+                    <SellerDashboard />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/seller/add-product"
                 element={
                   <ProtectedRoute
@@ -401,6 +414,7 @@ const AppContent = () => {
           </motion.div>
         </AnimatePresence>
       </Suspense>
+      <ComparisonSelectionBar />
       <MobileBottomNav />
     </>
   );

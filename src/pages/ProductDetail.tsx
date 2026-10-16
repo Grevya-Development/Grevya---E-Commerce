@@ -12,6 +12,8 @@ import {
   ShieldCheck,
   RefreshCw,
   Lock,
+  ArrowLeftRight,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
@@ -21,6 +23,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { getProductStockDetails, SellableVariant } from "@/lib/stock";
+import { useComparisonStore } from "@/store/useComparisonStore";
+import { useRecentlyViewedStore } from "@/store/useRecentlyViewedStore";
+import RecentlyViewedProducts from "@/components/RecentlyViewedProducts";
 
 interface Review {
   id: string;
@@ -29,24 +34,51 @@ interface Review {
   comment: string;
   created_at: string;
   user_id: string | null;
+  is_verified_purchase: boolean;
   profiles: {
     username: string | null;
     full_name: string | null;
   } | null;
 }
 
+interface ProductDetailRecord {
+  id: number;
+  name: string;
+  price: number;
+  description?: string | null;
+  stock?: number | null;
+  category?: string | null;
+  image_url?: string | null;
+  image?: string | null;
+  rating?: number | null;
+  variant_id?: string | null;
+  sku?: string | null;
+}
+
 const getReviewerName = (review: Review) =>
   review.profiles?.username || review.profiles?.full_name || "Anonymous";
 
 const ProductDetail = () => {
-  const { slug } = useParams();
+  const { category, slug } = useParams();
   const location = useLocation();
   const { user } = useAuth();
+  const productIdFromState = (location.state as { productId?: number } | null)
+    ?.productId;
   const [quantity, setQuantity] = useState(1);
   const addItem = useCartStore((state) => state.addItem);
   const cartItems = useCartStore((state) => state.items);
+  const addComparisonProduct = useComparisonStore((state) => state.addProduct);
+  const removeComparisonProduct = useComparisonStore(
+    (state) => state.removeProduct,
+  );
+  const recordProductView = useRecentlyViewedStore(
+    (state) => state.recordProductView,
+  );
 
-  const [product, setProduct] = useState<any>(null);
+  const [product, setProduct] = useState<ProductDetailRecord | null>(null);
+  const isCompared = useComparisonStore((state) =>
+    state.selectedIds.includes(product?.id ?? -1),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [variants, setVariants] = useState<SellableVariant[]>([]);
@@ -60,6 +92,8 @@ const ProductDetail = () => {
   const [newRating, setNewRating] = useState(5);
   const [newComment, setNewComment] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [canReview, setCanReview] = useState<boolean | null>(null);
+  const [reviewEligibilityError, setReviewEligibilityError] = useState(false);
 
   // Fetch reviews logic abstracted so we can re-call it after submitting
   const fetchReviews = async (productId: string) => {
@@ -67,7 +101,7 @@ const ProductDetail = () => {
       const { data: revData, error: revError } = await supabase
         .from("reviews")
         .select(
-          "id, product_id, rating, comment, created_at, user_id, profiles(username, full_name)",
+          "id, product_id, rating, comment, created_at, user_id, is_verified_purchase, profiles(username, full_name)",
         )
         .eq("product_id", productId)
         .order("created_at", { ascending: false });
@@ -75,11 +109,17 @@ const ProductDetail = () => {
       if (revError && !(revError.message || "").includes("relation")) {
         console.error("Reviews fetch error:", revError);
       } else if (revData) {
+        const nextAverage =
+          revData.length > 0
+            ? Math.round(
+                (revData.reduce((acc, curr) => acc + curr.rating, 0) /
+                  revData.length) *
+                  10,
+              ) / 10
+            : 0;
+
         setReviews(revData as Review[]);
-        if (revData.length > 0) {
-          const sum = revData.reduce((acc, curr) => acc + curr.rating, 0);
-          setAverageRating(Math.round((sum / revData.length) * 10) / 10);
-        }
+        setAverageRating(nextAverage);
       }
     } catch (e) {
       console.warn("Reviews logic fallback triggered", e);
@@ -90,35 +130,115 @@ const ProductDetail = () => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
+        setError(null);
+        setProduct(null);
+        setReviews([]);
+        setAverageRating(0);
 
-        const formattedName = slug?.replace(/-/g, " ")?.toLowerCase()?.trim();
+        const normalizedSlug = (slug ?? "")
+          .replace(/-/g, " ")
+          .trim()
+          .toLowerCase();
+        const normalizedCategory = (category ?? "").trim();
 
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .ilike("name", `%${formattedName}%`);
+        let matchedProduct: ProductDetailRecord | null = null;
 
-        if (error) throw error;
+        if (productIdFromState) {
+          const { data, error: productError } = await supabase
+            .from("products")
+            .select("*")
+            .eq("id", productIdFromState)
+            .maybeSingle();
 
-        const matchedProduct = data && data.length > 0 ? data[0] : null;
-        setProduct(matchedProduct);
+          if (productError) throw productError;
+          matchedProduct = (data as ProductDetailRecord | null) ?? null;
+        } else {
+          let productQuery = supabase.from("products").select("*");
 
-        if (matchedProduct) {
-          const stockDetails = await getProductStockDetails(matchedProduct.id);
-          setVariants(stockDetails.variants);
-          setSelectedVariantId(stockDetails.variants[0]?.id);
-          await fetchReviews(matchedProduct.id);
+          if (normalizedCategory) {
+            productQuery = productQuery.eq("category", normalizedCategory);
+          }
+
+          if (normalizedSlug) {
+            productQuery = productQuery.ilike("name", normalizedSlug);
+          }
+
+          const { data, error: productError } = await productQuery.limit(1);
+          if (productError) throw productError;
+
+          matchedProduct =
+            data && data.length > 0 ? (data[0] as ProductDetailRecord) : null;
         }
-      } catch (err: any) {
+
+        if (!matchedProduct) {
+          setError("Product not found.");
+          setLoading(false);
+          return;
+        }
+
+        recordProductView(matchedProduct.id);
+        setProduct(matchedProduct);
+        setLoading(false);
+
+        void getProductStockDetails(matchedProduct.id)
+          .then((stockDetails) => {
+            setVariants(stockDetails.variants);
+            setSelectedVariantId(stockDetails.variants[0]?.id);
+          })
+          .catch((stockError) => {
+            console.error("Stock fetch error:", stockError);
+            setVariants([]);
+            setSelectedVariantId(undefined);
+          });
+
+        void fetchReviews(String(matchedProduct.id)).catch((reviewError) => {
+          console.error("Reviews fetch error:", reviewError);
+        });
+      } catch (err: unknown) {
         console.error("Error fetching product details:", err);
-        setError(err.message);
-      } finally {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Could not load product details.";
+        setError(message);
         setLoading(false);
       }
     };
 
     if (slug) fetchProduct();
-  }, [slug]);
+  }, [category, productIdFromState, recordProductView, slug]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkReviewEligibility = async () => {
+      if (!user || !product?.id) {
+        setCanReview(false);
+        setReviewEligibilityError(false);
+        return;
+      }
+
+      setCanReview(null);
+      setReviewEligibilityError(false);
+      const { data, error: eligibilityError } = await supabase.rpc(
+        "can_review_product",
+        { p_product_id: product.id },
+      );
+
+      if (eligibilityError) {
+        console.error("Review eligibility check failed:", eligibilityError);
+      }
+      if (!cancelled) {
+        setReviewEligibilityError(Boolean(eligibilityError));
+        setCanReview(!eligibilityError && data === true);
+      }
+    };
+
+    void checkReviewEligibility();
+    return () => {
+      cancelled = true;
+    };
+  }, [product?.id, user]);
 
   const selectedVariant = variants.find(
     (variant) => variant.id === selectedVariantId,
@@ -188,8 +308,56 @@ const ProductDetail = () => {
     }
   };
 
+  const toggleComparison = () => {
+    if (!product) return;
+    if (isCompared) {
+      removeComparisonProduct(product.id);
+      toast({
+        title: "Removed from comparison",
+        description: `${product.name} has been removed from your comparison.`,
+      });
+      return;
+    }
+
+    const result = addComparisonProduct(product.id);
+    if (result === "limit-reached") {
+      toast({
+        title: "Comparison is full",
+        description:
+          "You can compare up to 3 products. Remove one to add another.",
+        variant: "destructive",
+      });
+    } else if (result === "already-selected") {
+      toast({
+        title: "Already selected",
+        description: `${product.name} is already in your comparison.`,
+      });
+    } else {
+      toast({
+        title: "Added to comparison",
+        description: `${product.name} added. Select up to 3 products to compare.`,
+      });
+    }
+  };
+
   const submitReview = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to write a review.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!canReview) {
+      toast({
+        title: "Purchase required",
+        description: "Purchase this product to write a review.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!product || !newComment.trim()) return;
 
     try {
@@ -211,11 +379,16 @@ const ProductDetail = () => {
       setNewRating(5);
 
       await fetchReviews(product.id);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to submit review:", err);
+      const message =
+        err instanceof Error &&
+        err.message === "You can review this product only after purchasing it."
+          ? err.message
+          : "Could not submit your review. Please try again later.";
       toast({
         title: "Submission failed",
-        description: "Could not submit your review. Please try again later.",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -357,6 +530,27 @@ const ProductDetail = () => {
                 ₹{product.price}
               </p>
 
+              <button
+                type="button"
+                onClick={toggleComparison}
+                aria-pressed={isCompared}
+                aria-label={`${isCompared ? "Remove" : "Add"} ${
+                  product.name
+                } ${isCompared ? "from" : "to"} comparison`}
+                className={`mb-8 inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-800 ${
+                  isCompared
+                    ? "border-green-800 bg-green-50 text-green-900"
+                    : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+                }`}
+              >
+                {isCompared ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <ArrowLeftRight className="h-4 w-4" />
+                )}
+                {isCompared ? "Added to comparison" : "Compare this product"}
+              </button>
+
               <div className="prose prose-lg text-neutral-600 mb-10 leading-relaxed max-w-none">
                 <p>{product.description}</p>
               </div>
@@ -455,6 +649,8 @@ const ProductDetail = () => {
             </motion.div>
           </div>
 
+          <RecentlyViewedProducts excludeProductId={product.id} />
+
           {/* Reviews Section */}
           <div className="mt-24 pt-16 border-t border-neutral-200">
             <h2 className="text-3xl md:text-4xl font-extrabold text-neutral-900 mb-12 tracking-tight">
@@ -468,7 +664,7 @@ const ProductDetail = () => {
                   <h3 className="text-2xl font-bold text-neutral-900 mb-6">
                     Write a Review
                   </h3>
-                  {user ? (
+                  {user && canReview ? (
                     <form onSubmit={submitReview}>
                       <div className="mb-6">
                         <label className="block text-sm font-bold text-neutral-700 mb-3">
@@ -524,6 +720,19 @@ const ProductDetail = () => {
                         {isSubmittingReview ? "Submitting..." : "Submit Review"}
                       </Button>
                     </form>
+                  ) : user ? (
+                    <div className="text-center py-6">
+                      <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-neutral-100">
+                        <Lock className="w-6 h-6 text-neutral-400" />
+                      </div>
+                      <p className="text-neutral-600 text-sm leading-relaxed">
+                        {canReview === null
+                          ? "Checking your purchase history..."
+                          : reviewEligibilityError
+                            ? "We could not verify your purchase right now. Please refresh and try again."
+                            : "Purchase this product to write a review."}
+                      </p>
+                    </div>
                   ) : (
                     <div className="text-center py-6">
                       <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-neutral-100">
@@ -573,6 +782,11 @@ const ProductDetail = () => {
                           <p className="text-sm font-extrabold text-neutral-800 mb-1.5">
                             {getReviewerName(review)}
                           </p>
+                          {review.is_verified_purchase && (
+                            <p className="mb-1.5 text-xs font-bold text-green-700">
+                              Verified Purchase
+                            </p>
+                          )}
                           <div className="flex items-center gap-3">
                             <div className="flex">
                               {[...Array(5)].map((_, i) => (

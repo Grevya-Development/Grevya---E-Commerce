@@ -1,8 +1,17 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Star, ShoppingCart, Heart, Eye, Leaf } from "lucide-react";
+import {
+  Star,
+  ShoppingCart,
+  Heart,
+  Eye,
+  Leaf,
+  ArrowLeftRight,
+  Check,
+} from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { useWishlistStore } from "@/store/useWishlistStore";
+import { useComparisonStore } from "@/store/useComparisonStore";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
@@ -42,6 +51,13 @@ const ProductCard = (props: ProductProps) => {
     image_secondary,
   } = props;
   const addItem = useCartStore((state) => state.addItem);
+  const addComparisonProduct = useComparisonStore((state) => state.addProduct);
+  const removeComparisonProduct = useComparisonStore(
+    (state) => state.removeProduct,
+  );
+  const isCompared = useComparisonStore((state) =>
+    state.selectedIds.includes(id),
+  );
   const { toggleWishlist, isInWishlist } = useWishlistStore();
   const isWishlisted = isInWishlist(id);
 
@@ -82,6 +98,38 @@ const ProductCard = (props: ProductProps) => {
       title: "Added to cart",
       description: `${name} added to your cart`,
     });
+  };
+
+  const toggleComparison = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isCompared) {
+      removeComparisonProduct(id);
+      toast({
+        title: "Removed from comparison",
+        description: `${name} has been removed from your comparison.`,
+      });
+      return;
+    }
+
+    const result = addComparisonProduct(id);
+    if (result === "limit-reached") {
+      toast({
+        title: "Comparison is full",
+        description: "You can compare up to 3 products. Remove one to add another.",
+        variant: "destructive",
+      });
+    } else if (result === "already-selected") {
+      toast({
+        title: "Already selected",
+        description: `${name} is already in your comparison.`,
+      });
+    } else {
+      toast({
+        title: "Added to comparison",
+        description: `${name} added. Select up to 3 products to compare.`,
+      });
+    }
   };
 
   const { user, loading: authLoading } = useAuth();
@@ -162,6 +210,7 @@ const ProductCard = (props: ProductProps) => {
         {/* Product image with zoom transitions */}
         <Link
           to={`/products/${category}/${slug}`}
+          state={{ productId: id }}
           onClick={saveProductsScrollPosition}
           className="block w-full h-full"
         >
@@ -266,6 +315,7 @@ const ProductCard = (props: ProductProps) => {
       <div className="p-2.5 sm:p-3 md:p-4 flex flex-col flex-grow bg-white/40">
         <Link
           to={`/products/${category}/${slug}`}
+          state={{ productId: id }}
           onClick={saveProductsScrollPosition}
           className="block mb-auto"
         >
@@ -337,6 +387,26 @@ const ProductCard = (props: ProductProps) => {
             <span>Add to Cart</span>
           </button>
         </div>
+        <button
+          type="button"
+          onClick={toggleComparison}
+          aria-pressed={isCompared}
+          aria-label={`${isCompared ? "Remove" : "Add"} ${name} ${
+            isCompared ? "from" : "to"
+          } comparison`}
+          className={`mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-bold transition-colors sm:text-xs ${
+            isCompared
+              ? "border-[#33381C] bg-[#33381C]/5 text-[#33381C]"
+              : "border-[#A68D65]/35 bg-white/70 text-[#33381C] hover:bg-[#F7EEE4]"
+          }`}
+        >
+          {isCompared ? (
+            <Check className="h-3.5 w-3.5" />
+          ) : (
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+          )}
+          {isCompared ? "Added to compare" : "Compare"}
+        </button>
       </div>
     </motion.div>
   );

@@ -14,6 +14,11 @@ Use this checklist in the Supabase dashboard before deployment.
   - `http://localhost:8080/auth`
   - `http://localhost:8080/login`
   - Production equivalents for each route.
+- Password recovery emails redirect to `/reset-password`. Ensure the deployed
+  origin is listed as a Redirect URL and `VITE_APP_SITE_URL` is set to that
+  origin (for example, `https://shop.example.com`, without a trailing slash).
+  Keep the Supabase password recovery email template's confirmation link intact
+  so Supabase can validate the recovery token before returning to the app.
 - Enable Google OAuth and Apple OAuth only after adding their client IDs/secrets in Supabase.
 - Use the same callback URL Supabase shows for each OAuth provider.
 

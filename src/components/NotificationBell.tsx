@@ -135,8 +135,10 @@ const NotificationBell = () => {
     // enabled for the notifications table. This keeps the bell badge current
     // everywhere in the app without a browser refresh.
     const refreshInterval = window.setInterval(() => {
-      fetchNotifications();
-    }, 2_000);
+      if (document.visibilityState === "visible") {
+        fetchNotifications();
+      }
+    }, 30_000);
 
     let channel: any = null;
 

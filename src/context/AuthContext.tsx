@@ -22,7 +22,7 @@ export interface UserProfile {
   avatar_url: string | null;
   phone: string | null;
   email: string | null;
-  preferences: Record<string, any> | null;
+  preferences: Record<string, unknown> | null;
   role?: string | null;
   status?: string | null;
   is_active?: boolean;
@@ -67,7 +67,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       useWishlistStore.getState().syncUserSession(null);
       toast({
         title: "Account blocked",
-        description: "Your account has been blocked. Please contact the administrator.",
+        description:
+          "Your account has been blocked. Please contact the administrator.",
         variant: "destructive",
       });
       navigate("/login", { replace: true });
@@ -135,43 +136,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let mounted = true;
     let authSubscription: { unsubscribe: () => void } | null = null;
 
-    const initialize = async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!mounted) return;
-
-      const nextSession = sessionData.session;
+    const syncAuthState = (nextSession: Session | null) => {
+      const nextUser = nextSession?.user ?? null;
       setSession(nextSession);
-      setUser(nextSession?.user ?? null);
+      setUser(nextUser);
       setAuthLoading(false);
 
-      if (nextSession?.user) {
-        await loadProfile(nextSession.user);
+      if (nextUser) {
+        void loadProfile(nextUser);
       } else {
+        loadedUserIdRef.current = null;
         setProfile(null);
         setProfileLoading(false);
+        useCartStore.getState().syncUserSession(null);
+        useWishlistStore.getState().syncUserSession(null);
       }
+    };
 
+    const initialize = async () => {
       const { data: authData } = supabase.auth.onAuthStateChange(
         (_event, nextSession) => {
           if (!mounted) return;
-
-          const nextUser = nextSession?.user ?? null;
-          setSession(nextSession);
-          setUser(nextUser);
-          setAuthLoading(false);
-
-          if (nextUser) {
-            void loadProfile(nextUser);
-          } else {
-            loadedUserIdRef.current = null;
-            setProfile(null);
-            useCartStore.getState().syncUserSession(null);
-            useWishlistStore.getState().syncUserSession(null);
-          }
+          syncAuthState(nextSession);
         },
       );
 
       authSubscription = authData.subscription;
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      syncAuthState(sessionData.session);
+
+      if (!sessionData.session?.user) {
+        setProfile(null);
+        setProfileLoading(false);
+      }
     };
 
     void initialize();
@@ -208,7 +208,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       )
       .subscribe((status) => {
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.warn("[AuthContext] Profile realtime subscription unavailable.");
+          console.warn(
+            "[AuthContext] Profile realtime subscription unavailable.",
+          );
         }
       });
 

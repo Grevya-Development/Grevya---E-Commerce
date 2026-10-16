@@ -320,6 +320,10 @@ BEGIN
     END IF;
   END IF;
 
+  -- The history trigger handles direct updates. Suppress only its history
+  -- insert here because this RPC writes a richer audit row below.
+  PERFORM set_config('app.order_status_history_logged_by_rpc', 'true', true);
+
   -- Update the order
   UPDATE public.orders
   SET
@@ -329,6 +333,8 @@ BEGIN
     estimated_delivery = COALESCE(p_estimated_delivery, estimated_delivery),
     updated_at = now()
   WHERE id = p_order_id;
+
+  PERFORM set_config('app.order_status_history_logged_by_rpc', 'false', true);
 
   -- Create audit trail entry
   INSERT INTO public.order_status_history (

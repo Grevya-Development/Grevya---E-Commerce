@@ -33,6 +33,93 @@ export interface OrderWithHistory {
   history?: OrderStatusHistoryEntry[];
 }
 
+function deduplicateOrderStatusHistory(
+  entries: OrderStatusHistoryEntry[],
+): OrderStatusHistoryEntry[] {
+  const byTransition = new Map<string, OrderStatusHistoryEntry>();
+
+  entries.forEach((entry) => {
+    const key = JSON.stringify([
+      entry.status.toLowerCase(),
+      entry.created_at,
+    ]);
+    const existing = byTransition.get(key);
+    const noteQuality = (notes?: string | null) => {
+      const normalized = notes?.trim().toLowerCase();
+      if (!normalized) return 0;
+      return normalized === "status updated" ? 1 : 2;
+    };
+
+    if (!existing || noteQuality(entry.notes) > noteQuality(existing.notes)) {
+      byTransition.set(key, entry);
+    }
+  });
+
+  return Array.from(byTransition.values()).sort(
+    (left, right) =>
+      new Date(right.created_at).getTime() -
+      new Date(left.created_at).getTime(),
+  );
+}
+
+export async function sendOrderShippedEmail(orderId: string): Promise<void> {
+  try {
+    console.info("[ORDER EMAIL] Dispatching shipped email function.", {
+      orderId,
+    });
+
+    const { data, error } = await supabase.functions.invoke(
+      "order-confirmation",
+      { body: { orderId } },
+    );
+
+    if (error) {
+      let responseStatus: number | undefined;
+      let responseReason: string | undefined;
+      if ("context" in error && error.context instanceof Response) {
+        responseStatus = error.context.status;
+        const responseBody = await error.context
+          .clone()
+          .json()
+          .catch(() => undefined);
+        if (
+          responseBody &&
+          typeof responseBody === "object" &&
+          "reason" in responseBody &&
+          typeof responseBody.reason === "string"
+        ) {
+          responseReason = responseBody.reason;
+        }
+      }
+      console.error("[ORDER EMAIL] Edge Function request failed.", {
+        orderId,
+        errorName: error.name,
+        errorMessage: error.message,
+        responseStatus,
+        responseReason,
+      });
+      return;
+    }
+
+    if (data?.sent === true) {
+      console.info("[ORDER EMAIL] Edge Function confirmed email sent.", {
+        orderId,
+      });
+    } else {
+      console.warn("[ORDER EMAIL] Edge Function did not send email.", {
+        orderId,
+        reason:
+          typeof data?.reason === "string" ? data.reason : "unknown_reason",
+      });
+    }
+  } catch (error: unknown) {
+    console.error("[ORDER EMAIL] Edge Function invocation threw.", {
+      orderId,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 /**
  * Update order status with backend validation
  * This calls the RPC function which enforces all business rules
@@ -78,13 +165,25 @@ export async function updateOrderStatus(
     }
 
     const result = data[0];
-    return {
+    const updateResult = {
       success: result.success,
       message: result.message,
       order_id: result.order_id,
       new_order_status: result.new_order_status,
       new_payment_status: result.new_payment_status,
     };
+
+    if (
+      updateResult.success &&
+      updateResult.new_order_status?.toLowerCase() === "shipped"
+    ) {
+      console.info("[ORDER EMAIL] Shipped status update succeeded.", {
+        orderId,
+      });
+      await sendOrderShippedEmail(orderId);
+    }
+
+    return updateResult;
   } catch (err: any) {
     console.error("Error updating order status:", err);
     return {
@@ -133,15 +232,17 @@ export async function getOrderWithHistory(
     const mappedOrder: OrderWithHistory = {
       ...order,
       order_status: order.status,
-      history: (history || []).map((entry: any) => ({
-        id: entry.id,
-        order_id: entry.order_id,
-        status: entry.status,
-        notes: entry.notes,
-        changed_by: entry.changed_by,
-        changed_by_name: "Unknown",
-        created_at: entry.created_at,
-      })),
+      history: deduplicateOrderStatusHistory(
+        (history || []).map((entry: any) => ({
+          id: entry.id,
+          order_id: entry.order_id,
+          status: entry.status,
+          notes: entry.notes,
+          changed_by: entry.changed_by,
+          changed_by_name: "Unknown",
+          created_at: entry.created_at,
+        })),
+      ),
     };
 
     return mappedOrder;

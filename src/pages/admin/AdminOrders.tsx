@@ -1,34 +1,24 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  type KeyboardEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
+  AlertCircle,
+  ArrowRight,
   CheckCircle2,
+  ChevronRight,
   CircleDollarSign,
-  CalendarDays,
-  ClipboardCheck,
-  CreditCard,
-  Eye,
-  Filter,
-  Hash,
+  Download,
+  History,
   Mail,
   MapPin,
   Package,
   PackagePlus,
+  Phone,
   RefreshCw,
   Search,
-  SlidersHorizontal,
   Truck,
-  UserRound,
-  AlertCircle,
-  History,
+  X,
 } from "lucide-react";
 import AdminLayout from "@/layouts/AdminLayout";
 import { supabase } from "@/lib/supabaseClient";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -52,6 +42,10 @@ import {
   type OrderStatusHistoryEntry,
 } from "@/lib/orderStateMachine";
 import { updateOrderStatus, getOrderWithHistory } from "@/lib/orderService";
+
+/* -------------------------------------------------------------------------- */
+/*  Types                                                                      */
+/* -------------------------------------------------------------------------- */
 
 interface Order {
   id: string;
@@ -87,8 +81,15 @@ interface OrderItem {
   price?: number | null;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
 const formatCurrency = (value?: number | null) =>
-  `₹${Number(value || 0).toFixed(2)}`;
+  `₹${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 const formatDateInputValue = (value?: string | null) => {
   if (!value) return "";
@@ -101,26 +102,52 @@ const formatDateInputValue = (value?: string | null) => {
 const formatStatus = (value?: string | null) =>
   (value || "pending").replace(/_/g, " ");
 
-const getOrderStatusBadgeClass = (value?: string | null) => {
-  const status = (value || "pending").toLowerCase();
-  if (["delivered"].includes(status))
-    return "bg-emerald-100 text-emerald-700 hover:bg-emerald-100";
-  if (
-    ["shipped", "in_transit", "out_for_delivery", "processing"].includes(status)
-  )
-    return "bg-sky-100 text-sky-700 hover:bg-sky-100";
-  if (["cancelled", "refunded", "returned"].includes(status))
-    return "bg-rose-100 text-rose-700 hover:bg-rose-100";
-  return "bg-amber-100 text-amber-700 hover:bg-amber-100";
+const normalizeStatus = (value?: string | null) =>
+  (value || "pending").toLowerCase().replace(/[\s-]+/g, "_");
+
+const FULFILLMENT_STATUSES = [
+  "processing",
+  "shipped",
+  "in_transit",
+  "out_for_delivery",
+];
+
+const formatPaymentMethod = (value?: string | null) => {
+  if (!value) return "Payment method unavailable";
+  if (value.toLowerCase() === "cod") return "Cash on delivery";
+  const text = value.replace(/_/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
 };
 
-const getPaymentStatusBadgeClass = (value?: string | null) => {
-  const status = (value || "pending").toLowerCase();
-  if (["paid"].includes(status))
-    return "bg-emerald-100 text-emerald-700 hover:bg-emerald-100";
-  if (["failed", "refunded"].includes(status))
-    return "bg-rose-100 text-rose-700 hover:bg-rose-100";
-  return "bg-amber-100 text-amber-700 hover:bg-amber-100";
+const csvCell = (value: string | number | null | undefined) =>
+  `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+type Tone = "success" | "info" | "danger" | "warn";
+
+const TONES: Record<Tone, { dot: string; text: string; bg: string }> = {
+  success: {
+    dot: "bg-emerald-500",
+    text: "text-emerald-800",
+    bg: "bg-emerald-50",
+  },
+  info: { dot: "bg-sky-500", text: "text-sky-800", bg: "bg-sky-50" },
+  danger: { dot: "bg-rose-500", text: "text-rose-800", bg: "bg-rose-50" },
+  warn: { dot: "bg-amber-500", text: "text-amber-800", bg: "bg-amber-50" },
+};
+
+const getOrderTone = (value?: string | null): Tone => {
+  const status = normalizeStatus(value);
+  if (status === "delivered") return "success";
+  if (["confirmed", ...FULFILLMENT_STATUSES].includes(status)) return "info";
+  if (["cancelled", "refunded", "returned"].includes(status)) return "danger";
+  return "warn";
+};
+
+const getPaymentTone = (value?: string | null): Tone => {
+  const status = normalizeStatus(value);
+  if (status === "paid") return "success";
+  if (["failed", "refunded"].includes(status)) return "danger";
+  return "warn";
 };
 
 const getEffectivePaymentStatus = (order: Order): PaymentStatus => {
@@ -136,8 +163,56 @@ const getEffectivePaymentStatus = (order: Order): PaymentStatus => {
 
 const getShortOrderId = (id?: string | null) => {
   if (!id) return "—";
-  return `${id.slice(0, 8)}…`;
+  return id.slice(0, 8);
 };
+
+/* -------------------------------------------------------------------------- */
+/*  Small presentational pieces                                                */
+/* -------------------------------------------------------------------------- */
+
+function StatusPill({ label, tone }: { label: string; tone: Tone }) {
+  const t = TONES[tone];
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium capitalize ${t.bg} ${t.text}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${t.dot}`} />
+      {label}
+    </span>
+  );
+}
+
+function TransitionButton({
+  label,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="group inline-flex items-center gap-1.5 rounded-lg border border-[#E2DBCD] bg-white px-3 py-1.5 text-xs font-medium text-[#3F4723] transition hover:border-[#4D5528] hover:bg-[#4D5528] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A68D65] disabled:pointer-events-none disabled:opacity-50"
+    >
+      {label}
+      <ArrowRight className="h-3 w-3 opacity-60 transition group-hover:opacity-100" />
+    </button>
+  );
+}
+
+const fieldClass =
+  "w-full rounded-lg border border-[#E2DBCD] bg-white px-3 py-2 text-sm text-[#2B2F18] outline-none transition placeholder:text-[#B3AFA3] focus:border-[#A68D65] focus:ring-4 focus:ring-[#A68D65]/15";
+
+const surfaceClass =
+  "rounded-2xl border border-[#ECE6DA] bg-white shadow-[0_1px_2px_rgba(43,47,24,0.04)]";
+
+/* -------------------------------------------------------------------------- */
+/*  Page                                                                       */
+/* -------------------------------------------------------------------------- */
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -296,6 +371,7 @@ export default function AdminOrders() {
           getCustomer(order)?.phone || "",
           order.order_status || "",
           order.payment_status || "",
+          order.tracking_number || "",
         ]
           .join(" ")
           .toLowerCase()
@@ -303,11 +379,8 @@ export default function AdminOrders() {
       const matchesOrderStatus =
         orderStatusFilter === "all" ||
         (orderStatusFilter === "fulfillment"
-          ? ["processing", "shipped", "out for delivery"].includes(
-              (order.order_status || "").toLowerCase(),
-            )
-          : (order.order_status || "pending").toLowerCase() ===
-            orderStatusFilter);
+          ? FULFILLMENT_STATUSES.includes(normalizeStatus(order.order_status))
+          : normalizeStatus(order.order_status) === orderStatusFilter);
       const matchesPaymentStatus =
         paymentStatusFilter === "all" ||
         getEffectivePaymentStatus(order) === paymentStatusFilter;
@@ -478,19 +551,6 @@ export default function AdminOrders() {
   };
 
   const exportOrders = () => {
-    const rows = filteredOrders.map((order) => ({
-      id: order.id,
-      customer: getCustomerName(order),
-      email: getCustomer(order)?.email || "",
-      phone: getCustomer(order)?.phone || "",
-      payment_status: formatStatus(getEffectivePaymentStatus(order)),
-      order_status: formatStatus(order.order_status),
-      total_amount: formatCurrency(order.total_amount),
-      created_at: formatOrderDate(order.created_at),
-      estimated_delivery: formatOrderDate(order.estimated_delivery),
-      tracking_number: order.tracking_number || "",
-    }));
-
     const headers = [
       "Order ID",
       "Customer",
@@ -504,24 +564,24 @@ export default function AdminOrders() {
       "Tracking",
     ];
 
-    const csv = [headers.join(",")]
-      .concat(
-        rows.map((row) =>
-          [
-            row.id,
-            `"${row.customer}"`,
-            `"${row.email}"`,
-            `"${row.phone}"`,
-            row.payment_status,
-            row.order_status,
-            row.total_amount,
-            row.created_at,
-            row.estimated_delivery,
-            row.tracking_number,
-          ].join(","),
-        ),
-      )
-      .join("\n");
+    const rows = filteredOrders.map((order) =>
+      [
+        order.id,
+        getCustomerName(order),
+        getCustomer(order)?.email || "",
+        getCustomer(order)?.phone || "",
+        formatStatus(getEffectivePaymentStatus(order)),
+        formatStatus(order.order_status),
+        Number(order.total_amount || 0).toFixed(2),
+        formatOrderDate(order.created_at),
+        formatOrderDate(order.estimated_delivery),
+        order.tracking_number || "",
+      ]
+        .map(csvCell)
+        .join(","),
+    );
+
+    const csv = [headers.map(csvCell).join(","), ...rows].join("\n");
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -532,6 +592,8 @@ export default function AdminOrders() {
     URL.revokeObjectURL(url);
   };
 
+  /* ------------------------------ Derived stats ----------------------------- */
+
   const totalRevenue = orders.reduce(
     (sum, order) => sum + Number(order.total_amount || 0),
     0,
@@ -540,15 +602,13 @@ export default function AdminOrders() {
     .filter((order) => getEffectivePaymentStatus(order) === "paid")
     .reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
   const activeOrders = orders.filter((order) =>
-    ["processing", "shipped", "out for delivery"].includes(
-      (order.order_status || "").toLowerCase(),
-    ),
+    FULFILLMENT_STATUSES.includes(normalizeStatus(order.order_status)),
   ).length;
   const deliveredOrders = orders.filter(
-    (order) => (order.order_status || "").toLowerCase() === "delivered",
+    (order) => normalizeStatus(order.order_status) === "delivered",
   ).length;
   const newOrders = orders.filter(
-    (order) => (order.order_status || "pending").toLowerCase() === "pending",
+    (order) => normalizeStatus(order.order_status) === "pending",
   ).length;
   const filtersActive =
     orderStatusFilter !== "all" || paymentStatusFilter !== "all";
@@ -565,44 +625,95 @@ export default function AdminOrders() {
     setPaymentStatusFilter(paymentStatus);
   };
 
-  const handleMetricKeyDown = (
-    event: KeyboardEvent<HTMLDivElement>,
-    orderStatus: string,
-    paymentStatus = "all",
-  ) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      activateMetric(orderStatus, paymentStatus);
-    }
-  };
+  const stats = [
+    {
+      key: "all",
+      label: "All orders",
+      value: String(orders.length),
+      hint: "Every order placed",
+      icon: Package,
+      order: "all",
+      payment: "all",
+    },
+    {
+      key: "paid",
+      label: "Order value",
+      value: formatCurrency(totalRevenue),
+      hint: `${formatCurrency(paidRevenue)} collected`,
+      icon: CircleDollarSign,
+      order: "all",
+      payment: "paid",
+    },
+    {
+      key: "fulfillment",
+      label: "In fulfillment",
+      value: String(activeOrders),
+      hint: "Processing, shipped or on the way",
+      icon: Truck,
+      order: "fulfillment",
+      payment: "all",
+    },
+    {
+      key: "delivered",
+      label: "Delivered",
+      value: String(deliveredOrders),
+      hint: `${filteredOrders.length} in current view`,
+      icon: CheckCircle2,
+      order: "delivered",
+      payment: "all",
+    },
+  ];
+
+  /* ------------------------------ Dialog helpers ---------------------------- */
+
+  const shippingAddressText = (order: Order) =>
+    order.shipping_address
+      ? [
+          order.shipping_address.line1,
+          order.shipping_address.line2,
+          order.shipping_address.city,
+          order.shipping_address.state,
+          order.shipping_address.pincode,
+          order.shipping_address.country,
+        ]
+          .filter(Boolean)
+          .join(", ") || "No shipping address on file"
+      : "No shipping address on file";
+
+  const closeConfirm = () =>
+    setConfirmDialog({
+      open: false,
+      action: null,
+      newStatus: "",
+      reason: "",
+    });
+
+  /* --------------------------------- Render --------------------------------- */
 
   return (
     <AdminLayout>
-      <div className="mx-auto max-w-[1500px] space-y-7">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div className="mx-auto max-w-[1400px] space-y-8">
+        {/* Header */}
+        <header className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-[#A68D65]">
-              Operations / Customer orders
-            </p>
-            <h1 className="text-4xl font-semibold text-[#33381C]">
-              Order desk
+            <h1 className="font-serif text-4xl font-semibold tracking-tight text-[#2B2F18]">
+              Orders
             </h1>
-            <p className="mt-2 text-sm text-[#5C5C54] md:text-base">
-              Keep every order, payment, and delivery moving with confidence.
+            <p className="mt-2 max-w-md text-[15px] leading-relaxed text-[#6F6C61]">
+              Follow each order from payment to doorstep.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOrderStatusFilter("pending")}
-              title="View new orders"
+              onClick={() => activateMetric("pending")}
               aria-label={`View ${newOrders} new orders`}
-              className="relative rounded-xl border-[#DED4C4] bg-white px-4 py-3 text-sm font-semibold text-[#4D5528] shadow-sm hover:bg-[#F8F5EE]"
+              className="h-10 gap-2 rounded-lg border-[#E2DBCD] bg-white px-4 text-sm font-medium text-[#3F4723] shadow-none hover:bg-[#FAF8F3]"
             >
               <PackagePlus className="h-4 w-4" />
-              <span>New orders</span>
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#E9B949] px-1.5 text-[11px] font-bold text-[#33381C]">
+              New orders
+              <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#2B2F18] px-1.5 text-[11px] font-semibold text-white">
                 {newOrders}
               </span>
             </Button>
@@ -610,323 +721,231 @@ export default function AdminOrders() {
               type="button"
               variant="outline"
               onClick={exportOrders}
-              className="rounded-xl border-[#DED4C4] bg-white px-5 py-3 text-sm font-semibold text-[#4D5528] shadow-sm hover:bg-[#F8F5EE]"
+              className="h-10 gap-2 rounded-lg border-[#E2DBCD] bg-white px-4 text-sm font-medium text-[#3F4723] shadow-none hover:bg-[#FAF8F3]"
             >
+              <Download className="h-4 w-4" />
               Export CSV
             </Button>
             <Button
               type="button"
               onClick={fetchOrders}
-              className="rounded-xl bg-[#33381C] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4D5528]"
+              className="h-10 gap-2 rounded-lg bg-[#2B2F18] px-4 text-sm font-medium text-white shadow-none hover:bg-[#4D5528]"
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw
+                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+              />
               Refresh
             </Button>
           </div>
-        </div>
+        </header>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => activateMetric("all")}
-            onKeyDown={(event) => handleMetricKeyDown(event, "all")}
-            title="View all orders"
-            className="cursor-pointer rounded-2xl border border-[#E7E0D4] bg-white p-5 shadow-[0_8px_24px_-18px_rgba(51,56,28,0.35)] transition hover:-translate-y-0.5 hover:border-[#CFC0A6] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#A68D65]"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-[#73736A]">
-                  Total orders
-                </p>
-                <p className="mt-2 text-3xl font-semibold text-[#33381C]">
-                  {orders.length}
-                </p>
-              </div>
-              <span className="rounded-xl bg-[#EEF0E5] p-2.5 text-[#4D5528]">
-                <Package className="h-5 w-5" />
-              </span>
-            </div>
-            <p className="mt-3 text-xs text-[#88877D]">All-time order volume</p>
-          </div>
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => activateMetric("all", "paid")}
-            onKeyDown={(event) => handleMetricKeyDown(event, "all", "paid")}
-            title="View paid orders"
-            className="cursor-pointer rounded-2xl border border-[#E7E0D4] bg-white p-5 shadow-[0_8px_24px_-18px_rgba(51,56,28,0.35)] transition hover:-translate-y-0.5 hover:border-[#CFC0A6] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#A68D65]"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-[#73736A]">
-                  Order value
-                </p>
-                <p className="mt-2 text-3xl font-semibold text-[#33381C]">
-                  {formatCurrency(totalRevenue)}
-                </p>
-              </div>
-              <span className="rounded-xl bg-[#F8EEDB] p-2.5 text-[#A66A12]">
-                <CircleDollarSign className="h-5 w-5" />
-              </span>
-            </div>
-            <p className="mt-3 text-xs text-[#88877D]">
-              {formatCurrency(paidRevenue)} successfully paid
-            </p>
-          </div>
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => activateMetric("fulfillment")}
-            onKeyDown={(event) => handleMetricKeyDown(event, "fulfillment")}
-            title="View orders in fulfillment"
-            className="cursor-pointer rounded-2xl border border-[#E7E0D4] bg-white p-5 shadow-[0_8px_24px_-18px_rgba(51,56,28,0.35)] transition hover:-translate-y-0.5 hover:border-[#CFC0A6] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#A68D65]"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-[#73736A]">
-                  In fulfillment
-                </p>
-                <p className="mt-2 text-3xl font-semibold text-[#33381C]">
-                  {activeOrders}
-                </p>
-              </div>
-              <span className="rounded-xl bg-[#E6F1F5] p-2.5 text-[#37748B]">
-                <Truck className="h-5 w-5" />
-              </span>
-            </div>
-            <p className="mt-3 text-xs text-[#88877D]">
-              Processing, shipped, or out for delivery
-            </p>
-          </div>
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => activateMetric("delivered")}
-            onKeyDown={(event) => handleMetricKeyDown(event, "delivered")}
-            title="View delivered orders"
-            className="cursor-pointer rounded-2xl border border-[#E7E0D4] bg-white p-5 shadow-[0_8px_24px_-18px_rgba(51,56,28,0.35)] transition hover:-translate-y-0.5 hover:border-[#CFC0A6] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#A68D65]"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-[#73736A]">Delivered</p>
-                <p className="mt-2 text-3xl font-semibold text-[#33381C]">
-                  {deliveredOrders}
-                </p>
-              </div>
-              <span className="rounded-xl bg-[#E8F3E7] p-2.5 text-[#4E8253]">
-                <CheckCircle2 className="h-5 w-5" />
-              </span>
-            </div>
-            <p className="mt-3 text-xs text-[#88877D]">
-              {filteredOrders.length} orders in current view
-            </p>
-          </div>
-        </div>
+        {/* Summary strip — also works as quick filters */}
+        <section
+          aria-label="Order summary"
+          className={`${surfaceClass} grid grid-cols-2 gap-px overflow-hidden bg-[#ECE6DA] xl:grid-cols-4`}
+        >
+          {stats.map((stat) => {
+            const Icon = stat.icon;
+            const active =
+              !search &&
+              orderStatusFilter === stat.order &&
+              paymentStatusFilter === stat.payment;
+            return (
+              <button
+                key={stat.key}
+                type="button"
+                onClick={() => activateMetric(stat.order, stat.payment)}
+                aria-pressed={active}
+                className={`group relative bg-white px-6 py-5 text-left transition focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#A68D65] ${
+                  active
+                    ? "bg-[#FAF8F3] shadow-[inset_0_-2px_0_#4D5528]"
+                    : "hover:bg-[#FCFBF8]"
+                }`}
+              >
+                <span className="flex items-center justify-between text-[#7A776C]">
+                  <span className="text-sm">{stat.label}</span>
+                  <Icon className="h-4 w-4 text-[#A68D65]" />
+                </span>
+                <span className="mt-3 block font-serif text-[1.75rem] font-semibold leading-none tracking-tight text-[#2B2F18] tabular-nums">
+                  {stat.value}
+                </span>
+                <span className="mt-2 block text-xs text-[#8A8678]">
+                  {stat.hint}
+                </span>
+              </button>
+            );
+          })}
+        </section>
 
-        <div className="rounded-2xl border border-[#E7E0D4] bg-white p-3 shadow-[0_8px_24px_-18px_rgba(51,56,28,0.35)]">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+        {/* Table with integrated toolbar */}
+        <section className={`${surfaceClass} overflow-hidden`}>
+          <div className="flex flex-col gap-3 border-b border-[#ECE6DA] p-4 lg:flex-row lg:items-center">
             <div className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#99978D]" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A3A095]" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search customer, order ID, email, or tracking number"
-                className="w-full rounded-xl border border-transparent bg-[#F8F6F1] py-3 pl-10 pr-4 text-sm text-[#33381C] outline-none transition placeholder:text-[#A3A095] focus:border-[#CFC0A6] focus:bg-white focus:ring-4 focus:ring-[#F1ECE3]"
+                placeholder="Search by customer, order ID, email or tracking number"
+                aria-label="Search orders"
+                className="h-10 w-full rounded-lg border border-transparent bg-[#F6F3EC] pl-10 pr-4 text-sm text-[#2B2F18] outline-none transition placeholder:text-[#A3A095] focus:border-[#D9CFBC] focus:bg-white focus:ring-4 focus:ring-[#A68D65]/15"
               />
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 xl:flex">
-              <label className="relative">
-                <span className="sr-only">Filter fulfillment</span>
-                <select
-                  value={orderStatusFilter}
-                  onChange={(event) => setOrderStatusFilter(event.target.value)}
-                  className="h-11 w-full appearance-none rounded-xl border border-[#E7E0D4] bg-white py-2 pl-3 pr-9 text-sm font-medium text-[#5C5C54] outline-none focus:border-[#A68D65]"
-                >
-                  <option value="all">All fulfillment</option>
-                  <option value="fulfillment">In fulfillment</option>
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="processing">Processing</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="in_transit">In Transit</option>
-                  <option value="out_for_delivery">Out for delivery</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="returned">Returned</option>
-                </select>
-                <SlidersHorizontal className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-[#8C887D]" />
-              </label>
-              <label className="relative">
-                <span className="sr-only">Filter payment</span>
-                <select
-                  value={paymentStatusFilter}
-                  onChange={(event) =>
-                    setPaymentStatusFilter(event.target.value)
-                  }
-                  className="h-11 w-full appearance-none rounded-xl border border-[#E7E0D4] bg-white py-2 pl-3 pr-9 text-sm font-medium text-[#5C5C54] outline-none focus:border-[#A68D65]"
-                >
-                  <option value="all">All payments</option>
-                  <option value="pending">Pending payment</option>
-                  <option value="paid">Paid</option>
-                  <option value="failed">Failed</option>
-                  <option value="refunded">Refunded</option>
-                </select>
-                <CircleDollarSign className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-[#8C887D]" />
-              </label>
-            </div>
-            {filtersActive && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="h-10 rounded-xl text-[#75684E] hover:bg-[#F8F5EE] hover:text-[#33381C]"
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={orderStatusFilter}
+                onChange={(event) => setOrderStatusFilter(event.target.value)}
+                aria-label="Filter by fulfillment status"
+                className="h-10 rounded-lg border border-[#E2DBCD] bg-white px-3 text-sm text-[#4A4A42] outline-none transition focus:border-[#A68D65] focus:ring-4 focus:ring-[#A68D65]/15"
               >
-                Clear filters
-              </Button>
-            )}
+                <option value="all">All fulfillment</option>
+                <option value="fulfillment">In fulfillment</option>
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="processing">Processing</option>
+                <option value="shipped">Shipped</option>
+                <option value="in_transit">In transit</option>
+                <option value="out_for_delivery">Out for delivery</option>
+                <option value="delivered">Delivered</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="returned">Returned</option>
+              </select>
+              <select
+                value={paymentStatusFilter}
+                onChange={(event) => setPaymentStatusFilter(event.target.value)}
+                aria-label="Filter by payment status"
+                className="h-10 rounded-lg border border-[#E2DBCD] bg-white px-3 text-sm text-[#4A4A42] outline-none transition focus:border-[#A68D65] focus:ring-4 focus:ring-[#A68D65]/15"
+              >
+                <option value="all">All payments</option>
+                <option value="pending">Pending payment</option>
+                <option value="paid">Paid</option>
+                <option value="failed">Failed</option>
+                <option value="refunded">Refunded</option>
+              </select>
+              {(filtersActive || search) && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm text-[#75684E] transition hover:bg-[#F6F3EC] hover:text-[#2B2F18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A68D65]"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="overflow-hidden rounded-2xl border border-[#E7E0D4] bg-white shadow-[0_8px_24px_-18px_rgba(51,56,28,0.35)]">
-          <div className="flex flex-col gap-2 border-b border-[#EEE8DE] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="font-sans text-base font-semibold text-[#33381C]">
-                Order activity
-              </h2>
-              <p className="mt-0.5 text-sm text-[#817D73]">
-                {loading
-                  ? "Syncing your latest orders…"
-                  : `${filteredOrders.length} ${filteredOrders.length === 1 ? "order" : "orders"} displayed`}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs font-medium text-[#75684E]">
-              <Filter className="h-3.5 w-3.5" />
-              {filtersActive ? "Filtered view" : "All orders"}
-            </div>
-          </div>
           <div className="overflow-x-auto">
-            <table className="min-w-[1120px] w-full divide-y divide-[#EEE8DE]">
-              <thead className="bg-[#FCFBF8]">
-                <tr>
-                  <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
-                    Customer & order
-                  </th>
-                  <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
-                    Payment
-                  </th>
-                  <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
-                    Status
-                  </th>
-                  <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
-                    Total
-                  </th>
-                  <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
-                    Date
-                  </th>
-                  <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
-                    Estimated
-                  </th>
-                  <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
-                    Tracking
-                  </th>
-                  <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.12em] text-[#827D72]">
-                    Details
+            <table className="w-full min-w-[1040px] text-sm">
+              <thead>
+                <tr className="border-b border-[#ECE6DA] text-left text-xs font-medium text-[#8A8678]">
+                  <th className="px-6 py-3 font-medium">Customer</th>
+                  <th className="px-4 py-3 font-medium">Payment</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Placed</th>
+                  <th className="px-4 py-3 font-medium">Expected</th>
+                  <th className="px-4 py-3 font-medium">Tracking</th>
+                  <th className="px-4 py-3 text-right font-medium">Total</th>
+                  <th className="w-12 px-4 py-3">
+                    <span className="sr-only">Open</span>
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F0ECE5]">
-                {loading ? (
+              <tbody className="divide-y divide-[#F1EDE4]">
+                {loading && orders.length === 0 ? (
                   <tr>
                     <td
                       colSpan={8}
-                      className="px-5 py-12 text-center text-sm text-[#817D73]"
+                      className="px-6 py-16 text-center text-sm text-[#8A8678]"
                     >
-                      Loading orders...
+                      Loading orders…
                     </td>
                   </tr>
                 ) : error ? (
                   <tr>
                     <td
                       colSpan={8}
-                      className="px-5 py-12 text-center text-sm text-rose-600"
+                      className="px-6 py-16 text-center text-sm text-rose-600"
                     >
                       {error}
                     </td>
                   </tr>
                 ) : filteredOrders.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={8}
-                      className="px-5 py-12 text-center text-sm text-[#817D73]"
-                    >
-                      No orders found.
+                    <td colSpan={8} className="px-6 py-16 text-center">
+                      <p className="font-medium text-[#2B2F18]">
+                        No orders match these filters
+                      </p>
+                      <p className="mt-1 text-sm text-[#8A8678]">
+                        Try a different search or clear the filters.
+                      </p>
                     </td>
                   </tr>
                 ) : (
                   filteredOrders.map((order) => (
                     <tr
                       key={order.id}
-                      className="cursor-pointer transition-colors hover:bg-[#FCFBF8]"
+                      tabIndex={0}
                       onClick={() => openOrderDetails(order)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openOrderDetails(order);
+                        }
+                      }}
+                      className="group cursor-pointer transition-colors hover:bg-[#FCFBF8] focus-visible:bg-[#FAF8F3] focus-visible:outline-none"
                     >
-                      <td className="px-5 py-4 text-sm">
+                      <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF0E5] text-sm font-semibold text-[#4D5528]">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EEF0E5] text-sm font-semibold text-[#4D5528]">
                             {getCustomerName(order).slice(0, 1).toUpperCase()}
                           </div>
-                          <div>
-                            <p className="font-semibold text-[#33381C]">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-[#2B2F18]">
                               {getCustomerName(order)}
                             </p>
-                            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-[#A09B90]">
-                              Order #{getShortOrderId(order.id)}
-                            </p>
-                            <p className="mt-1 flex items-center gap-1 text-xs text-[#817D73]">
-                              <Mail className="h-3.5 w-3.5" />
-                              {getCustomer(order)?.email ||
-                                "No email available"}
+                            <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-[#8A8678]">
+                              <span className="font-mono">
+                                #{getShortOrderId(order.id)}
+                              </span>
+                              <span className="text-[#CFC9BB]">/</span>
+                              <span className="truncate">
+                                {getCustomer(order)?.email ||
+                                  "No email available"}
+                              </span>
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-sm capitalize text-slate-700">
-                        <Badge
-                          variant="outline"
-                          className={`capitalize ${getPaymentStatusBadgeClass(getEffectivePaymentStatus(order))}`}
-                        >
-                          {formatStatus(getEffectivePaymentStatus(order))}
-                        </Badge>
+                      <td className="px-4 py-4">
+                        <StatusPill
+                          label={formatStatus(getEffectivePaymentStatus(order))}
+                          tone={getPaymentTone(
+                            getEffectivePaymentStatus(order),
+                          )}
+                        />
                       </td>
-                      <td className="px-5 py-4 text-sm">
-                        <Badge
-                          className={`capitalize ${getOrderStatusBadgeClass(order.order_status)}`}
-                        >
-                          {formatStatus(order.order_status)}
-                        </Badge>
+                      <td className="px-4 py-4">
+                        <StatusPill
+                          label={formatStatus(order.order_status)}
+                          tone={getOrderTone(order.order_status)}
+                        />
                       </td>
-                      <td className="px-5 py-4 text-right text-sm font-semibold text-[#4D5528]">
-                        {formatCurrency(order.total_amount)}
-                      </td>
-                      <td className="px-5 py-4 text-right text-sm text-[#625F57]">
+                      <td className="whitespace-nowrap px-4 py-4 text-[#5C5A50]">
                         {formatOrderDate(order.created_at)}
                       </td>
-                      <td className="px-5 py-4 text-right text-sm text-[#625F57]">
+                      <td className="whitespace-nowrap px-4 py-4 text-[#5C5A50]">
                         {formatOrderDate(order.estimated_delivery)}
                       </td>
-                      <td className="px-5 py-4 text-right text-sm font-medium text-[#625F57]">
-                        {order.tracking_number || "-"}
+                      <td className="px-4 py-4 font-mono text-xs text-[#5C5A50]">
+                        {order.tracking_number || (
+                          <span className="text-[#CFC9BB]">—</span>
+                        )}
                       </td>
-                      <td className="px-5 py-4 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-lg border-[#E4DCCF] bg-white text-[#4D5528] hover:bg-[#F8F5EE]"
-                        >
-                          <Eye className="h-4 w-4" />
-                          View
-                        </Button>
+                      <td className="whitespace-nowrap px-4 py-4 text-right font-semibold tabular-nums text-[#2B2F18]">
+                        {formatCurrency(order.total_amount)}
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <ChevronRight className="inline h-4 w-4 text-[#CFC9BB] transition group-hover:translate-x-0.5 group-hover:text-[#4D5528]" />
                       </td>
                     </tr>
                   ))
@@ -934,9 +953,21 @@ export default function AdminOrders() {
               </tbody>
             </table>
           </div>
-        </div>
+
+          <div className="flex items-center justify-between border-t border-[#ECE6DA] bg-[#FCFBF8] px-6 py-3 text-xs text-[#8A8678]">
+            <span>
+              {loading
+                ? "Syncing latest orders…"
+                : `Showing ${filteredOrders.length} of ${orders.length} ${orders.length === 1 ? "order" : "orders"}`}
+            </span>
+            {filtersActive && <span>Filters applied</span>}
+          </div>
+        </section>
       </div>
 
+      {/* ------------------------------------------------------------------ */}
+      {/* Order details                                                       */}
+      {/* ------------------------------------------------------------------ */}
       <Dialog
         open={Boolean(selectedOrder)}
         onOpenChange={(open) => {
@@ -947,413 +978,377 @@ export default function AdminOrders() {
           }
         }}
       >
-        <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto border-[#E7E0D4] bg-[#FBF7F0] p-0 shadow-2xl">
+        <DialogContent className="max-h-[92vh] max-w-5xl gap-0 overflow-y-auto rounded-2xl border-[#ECE6DA] bg-white p-0 shadow-2xl">
           {selectedOrder && (
             <>
-              <DialogHeader className="border-b border-[#E8E1D6] px-6 pb-5 pt-6 sm:px-8">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#7B8064]">
-                      <ClipboardCheck className="h-4 w-4" />
-                      Order workspace
-                    </div>
-                    <DialogTitle className="text-3xl text-[#2D311C]">
-                      Order details
+              <DialogHeader className="space-y-0 border-b border-[#ECE6DA] px-6 py-6 text-left sm:px-8">
+                <div className="flex flex-col gap-4 pr-8 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <DialogTitle className="font-serif text-3xl font-semibold tracking-tight text-[#2B2F18]">
+                      Order #{getShortOrderId(selectedOrder.id)}
                     </DialogTitle>
-                    <DialogDescription className="mt-1 text-[#777467]">
-                      Review the customer, payment, and fulfillment record.
+                    <DialogDescription className="mt-1.5 text-sm text-[#7A776C]">
+                      Placed {formatOrderDate(selectedOrder.created_at)}
                     </DialogDescription>
-                  </div>
-                  <div className="rounded-xl border border-[#E5DDCE] bg-white/70 px-4 py-3 sm:text-right">
-                    <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#9A9589] sm:justify-end">
-                      <Hash className="h-3.5 w-3.5" /> Order reference
-                    </p>
-                    <p className="mt-1 max-w-[220px] truncate font-mono text-xs text-[#4C5230]">
+                    <p
+                      className="mt-2 max-w-full truncate font-mono text-xs text-[#A3A095]"
+                      title={selectedOrder.id}
+                    >
                       {selectedOrder.id}
                     </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusPill
+                      label={
+                        ORDER_STATUS_LABELS[
+                          selectedOrder.order_status as OrderStatus
+                        ] || formatStatus(selectedOrder.order_status)
+                      }
+                      tone={getOrderTone(selectedOrder.order_status)}
+                    />
+                    <StatusPill
+                      label={formatStatus(
+                        getEffectivePaymentStatus(selectedOrder),
+                      )}
+                      tone={getPaymentTone(
+                        getEffectivePaymentStatus(selectedOrder),
+                      )}
+                    />
                   </div>
                 </div>
               </DialogHeader>
 
-              <div className="grid gap-4 overflow-hidden px-6 pt-6 pb-6 sm:px-8 md:grid-cols-3">
-                <div className="rounded-2xl border border-[#E5E8E3] bg-[#F5F7F5] p-5">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7B8064]">
-                    Customer
-                  </p>
-                  <div className="mt-3 flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#E4E9DF] text-[#4D5528]">
-                      <UserRound className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-[#303526]">
-                        {getCustomerName(selectedOrder)}
-                      </p>
-                      <p className="mt-2 flex items-center gap-1.5 text-sm text-[#777D70]">
-                        <Mail className="h-3.5 w-3.5" />
-                        {getCustomer(selectedOrder)?.email ||
-                          "No email available"}
-                      </p>
-                      {getCustomer(selectedOrder)?.phone && (
-                        <p className="mt-1 text-sm text-[#777D70]">
-                          {getCustomer(selectedOrder)?.phone}
-                        </p>
-                      )}
-                      <p className="mt-3 flex items-start gap-1.5 text-sm leading-5 text-[#777D70]">
-                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        {selectedOrder.shipping_address
-                          ? [
-                              selectedOrder.shipping_address.line1,
-                              selectedOrder.shipping_address.line2,
-                              selectedOrder.shipping_address.city,
-                              selectedOrder.shipping_address.state,
-                              selectedOrder.shipping_address.pincode,
-                              selectedOrder.shipping_address.country,
-                            ]
-                              .filter(Boolean)
-                              .join(", ") || "No shipping address on file"
-                          : "No shipping address on file"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-2xl border border-[#E8E5D9] bg-[#F8F7F1] p-5">
-                  <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7B8064]">
-                    <CreditCard className="h-4 w-4" />
-                    Payment
-                  </p>
-                  <p className="mt-5 text-3xl font-semibold tracking-tight text-[#343A20]">
-                    {formatCurrency(selectedOrder.total_amount)}
-                  </p>
-                  <Badge
-                    variant="outline"
-                    className={`mt-3 rounded-full px-3 py-1 capitalize ${getPaymentStatusBadgeClass(getEffectivePaymentStatus(selectedOrder))}`}
-                  >
-                    {formatStatus(getEffectivePaymentStatus(selectedOrder))}
-                  </Badge>
-                  <p className="mt-5 text-xs text-[#8C897E]">
-                    {selectedOrder.payment_method ||
-                      "Payment method unavailable"}
-                  </p>
-                </div>
-
-                <div className="max-h-[550px] overflow-y-auto rounded-2xl border border-[#E5E8E3] bg-[#F5F7F5] p-5">
-                  <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7B8064]">
-                    <Truck className="h-4 w-4" />
-                    Fulfillment & Shipping
-                  </p>
-
-                  {/* Order Status Section */}
-                  <div className="mt-4 space-y-3 border-b border-[#E0E5DE] pb-4">
-                    <div>
-                      <p className="text-xs font-semibold text-[#777D70]">
-                        Current Order Status
-                      </p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <Badge
-                          className={`rounded-full px-3 py-1 capitalize ${getOrderStatusBadgeClass(
-                            selectedOrder.order_status,
-                          )}`}
-                        >
-                          {ORDER_STATUS_LABELS[
-                            selectedOrder.order_status as OrderStatus
-                          ] || formatStatus(selectedOrder.order_status)}
-                        </Badge>
+              <div className="grid lg:grid-cols-[minmax(0,1fr)_340px]">
+                {/* Left: customer + items */}
+                <div className="min-w-0 space-y-8 px-6 py-6 sm:px-8">
+                  <section>
+                    <h3 className="text-sm font-semibold text-[#2B2F18]">
+                      Customer
+                    </h3>
+                    <div className="mt-4 flex items-start gap-4">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#EEF0E5] text-base font-semibold text-[#4D5528]">
+                        {getCustomerName(selectedOrder)
+                          .slice(0, 1)
+                          .toUpperCase()}
                       </div>
-                      <p className="mt-1 text-xs text-[#888880]">
-                        {getOrderStatusDescription(selectedOrder.order_status)}
+                      <div className="min-w-0 flex-1 space-y-2 text-sm text-[#6F6C61]">
+                        <p className="break-words text-base font-medium text-[#2B2F18]">
+                          {getCustomerName(selectedOrder)}
+                        </p>
+                        <p className="flex items-start gap-2">
+                          <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#A68D65]" />
+                          <span className="min-w-0 break-words">
+                            {getCustomer(selectedOrder)?.email ||
+                              "No email available"}
+                          </span>
+                        </p>
+                        {getCustomer(selectedOrder)?.phone && (
+                          <p className="flex items-start gap-2">
+                            <Phone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#A68D65]" />
+                            <span className="break-words">
+                              {getCustomer(selectedOrder)?.phone}
+                            </span>
+                          </p>
+                        )}
+                        <p className="flex items-start gap-2 leading-5">
+                          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#A68D65]" />
+                          <span className="min-w-0 [overflow-wrap:anywhere]">
+                            {shippingAddressText(selectedOrder)}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section>
+                    <div className="flex items-baseline justify-between">
+                      <h3 className="text-sm font-semibold text-[#2B2F18]">
+                        Items
+                      </h3>
+                      <p className="text-xs text-[#8A8678]">
+                        {detailsLoading
+                          ? "Loading…"
+                          : detailsLoaded
+                            ? `${selectedItems.length} ${selectedItems.length === 1 ? "line item" : "line items"}`
+                            : ""}
                       </p>
                     </div>
 
-                    {validOrderStatuses.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-[#777D70]">
-                          Change Order Status
-                        </p>
-                        <div className="mt-2 grid min-w-0 grid-cols-1 gap-2 xl:grid-cols-2">
-                          {validOrderStatuses.map((status) => (
-                            <Button
-                              key={status}
-                              variant="outline"
-                              className="h-auto min-h-10 min-w-0 whitespace-normal break-words px-2 text-center text-xs leading-4 rounded-lg border-[#DADFD6] bg-white text-[#4D5528] hover:bg-[#EEF2EB]"
-                              onClick={() =>
-                                handleStatusChangeClick("order", status)
-                              }
-                              disabled={savingStatus}
-                            >
-                              →{" "}
-                              {ORDER_STATUS_LABELS[status as OrderStatus] ||
-                                formatStatus(status)}
-                            </Button>
-                          ))}
+                    <div className="mt-3 overflow-hidden rounded-xl border border-[#ECE6DA]">
+                      {detailsLoading ? (
+                        <div className="flex items-center justify-center gap-3 p-10 text-sm text-[#8A8678]">
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Loading items…
                         </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Payment Status Section */}
-                  <div className="mt-4 space-y-3 border-b border-[#E0E5DE] pb-4">
-                    <div>
-                      <p className="text-xs font-semibold text-[#777D70]">
-                        Current Payment Status
-                      </p>
-                      <div className="mt-2">
-                        <Badge
-                          variant="outline"
-                          className={`rounded-full px-3 py-1 capitalize ${getPaymentStatusBadgeClass(
-                            getEffectivePaymentStatus(selectedOrder),
-                          )}`}
-                        >
-                          {PAYMENT_STATUS_LABELS[
-                            getEffectivePaymentStatus(selectedOrder)
-                          ] || formatStatus(selectedOrder.payment_status)}
-                        </Badge>
-                      </div>
+                      ) : detailsError ? (
+                        <div className="space-y-3 p-10 text-center text-sm text-rose-600">
+                          <div className="flex items-center justify-center gap-2">
+                            <AlertCircle className="h-4 w-4" />
+                            <span>{detailsError}</span>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              selectedOrder && openOrderDetails(selectedOrder)
+                            }
+                          >
+                            Try again
+                          </Button>
+                        </div>
+                      ) : selectedItems.length === 0 ? (
+                        <div className="p-10 text-center text-sm text-[#8A8678]">
+                          This order has no items.
+                        </div>
+                      ) : (
+                        <>
+                          <ul className="divide-y divide-[#F1EDE4]">
+                            {selectedItems.map((item) => (
+                              <li
+                                key={item.id}
+                                className="flex items-center justify-between gap-4 px-4 py-4"
+                              >
+                                <div className="flex min-w-0 items-center gap-3">
+                                  {item.product_image ? (
+                                    <img
+                                      src={item.product_image}
+                                      alt={item.product_name || "Product"}
+                                      className="h-14 w-14 shrink-0 rounded-lg border border-[#ECE6DA] object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-[#ECE6DA] bg-[#F6F3EC] text-[#B3AFA3]">
+                                      <Package className="h-5 w-5" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <p className="truncate font-medium text-[#2B2F18]">
+                                      {item.product_name || "Product"}
+                                    </p>
+                                    <p className="mt-0.5 text-sm text-[#8A8678] tabular-nums">
+                                      {item.quantity || 0} ×{" "}
+                                      {formatCurrency(item.price)}
+                                    </p>
+                                  </div>
+                                </div>
+                                <p className="shrink-0 font-semibold tabular-nums text-[#2B2F18]">
+                                  {formatCurrency(
+                                    Number(item.price || 0) *
+                                      Number(item.quantity || 0),
+                                  )}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                          <div className="flex items-center justify-between border-t border-[#ECE6DA] bg-[#FAF8F3] px-4 py-3.5">
+                            <span className="text-sm text-[#6F6C61]">
+                              Order total
+                            </span>
+                            <span className="font-serif text-xl font-semibold tabular-nums text-[#2B2F18]">
+                              {formatCurrency(selectedOrder.total_amount)}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
+                  </section>
+                </div>
 
+                {/* Right: status & shipping controls */}
+                <aside className="min-w-0 space-y-6 border-t border-[#ECE6DA] bg-[#FAF8F3] px-6 py-6 lg:border-l lg:border-t-0">
+                  <section>
+                    <h3 className="text-sm font-semibold text-[#2B2F18]">
+                      Payment
+                    </h3>
+                    <p className="mt-2 font-serif text-3xl font-semibold tracking-tight tabular-nums text-[#2B2F18]">
+                      {formatCurrency(selectedOrder.total_amount)}
+                    </p>
+                    <p className="mt-1 text-sm text-[#7A776C]">
+                      {formatPaymentMethod(selectedOrder.payment_method)}
+                    </p>
                     {validPaymentStatuses.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-[#777D70]">
-                          Change Payment Status
-                        </p>
-                        <div className="mt-2 grid min-w-0 grid-cols-1 gap-2 xl:grid-cols-2">
+                      <div className="mt-4">
+                        <p className="text-xs text-[#8A8678]">Update payment</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
                           {validPaymentStatuses.map((status) => (
-                            <Button
+                            <TransitionButton
                               key={status}
-                              variant="outline"
-                              className="h-auto min-h-10 min-w-0 whitespace-normal break-words px-2 text-center text-xs leading-4 rounded-lg border-[#DADFD6] bg-white text-[#4D5528] hover:bg-[#EEF2EB]"
+                              label={
+                                PAYMENT_STATUS_LABELS[
+                                  status as PaymentStatus
+                                ] || formatStatus(status)
+                              }
                               onClick={() =>
                                 handleStatusChangeClick("payment", status)
                               }
                               disabled={savingStatus}
-                            >
-                              →{" "}
-                              {PAYMENT_STATUS_LABELS[status as PaymentStatus] ||
-                                formatStatus(status)}
-                            </Button>
+                            />
                           ))}
                         </div>
                       </div>
                     )}
-                  </div>
+                  </section>
 
-                  {/* Shipping Details Section */}
-                  <div className="mt-4 space-y-3">
-                    <label className="text-[11px] font-semibold text-[#777D70]">
-                      Tracking Number
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Enter tracking number"
-                      value={trackingNumber}
-                      onChange={(e) => setTrackingNumber(e.target.value)}
-                      className="w-full rounded-xl border border-[#DDE3DA] bg-white px-3 py-2.5 text-sm text-[#343A20] outline-none transition placeholder:text-[#B0AEA7] focus:border-[#7B8064] focus:ring-2 focus:ring-[#DDE7D7]"
-                    />
+                  <hr className="border-[#ECE6DA]" />
+
+                  <section>
+                    <h3 className="text-sm font-semibold text-[#2B2F18]">
+                      Fulfillment
+                    </h3>
+                    <p className="mt-1.5 text-sm leading-relaxed text-[#7A776C]">
+                      {getOrderStatusDescription(selectedOrder.order_status)}
+                    </p>
+                    {validOrderStatuses.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-xs text-[#8A8678]">Move order to</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {validOrderStatuses.map((status) => (
+                            <TransitionButton
+                              key={status}
+                              label={
+                                ORDER_STATUS_LABELS[status as OrderStatus] ||
+                                formatStatus(status)
+                              }
+                              onClick={() =>
+                                handleStatusChangeClick("order", status)
+                              }
+                              disabled={savingStatus}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </section>
+
+                  <hr className="border-[#ECE6DA]" />
+
+                  <section className="space-y-4">
+                    <h3 className="text-sm font-semibold text-[#2B2F18]">
+                      Shipping details
+                    </h3>
+                    <div>
+                      <label
+                        htmlFor="tracking-number"
+                        className="text-xs text-[#8A8678]"
+                      >
+                        Tracking number
+                      </label>
+                      <input
+                        id="tracking-number"
+                        type="text"
+                        placeholder="Enter tracking number"
+                        value={trackingNumber}
+                        onChange={(e) => setTrackingNumber(e.target.value)}
+                        className={`${fieldClass} mt-1.5`}
+                      />
+                    </div>
 
                     {selectedOrder.order_status?.toLowerCase() !==
                       "delivered" && (
-                      <>
-                        <label className="text-[11px] font-semibold text-[#777D70]">
-                          Estimated Delivery
+                      <div>
+                        <label
+                          htmlFor="estimated-delivery"
+                          className="text-xs text-[#8A8678]"
+                        >
+                          Expected delivery
                         </label>
                         <input
+                          id="estimated-delivery"
                           type="date"
                           value={estimatedDelivery}
                           onChange={(e) => setEstimatedDelivery(e.target.value)}
-                          className="w-full rounded-xl border border-[#DDE3DA] bg-white px-3 py-2.5 text-sm text-[#343A20] outline-none transition focus:border-[#7B8064] focus:ring-2 focus:ring-[#DDE7D7]"
+                          className={`${fieldClass} mt-1.5`}
                         />
-                      </>
+                      </div>
                     )}
 
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="flex items-center gap-2 text-[#777D70] hover:bg-[#E8EBE6] hover:text-[#4D5528]"
+                    <button
+                      type="button"
                       onClick={() => setShowHistory(true)}
+                      className="inline-flex items-center gap-2 rounded-lg py-1 text-sm text-[#6F6C61] transition hover:text-[#2B2F18] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A68D65]"
                     >
                       <History className="h-4 w-4" />
-                      Show Status History
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-hidden rounded-2xl border border-[#E5DDCE] bg-white shadow-sm">
-                <div className="flex items-center justify-between border-b border-[#EEE8DE] bg-[#F8F5EE] px-5 py-4">
-                  <div>
-                    <p className="flex items-center gap-2 font-semibold text-[#303526]">
-                      <Package className="h-4 w-4 text-[#7B8064]" />
-                      Products
-                    </p>
-                    <p className="mt-1 text-sm text-[#8A877C]">
-                      {detailsLoading
-                        ? "Loading line items..."
-                        : detailsLoaded
-                          ? `${selectedItems.length} line items`
-                          : "0 line items"}
-                    </p>
-                  </div>
-                </div>
-
-                {detailsLoading ? (
-                  <div className="flex items-center justify-center gap-3 p-10 text-sm text-[#8A877C]">
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Loading order products...
-                  </div>
-                ) : detailsError ? (
-                  <div className="space-y-3 p-10 text-center text-sm text-red-600">
-                    <div className="flex items-center justify-center gap-2">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>{detailsError}</span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        selectedOrder && openOrderDetails(selectedOrder)
-                      }
-                    >
-                      Retry
-                    </Button>
-                  </div>
-                ) : selectedItems.length === 0 ? (
-                  <div className="p-10 text-center text-sm text-[#8A877C]">
-                    No items found for this order.
-                  </div>
-                ) : (
-                  <div className="divide-y divide-[#F0ECE5]">
-                    {selectedItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex flex-col gap-4 p-5 transition-colors hover:bg-[#FCFBF8] sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="flex items-center gap-3">
-                          {item.product_image ? (
-                            <img
-                              src={item.product_image}
-                              alt={item.product_name || "Product"}
-                              className="h-16 w-16 rounded-xl border border-[#E8E1D6] object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-[#E8E1D6] bg-[#F8F5EE] text-[#AAA497]">
-                              <Package className="h-5 w-5" />
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-semibold text-[#303526]">
-                              {item.product_name || "Product"}
-                            </p>
-                            <p className="mt-1 text-sm text-[#8A877C]">
-                              Qty {item.quantity || 0}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-left sm:text-right">
-                          <p className="font-semibold text-[#4D5528]">
-                            {formatCurrency(item.price)}
-                          </p>
-                          <p className="mt-1 text-xs text-[#9A9589]">
-                            Line total{" "}
-                            {formatCurrency(
-                              Number(item.price || 0) *
-                                Number(item.quantity || 0),
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      View status history
+                    </button>
+                  </section>
+                </aside>
               </div>
             </>
           )}
         </DialogContent>
       </Dialog>
 
+      {/* ------------------------------------------------------------------ */}
+      {/* Status history                                                      */}
+      {/* ------------------------------------------------------------------ */}
       <Dialog open={showHistory} onOpenChange={setShowHistory}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto border-[#E7E0D4] bg-[#FBF7F0] sm:max-w-2xl">
-          <DialogHeader className="border-b border-[#E8E1D6] pb-4">
-            <DialogTitle className="flex items-center gap-2 text-[#2D311C]">
-              <History className="h-5 w-5 text-[#7B8064]" />
-              Order Status History
+        <DialogContent className="max-h-[85vh] overflow-y-auto rounded-2xl border-[#ECE6DA] bg-white sm:max-w-xl">
+          <DialogHeader className="border-b border-[#ECE6DA] pb-4 text-left">
+            <DialogTitle className="font-serif text-2xl font-semibold text-[#2B2F18]">
+              Status history
             </DialogTitle>
-            <DialogDescription className="text-[#777467]">
-              Timeline for order #{getShortOrderId(selectedOrder?.id)}
+            <DialogDescription className="text-[#7A776C]">
+              Every change to order #{getShortOrderId(selectedOrder?.id)},
+              newest first.
             </DialogDescription>
           </DialogHeader>
 
           {selectedOrder?.history && selectedOrder.history.length > 0 ? (
-            <div className="relative py-2">
-              <div className="absolute bottom-6 left-[15px] top-6 w-px bg-[#D8DED2]" />
-              <div className="space-y-6">
-                {selectedOrder.history.map((entry, idx) => (
-                  <div key={entry.id} className="relative flex gap-4">
-                    <div className="z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-4 border-[#FBF7F0] bg-[#7B8064] text-xs font-bold text-white">
-                      {selectedOrder.history.length - idx}
-                    </div>
-                    <div className="min-w-0 flex-1 rounded-xl border border-[#E5E8E3] bg-white p-4 shadow-sm">
-                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                        <p className="font-semibold capitalize text-[#303526]">
-                          {ORDER_STATUS_LABELS[entry.status as OrderStatus] ||
-                            formatStatus(entry.status)}
-                        </p>
-                        <p className="shrink-0 text-xs text-[#8A877C]">
-                          {formatOrderDate(entry.created_at)}
-                        </p>
-                      </div>
-                      <p className="mt-2 text-sm text-[#777D70]">
-                        {entry.notes || "Status updated"}
-                      </p>
-                      <p className="mt-2 text-xs text-[#A09B90]">
-                        Updated by {entry.changed_by_name || "Unknown"}
-                      </p>
-                    </div>
+            <ol className="relative ml-2 space-y-6 py-2">
+              <span className="absolute bottom-3 left-[5px] top-3 w-px bg-[#E5DFD2]" />
+              {selectedOrder.history.map((entry) => (
+                <li key={entry.id} className="relative pl-8">
+                  <span className="absolute left-0 top-1.5 h-[11px] w-[11px] rounded-full border-2 border-white bg-[#4D5528] ring-1 ring-[#CFC9BB]" />
+                  <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+                    <p className="font-medium capitalize text-[#2B2F18]">
+                      {ORDER_STATUS_LABELS[entry.status as OrderStatus] ||
+                        formatStatus(entry.status)}
+                    </p>
+                    <p className="shrink-0 text-xs text-[#8A8678]">
+                      {formatOrderDate(entry.created_at)}
+                    </p>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <p className="mt-1 text-sm text-[#6F6C61]">
+                    {entry.notes || "Status updated"}
+                  </p>
+                  <p className="mt-1 text-xs text-[#A3A095]">
+                    By {entry.changed_by_name || "Unknown"}
+                  </p>
+                </li>
+              ))}
+            </ol>
           ) : (
-            <div className="rounded-xl border border-dashed border-[#D8DED2] bg-white p-8 text-center text-sm text-[#8A877C]">
-              No status history is available for this order yet.
+            <div className="rounded-xl border border-dashed border-[#E2DBCD] bg-[#FAF8F3] p-8 text-center text-sm text-[#8A8678]">
+              No status changes have been recorded for this order yet.
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Confirmation Dialog for Status Changes */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Confirm status change                                               */}
+      {/* ------------------------------------------------------------------ */}
       <Dialog
         open={confirmDialog.open}
         onOpenChange={(open) => {
-          if (!open) {
-            setConfirmDialog({
-              open: false,
-              action: null,
-              newStatus: "",
-              reason: "",
-            });
-          }
+          if (!open) closeConfirm();
         }}
       >
-        <DialogContent className="sm:max-w-md border-[#E7E0D4] bg-[#FBF7F0]">
-          <DialogHeader>
-            <DialogTitle className="text-[#2D311C]">
-              Confirm Status Change
+        <DialogContent className="rounded-2xl border-[#ECE6DA] bg-white sm:max-w-md">
+          <DialogHeader className="text-left">
+            <DialogTitle className="font-serif text-2xl font-semibold text-[#2B2F18]">
+              Confirm change
             </DialogTitle>
-            <DialogDescription className="text-[#777467]">
-              Are you sure you want to change this{" "}
-              {confirmDialog.action === "order" ? "order" : "payment"} status?
+            <DialogDescription className="text-[#7A776C]">
+              This updates the{" "}
+              {confirmDialog.action === "order" ? "order" : "payment"} status
+              and is recorded in the order history.
             </DialogDescription>
           </DialogHeader>
 
           {selectedOrder && (
-            <div className="space-y-4 py-4">
-              <div className="rounded-lg bg-[#F5F7F5] p-4">
-                <p className="text-xs font-semibold text-[#777D70]">
-                  {confirmDialog.action === "order"
-                    ? "Order Status"
-                    : "Payment Status"}
-                </p>
-                <p className="mt-2 font-semibold text-[#303526]">
+            <div className="space-y-4 py-2">
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-[#FAF8F3] px-4 py-3.5 text-sm">
+                <span className="font-medium text-[#6F6C61]">
                   {confirmDialog.action === "order"
                     ? ORDER_STATUS_LABELS[
                         selectedOrder.order_status as OrderStatus
@@ -1361,7 +1356,9 @@ export default function AdminOrders() {
                     : PAYMENT_STATUS_LABELS[
                         getEffectivePaymentStatus(selectedOrder)
                       ] || formatStatus(selectedOrder.payment_status)}
-                  {" → "}
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-[#A68D65]" />
+                <span className="font-semibold text-[#2B2F18]">
                   {confirmDialog.action === "order"
                     ? ORDER_STATUS_LABELS[
                         confirmDialog.newStatus as OrderStatus
@@ -1369,14 +1366,19 @@ export default function AdminOrders() {
                     : PAYMENT_STATUS_LABELS[
                         confirmDialog.newStatus as PaymentStatus
                       ] || formatStatus(confirmDialog.newStatus)}
-                </p>
+                </span>
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-[#777D70]">
-                  Reason (optional)
+                <label
+                  htmlFor="status-reason"
+                  className="text-sm font-medium text-[#4A4A42]"
+                >
+                  Reason{" "}
+                  <span className="font-normal text-[#A3A095]">(optional)</span>
                 </label>
                 <textarea
+                  id="status-reason"
                   value={confirmDialog.reason}
                   onChange={(e) =>
                     setConfirmDialog((prev) => ({
@@ -1384,8 +1386,8 @@ export default function AdminOrders() {
                       reason: e.target.value,
                     }))
                   }
-                  placeholder="Enter reason for this status change..."
-                  className="mt-2 w-full rounded-xl border border-[#DDE3DA] bg-white px-3 py-2.5 text-sm text-[#343A20] outline-none transition placeholder:text-[#B0AEA7] focus:border-[#7B8064] focus:ring-2 focus:ring-[#DDE7D7]"
+                  placeholder="Add a note for your team"
+                  className={`${fieldClass} mt-2 resize-none`}
                   rows={3}
                 />
               </div>
@@ -1393,11 +1395,11 @@ export default function AdminOrders() {
               {isTrackingNumberRequired(confirmDialog.newStatus) &&
                 confirmDialog.action === "order" &&
                 !trackingNumber && (
-                  <div className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
+                  <div className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3">
                     <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
-                    <p className="text-sm text-amber-800">
-                      Tracking number is required for{" "}
-                      {formatStatus(confirmDialog.newStatus)} status.
+                    <p className="text-sm text-amber-900">
+                      Add a tracking number before marking this order as{" "}
+                      {formatStatus(confirmDialog.newStatus)}.
                     </p>
                   </div>
                 )}
@@ -1407,21 +1409,14 @@ export default function AdminOrders() {
           <div className="flex gap-3">
             <Button
               variant="outline"
-              className="rounded-xl border-[#DADFD6] bg-white text-[#4D5528] hover:bg-[#EEF2EB]"
-              onClick={() =>
-                setConfirmDialog({
-                  open: false,
-                  action: null,
-                  newStatus: "",
-                  reason: "",
-                })
-              }
+              className="h-10 rounded-lg border-[#E2DBCD] bg-white text-[#3F4723] shadow-none hover:bg-[#FAF8F3]"
+              onClick={closeConfirm}
               disabled={savingStatus}
             >
               Cancel
             </Button>
             <Button
-              className="flex-1 rounded-xl bg-[#353D1E] text-white shadow-sm hover:bg-[#4D5528]"
+              className="h-10 flex-1 rounded-lg bg-[#2B2F18] text-white shadow-none hover:bg-[#4D5528]"
               onClick={confirmStatusChange}
               disabled={
                 savingStatus ||
@@ -1430,7 +1425,7 @@ export default function AdminOrders() {
                   !trackingNumber)
               }
             >
-              {savingStatus ? "Updating..." : "Confirm Change"}
+              {savingStatus ? "Saving…" : "Confirm change"}
             </Button>
           </div>
         </DialogContent>

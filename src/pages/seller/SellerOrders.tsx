@@ -19,6 +19,7 @@ import {
 import SellerLayout from "@/layouts/SellerLayout";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
+import { sendOrderShippedEmail } from "@/lib/orderService";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,7 +78,7 @@ interface Profile {
 }
 
 interface StatusHistoryItem {
-  id: number;
+  id: string;
   order_id: string;
   status: string;
   created_at: string;
@@ -167,6 +168,16 @@ const formatStatus = (status?: string | null) => {
     .replace(/_/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
+
+const deduplicateConsecutiveStatuses = (
+  entries: StatusHistoryItem[],
+): StatusHistoryItem[] =>
+  entries.filter(
+    (entry, index) =>
+      index === 0 ||
+      normalizeStatus(entry.status) !==
+        normalizeStatus(entries[index - 1].status),
+  );
 
 
 const getNextStatus = (status?: string | null) => {
@@ -944,8 +955,9 @@ export default function SellerOrders() {
 
 
       setStatusHistory(
-        (data as StatusHistoryItem[]) ||
-          [],
+        deduplicateConsecutiveStatuses(
+          (data as StatusHistoryItem[]) || [],
+        ),
       );
 
       setStatusHistoryOpen(true);
@@ -1069,6 +1081,10 @@ export default function SellerOrders() {
 
       if (updateError) {
         throw updateError;
+      }
+
+      if (updatePayload.status === "shipped") {
+        await sendOrderShippedEmail(selectedOrder.id);
       }
 
 
@@ -1209,6 +1225,10 @@ export default function SellerOrders() {
 
       if (updateError) {
         throw updateError;
+      }
+
+      if (normalized === "shipped") {
+        await sendOrderShippedEmail(selectedOrder.id);
       }
 
 

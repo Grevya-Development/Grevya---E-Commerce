@@ -7,6 +7,7 @@ import MissionSection from '@/components/MissionSection';
 import CategoryHighlight from '@/components/CategoryHighlight';
 import Newsletter from '@/components/Newsletter';
 import PersonalizedHome from '@/components/PersonalizedHome';
+import RecentlyViewedProducts from '@/components/RecentlyViewedProducts';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -52,6 +53,8 @@ const Index = () => {
         >
           <FeaturedProducts />
         </motion.div>
+
+        <RecentlyViewedProducts />
 
         {/* 3. Rebuilt Immersive Category Showcase */}
         <motion.div
