@@ -3,6 +3,7 @@ import { Eye, Trash2, Pencil, Plus, Minus, Save } from "lucide-react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 import SellerLayout from "@/layouts/SellerLayout";
+import { formatCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -582,7 +583,7 @@ export default function MyProducts() {
                         </p>
 
                         <p className="mt-2 text-lg font-semibold text-slate-900">
-                          ₹{product.price}
+                          {formatCurrency(product.price)}
                         </p>
                       </div>
 
@@ -1026,7 +1027,7 @@ export default function MyProducts() {
                         </p>
 
                         <p className="mt-3 text-3xl font-semibold text-emerald-700">
-                          ₹{selectedProduct.price}
+                          {formatCurrency(selectedProduct.price)}
                         </p>
                       </div>
 

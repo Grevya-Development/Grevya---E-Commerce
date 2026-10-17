@@ -29,6 +29,7 @@ import {
   Star,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatCurrency } from "@/lib/currency";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -297,10 +298,17 @@ const Account = () => {
   }, [profile, user]);
 
   useEffect(() => {
+    let isCurrent = true;
+    setOrders([]);
+    setAddresses([]);
+
     const fetchAccountData = async () => {
       if (!user) return;
 
-      const [{ data: orderRows }, { data: addressRows }] = await Promise.all([
+      const [
+        { data: orderRows, error: ordersError },
+        { data: addressRows, error: addressesError },
+      ] = await Promise.all([
         supabase
           .from("orders")
           .select(
@@ -315,6 +323,14 @@ const Account = () => {
           .eq("user_id", user.id)
           .order("is_default", { ascending: false }),
       ]);
+
+      if (!isCurrent) return;
+      if (ordersError) {
+        console.error("[Account] Failed to load customer orders:", ordersError);
+      }
+      if (addressesError) {
+        console.error("[Account] Failed to load saved addresses:", addressesError);
+      }
 
       const parseAddressLabelAndLine = (addressLine1: string) => {
         const match = (addressLine1 || "").match(/^\[(.*?)\]\s*(.*)$/);
@@ -342,6 +358,9 @@ const Account = () => {
     };
 
     fetchAccountData();
+    return () => {
+      isCurrent = false;
+    };
   }, [user]);
 
   // Profile Completeness calculation: Name (25%), Phone (25%), Avatar (25%), Default Address (25%)
@@ -1526,8 +1545,7 @@ const Account = () => {
                                     Amount
                                   </p>
                                   <p className="text-sm font-extrabold text-[#33381C]">
-                                    ₹
-                                    {Number(order.total_amount || 0).toFixed(0)}
+                                    {formatCurrency(order.total_amount)}
                                   </p>
                                 </div>
                                 <div className="flex gap-2">
@@ -1579,13 +1597,11 @@ const Account = () => {
                           Total Investments
                         </span>
                         <span className="font-extrabold text-[#33381C]">
-                          ₹
-                          {orders
+                          {formatCurrency(orders
                             .reduce(
                               (sum, o) => sum + Number(o.total_amount || 0),
                               0,
-                            )
-                            .toFixed(0)}
+                            ))}
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-xs">

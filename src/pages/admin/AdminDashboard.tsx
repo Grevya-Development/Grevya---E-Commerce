@@ -15,6 +15,7 @@ import {
 
 import AdminLayout from "@/layouts/AdminLayout";
 import { supabase } from "@/lib/supabaseClient";
+import { formatCurrency } from "@/lib/currency";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -116,14 +117,6 @@ export default function AdminDashboard() {
       supabase.removeChannel(channel);
     };
   }, []);
-
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(val);
-  };
 
   return (
     <AdminLayout>

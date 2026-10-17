@@ -4,6 +4,7 @@ import { ArrowRight, Leaf, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { productImages } from "@/lib/product-images";
 import { motion } from "framer-motion";
+import { formatCurrency } from "@/lib/currency";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -186,7 +187,7 @@ const Hero = () => {
                     Pure Coconut Oil
                   </h4>
                   <p className="text-[10px] text-[#33381C]/75 font-semibold mt-1">
-                    ₹299.00 • Quick View
+                    {formatCurrency(299)} • Quick View
                   </p>
                 </div>
               </motion.div>

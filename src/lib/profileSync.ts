@@ -61,14 +61,6 @@
         data?.phone ||
         authUser.user_metadata?.phone ||
         null,
-      // The database is the source of truth after a profile has been created.
-      // An admin may change a user's role without changing Auth user metadata.
-      role:
-        data?.role ||
-        seed.role ||
-        pending.role ||
-        authUser.user_metadata?.role ||
-        "customer",
       avatar_url:
         data?.avatar_url ||
         authUser.user_metadata?.avatar_url ||
@@ -82,7 +74,6 @@
       const needsUpdate =
         (mergedSeed.full_name && data.full_name !== mergedSeed.full_name) ||
         (mergedSeed.phone && data.phone !== mergedSeed.phone) ||
-        (mergedSeed.role && data.role !== mergedSeed.role) ||
         (authUser.email && data.email !== authUser.email) ||
         (mergedSeed.avatar_url && data.avatar_url !== mergedSeed.avatar_url);
 
@@ -92,7 +83,6 @@
           .update({
             full_name: mergedSeed.full_name || data.full_name,
             phone: mergedSeed.phone || data.phone,
-            role: mergedSeed.role || data.role,
             email: authUser.email || data.email,
             avatar_url: mergedSeed.avatar_url || data.avatar_url,
           })
@@ -114,7 +104,7 @@
             email: authUser.email || null,
             full_name: mergedSeed.full_name,
             phone: mergedSeed.phone,
-            role: mergedSeed.role || "customer",
+            role: "customer",
             avatar_url: mergedSeed.avatar_url,
           },
           { onConflict: "id" },

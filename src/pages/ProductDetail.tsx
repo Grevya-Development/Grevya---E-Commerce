@@ -26,6 +26,7 @@ import { getProductStockDetails, SellableVariant } from "@/lib/stock";
 import { useComparisonStore } from "@/store/useComparisonStore";
 import { useRecentlyViewedStore } from "@/store/useRecentlyViewedStore";
 import RecentlyViewedProducts from "@/components/RecentlyViewedProducts";
+import { formatCurrency } from "@/lib/currency";
 
 interface Review {
   id: string;
@@ -527,7 +528,7 @@ const ProductDetail = () => {
               </div>
 
               <p className="text-4xl md:text-5xl font-extrabold text-green-800 mb-8 tracking-tighter">
-                ₹{product.price}
+                {formatCurrency(product.price)}
               </p>
 
               <button
