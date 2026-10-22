@@ -47,7 +47,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfileState] = useState<UserProfile | null>(null);
+  const profileRef = useRef<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const loadedUserIdRef = useRef<string | null>(null);
@@ -55,6 +56,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const authStateRevisionRef = useRef(0);
   const blockedSignOutInProgressRef = useRef(false);
   const loading = authLoading || profileLoading;
+
+  const setProfile = useCallback((nextProfile: UserProfile | null) => {
+    profileRef.current = nextProfile;
+    setProfileState(nextProfile);
+  }, []);
 
   const signOutIfCurrentUser = useCallback(
     async (userId: string, revision: number) => {
@@ -133,7 +139,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       ) {
         return;
       }
-      if (loadedUserIdRef.current === currUser.id && profile) return;
+      if (loadedUserIdRef.current === currUser.id && profileRef.current) return;
       loadedUserIdRef.current = currUser.id;
       setProfileLoading(true);
 
@@ -225,7 +231,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
     },
-    [profile, signOutIfCurrentUser],
+    [setProfile, signOutIfCurrentUser],
   );
 
   const refreshProfile = useCallback(async () => {
@@ -238,13 +244,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     loadedUserIdRef.current = null;
     await loadProfile(user, authStateRevisionRef.current);
-  }, [loadProfile, user]);
+  }, [loadProfile, setProfile, user]);
 
   useEffect(() => {
     let mounted = true;
     let authSubscription: { unsubscribe: () => void } | null = null;
 
-    const syncAuthState = (nextSession: Session | null) => {
+    const syncAuthState = (
+      nextSession: Session | null,
+      deferProfileLoad = false,
+    ) => {
       const nextUser = nextSession?.user ?? null;
       const previousUserId = activeAuthUserIdRef.current;
       const nextRevision = authStateRevisionRef.current + 1;
@@ -260,7 +269,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setAuthLoading(false);
 
       if (nextUser) {
-        void loadProfile(nextUser, nextRevision);
+        if (deferProfileLoad) {
+          window.setTimeout(() => {
+            if (
+              mounted &&
+              activeAuthUserIdRef.current === nextUser.id &&
+              authStateRevisionRef.current === nextRevision
+            ) {
+              void loadProfile(nextUser, nextRevision);
+            }
+          }, 0);
+        } else {
+          void loadProfile(nextUser, nextRevision);
+        }
       } else {
         loadedUserIdRef.current = null;
         setProfile(null);
@@ -275,7 +296,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { data: authData } = supabase.auth.onAuthStateChange(
         (_event, nextSession) => {
           if (!mounted) return;
-          syncAuthState(nextSession);
+          syncAuthState(nextSession, true);
         },
       );
 
@@ -285,6 +306,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const { data: sessionData, error } = await supabase.auth.getSession();
         if (error) throw error;
         if (!mounted) return;
+        if (authStateRevisionRef.current !== restoreRevision) return;
 
         syncAuthState(sessionData.session);
 
@@ -319,7 +341,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       mounted = false;
       authSubscription?.unsubscribe();
     };
-  }, [loadProfile]);
+  }, [loadProfile, setProfile]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -357,7 +379,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => {
       void supabase.removeChannel(profileChannel);
     };
-  }, [signOutBlockedUser, user?.id]);
+  }, [setProfile, signOutBlockedUser, user?.id]);
 
   const signOut = useCallback(async () => {
     const userId = activeAuthUserIdRef.current;
