@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import { ProductProps } from './ProductCard';
 import { searchProducts } from '@/lib/productSearch';
+import { formatCurrency } from '@/lib/currency';
 
 type SpotlightProduct = ProductProps & {
   description?: string | null;
@@ -292,7 +293,7 @@ export default function SpotlightSearch() {
                           </div>
                         </div>
                         <div className="flex items-center space-x-3 pr-2">
-                          <span className="font-bold text-sm">₹{p.price.toFixed(2)}</span>
+                          <span className="font-bold text-sm">{formatCurrency(p.price)}</span>
                           {isKeyboardSelected && hoveredIndex === -1 && (
                             <CornerDownLeft className="h-3.5 w-3.5 opacity-60" />
                           )}

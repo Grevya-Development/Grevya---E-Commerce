@@ -16,6 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
 import { motion, useMotionValue, useTransform } from "framer-motion";
+import { formatCurrency } from "@/lib/currency";
 
 export interface ProductProps {
   id: number;
@@ -372,7 +373,7 @@ const ProductCard = (props: ProductProps) => {
               )}
             </div>
             <p className="text-xs md:text-base font-extrabold text-[#33381C] tracking-tight">
-              ₹{price.toFixed(0)}
+              {formatCurrency(price)}
             </p>
           </div>
         </Link>

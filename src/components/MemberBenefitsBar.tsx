@@ -1,12 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { X, Truck, Leaf, ShieldCheck, Sparkles } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from "react";
+import { X, Truck, Leaf, ShieldCheck } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { formatCurrency } from "@/lib/currency";
+import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 
 const BENEFITS = [
-  { id: 1, text: "Free shipping on organic orders over $50", icon: Truck },
+  {
+    id: 1,
+    text: `Free shipping on organic orders of ${formatCurrency(FREE_SHIPPING_THRESHOLD)} or more`,
+    icon: Truck,
+  },
   { id: 2, text: "100% Natural, Cruelty-Free & Vegan", icon: Leaf },
-  { id: 3, text: "Use code GREVYA10 for 10% off first order", icon: Sparkles },
-  { id: 4, text: "Secure payments & COD available", icon: ShieldCheck }
+  { id: 4, text: "Secure payments & COD available", icon: ShieldCheck },
 ];
 
 export default function MemberBenefitsBar() {
@@ -25,7 +30,8 @@ export default function MemberBenefitsBar() {
 
   // Sync visibility with localStorage persistence
   useEffect(() => {
-    const isDismissed = localStorage.getItem('grevya-benefits-dismissed') === 'true';
+    const isDismissed =
+      localStorage.getItem("grevya-benefits-dismissed") === "true";
     if (isDismissed) {
       setIsVisible(false);
     }
@@ -47,13 +53,13 @@ export default function MemberBenefitsBar() {
       setLastScrollY(currentScrollY);
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY]);
 
   const handleDismiss = () => {
     setIsVisible(false);
-    localStorage.setItem('grevya-benefits-dismissed', 'true');
+    localStorage.setItem("grevya-benefits-dismissed", "true");
   };
 
   if (!isVisible) return null;
@@ -62,11 +68,11 @@ export default function MemberBenefitsBar() {
     <AnimatePresence>
       <motion.div
         initial={{ height: 0, opacity: 0 }}
-        animate={{ height: 'auto', opacity: 1 }}
+        animate={{ height: "auto", opacity: 1 }}
         exit={{ height: 0, opacity: 0 }}
-        transition={{ duration: 0.3, ease: 'easeInOut' }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
         className={`w-full z-50 bg-[#33381C] text-[#F7EEE4] py-2 px-4 border-b border-[#F7EEE4]/10 transition-transform duration-300 sticky ${
-          isScrolledUp ? 'top-0' : '-translate-y-full'
+          isScrolledUp ? "top-0" : "-translate-y-full"
         }`}
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between text-xs md:text-sm font-sans tracking-wide">
@@ -75,7 +81,10 @@ export default function MemberBenefitsBar() {
             {BENEFITS.map((b) => {
               const IconComp = b.icon;
               return (
-                <div key={b.id} className="flex items-center space-x-2 text-[#F7EEE4]/90 hover:text-[#F7EEE4] transition-colors">
+                <div
+                  key={b.id}
+                  className="flex items-center space-x-2 text-[#F7EEE4]/90 hover:text-[#F7EEE4] transition-colors"
+                >
                   <IconComp className="h-4 w-4 text-[#A68D65]" />
                   <span>{b.text}</span>
                 </div>
@@ -91,11 +100,15 @@ export default function MemberBenefitsBar() {
                 initial={{ y: 8, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: -8, opacity: 0 }}
-                transition={{ duration: 0.25, ease: 'easeInOut' }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
                 className="flex items-center space-x-2 text-center"
               >
-                {React.createElement(BENEFITS[currentIndex].icon, { className: "h-4 w-4 text-[#A68D65]" })}
-                <span className="font-medium">{BENEFITS[currentIndex].text}</span>
+                {React.createElement(BENEFITS[currentIndex].icon, {
+                  className: "h-4 w-4 text-[#A68D65]",
+                })}
+                <span className="font-medium">
+                  {BENEFITS[currentIndex].text}
+                </span>
               </motion.div>
             </AnimatePresence>
           </div>

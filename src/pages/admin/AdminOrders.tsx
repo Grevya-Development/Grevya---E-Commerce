@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import AdminLayout from "@/layouts/AdminLayout";
+import { formatCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import {
@@ -84,12 +85,6 @@ interface OrderItem {
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
-
-const formatCurrency = (value?: number | null) =>
-  `₹${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 
 const formatDateInputValue = (value?: string | null) => {
   if (!value) return "";

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import AdminLayout from "@/layouts/AdminLayout";
+import { formatCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "@/components/ui/use-toast";
 import {
@@ -608,9 +609,6 @@ export default function AdminProductRequests() {
     [products, selectedIds],
   );
 
-  const formatPrice = (price?: number) =>
-    `₹${(price || 0).toLocaleString("en-IN")}`;
-
   const formatDate = (d?: string) =>
     d
       ? new Date(d).toLocaleDateString("en-IN", {
@@ -1200,7 +1198,7 @@ export default function AdminProductRequests() {
                                   className="h-3.5 w-3.5"
                                   style={{ color: C.mutedLight }}
                                 />
-                                {formatPrice(product.price)}
+                                {formatCurrency(product.price)}
                               </span>
                             </td>
 
@@ -1453,7 +1451,7 @@ export default function AdminProductRequests() {
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {[
                       ["Category", selectedProduct.category],
-                      ["Price", formatPrice(selectedProduct.price)],
+                      ["Price", formatCurrency(selectedProduct.price)],
                       ["Stock", String(selectedProduct.stock ?? 0)],
                       [
                         "Seller",

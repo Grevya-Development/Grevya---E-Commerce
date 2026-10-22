@@ -41,12 +41,11 @@ export const useCartStore = create<CartStore>()(
       currentUserId: null,
 
       addItem: async (product, quantity = 1) => {
+        if (quantity < 1) return { ok: false, availableStock: 0 };
         const availableStock = await getAvailableStock(
           product.id,
           product.variant_id,
         );
-        if (quantity < 1 || availableStock < 1)
-          return { ok: false, availableStock };
         let accepted = false;
         set((state) => {
           const activeKey = state.currentUserId || "guest";
@@ -56,19 +55,35 @@ export const useCartStore = create<CartStore>()(
               item.id === product.id && item.variant_id === product.variant_id,
           );
 
-          if ((existingItem?.quantity || 0) + quantity > availableStock)
-            return state;
-          accepted = true;
-
           let updatedCart: CartItem[];
           if (existingItem) {
-            updatedCart = currentCart.map((item) =>
-              item.id === product.id && item.variant_id === product.variant_id
-                ? { ...item, quantity: item.quantity + quantity }
-                : item,
-            );
+            if (availableStock < 1) {
+              updatedCart = currentCart.filter(
+                (item) =>
+                  item.id !== product.id ||
+                  item.variant_id !== product.variant_id,
+              );
+            } else {
+              const nextQuantity =
+                existingItem.quantity + quantity <= availableStock
+                  ? existingItem.quantity + quantity
+                  : Math.min(existingItem.quantity, availableStock);
+              accepted = nextQuantity === existingItem.quantity + quantity;
+              updatedCart = currentCart.map((item) =>
+                item.id === product.id && item.variant_id === product.variant_id
+                  ? { ...item, quantity: nextQuantity, stock: availableStock }
+                  : item,
+              );
+            }
           } else {
-            updatedCart = [...currentCart, { ...product, quantity }];
+            if (availableStock < 1 || quantity > availableStock) {
+              return state;
+            }
+            accepted = true;
+            updatedCart = [
+              ...currentCart,
+              { ...product, quantity, stock: availableStock },
+            ];
           }
 
           return {
@@ -110,15 +125,35 @@ export const useCartStore = create<CartStore>()(
           currentItem.id,
           currentItem.variant_id,
         );
-        if (quantity > availableStock) return { ok: false, availableStock };
+        let accepted = false;
         set((state) => {
           const activeKey = state.currentUserId || "guest";
           const currentCart = state.userCarts[activeKey] || [];
-          const updatedCart = currentCart.map((item) =>
-            item.id === id && item.variant_id === variantId
-              ? { ...item, quantity }
-              : item,
+          const latestItem = currentCart.find(
+            (item) => item.id === id && item.variant_id === variantId,
           );
+          if (!latestItem) return state;
+
+          const updatedCart =
+            availableStock < 1
+              ? currentCart.filter(
+                  (item) =>
+                    item.id !== id || item.variant_id !== variantId,
+                )
+              : currentCart.map((item) => {
+                  if (item.id !== id || item.variant_id !== variantId)
+                    return item;
+                  const nextQuantity =
+                    quantity <= availableStock
+                      ? quantity
+                      : Math.min(latestItem.quantity, availableStock);
+                  accepted = quantity <= availableStock;
+                  return {
+                    ...item,
+                    quantity: nextQuantity,
+                    stock: availableStock,
+                  };
+                });
 
           return {
             items: updatedCart,
@@ -128,40 +163,63 @@ export const useCartStore = create<CartStore>()(
             },
           };
         });
-        return { ok: true, availableStock };
+        return { ok: accepted, availableStock };
       },
 
       adjustQuantity: async (id, delta, variantId) => {
         if (delta === 0) return { ok: false, availableStock: 0 };
-
         let accepted = false;
-        let nextQuantity = 0;
-
+        let availableStock = 0;
         set((state) => {
           const activeKey = state.currentUserId || "guest";
           const currentCart = state.userCarts[activeKey] || [];
           const currentItem = currentCart.find(
             (item) => item.id === id && item.variant_id === variantId,
           );
-
           if (!currentItem) return state;
 
-          nextQuantity = currentItem.quantity + delta;
-          if (nextQuantity < 1) return state;
-
-          const itemStock = Number.isFinite(currentItem.stock)
-            ? Number(currentItem.stock)
-            : Number.POSITIVE_INFINITY;
-          if (delta > 0 && itemStock > 0 && nextQuantity > itemStock) {
-            return state;
+          availableStock = Number.isFinite(currentItem.stock)
+            ? Math.max(0, Number(currentItem.stock))
+            : 0;
+          if (availableStock < 1) {
+            return {
+              items: currentCart.filter(
+                (item) =>
+                  item.id !== id || item.variant_id !== variantId,
+              ),
+              userCarts: {
+                ...state.userCarts,
+                [activeKey]: currentCart.filter(
+                  (item) =>
+                    item.id !== id || item.variant_id !== variantId,
+                ),
+              },
+            };
           }
 
-          accepted = true;
-          const updatedCart = currentCart.map((item) =>
-            item.id === id && item.variant_id === variantId
-              ? { ...item, quantity: nextQuantity }
-              : item,
-          );
+          const updatedCart =
+            currentCart.map((item) => {
+              if (item.id !== id || item.variant_id !== variantId)
+                return item;
+              const currentQuantity = Math.min(
+                currentItem.quantity,
+                availableStock,
+              );
+              const nextQuantity = currentQuantity + delta;
+              if (nextQuantity < 1 || nextQuantity > availableStock) {
+                return {
+                  ...item,
+                  quantity: currentQuantity,
+                  stock: availableStock,
+                };
+              }
+              accepted = true;
+              return {
+                ...item,
+                quantity: nextQuantity,
+                stock: availableStock,
+              };
+            });
 
           return {
             items: updatedCart,
@@ -172,31 +230,7 @@ export const useCartStore = create<CartStore>()(
           };
         });
 
-        if (!accepted) {
-          const availableStock = await getAvailableStock(id, variantId);
-          return { ok: false, availableStock };
-        }
-
-        const availableStock = await getAvailableStock(id, variantId);
-        set((state) => {
-          const activeKey = state.currentUserId || "guest";
-          const currentCart = state.userCarts[activeKey] || [];
-          const updatedCart = currentCart.map((item) => {
-            if (item.id !== id || item.variant_id !== variantId) return item;
-            if (item.quantity <= availableStock) return item;
-            return { ...item, quantity: Math.max(1, availableStock) };
-          });
-
-          return {
-            items: updatedCart,
-            userCarts: {
-              ...state.userCarts,
-              [activeKey]: updatedCart,
-            },
-          };
-        });
-
-        return { ok: true, availableStock };
+        return { ok: accepted, availableStock };
       },
 
       clearCart: () => {
@@ -224,8 +258,9 @@ export const useCartStore = create<CartStore>()(
       },
 
       validateCartStock: async () => {
+        const itemsToCheck = get().items;
         const checks = await Promise.all(
-          get().items.map(async (item) => ({
+          itemsToCheck.map(async (item) => ({
             id: item.id,
             variantId: item.variant_id,
             availableStock: await getAvailableStock(item.id, item.variant_id),
@@ -239,7 +274,6 @@ export const useCartStore = create<CartStore>()(
           );
           return item && item.quantity > check.availableStock;
         });
-        if (!changed) return true;
 
         set((state) => {
           const activeKey = state.currentUserId || "guest";
@@ -254,6 +288,7 @@ export const useCartStore = create<CartStore>()(
                 ? {
                     ...item,
                     quantity: Math.min(item.quantity, check.availableStock),
+                    stock: check.availableStock,
                   }
                 : item;
             })
@@ -263,7 +298,7 @@ export const useCartStore = create<CartStore>()(
             userCarts: { ...state.userCarts, [activeKey]: updatedCart },
           };
         });
-        return false;
+        return !changed;
       },
 
       syncUserSession: async (userId) => {

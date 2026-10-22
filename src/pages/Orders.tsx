@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+import { formatCurrency } from "@/lib/currency";
 
 interface OrderItem {
   id: string;
@@ -28,9 +29,20 @@ const Orders = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setOrders([]);
+      setLoadError(null);
+      setLoading(false);
+      return;
+    }
+
+    setOrders([]);
+    setLoadError(null);
+    setLoading(true);
+    let isCurrent = true;
 
     const fetchOrders = async () => {
       const { data, error } = await supabase
@@ -41,7 +53,17 @@ const Orders = () => {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (!error) setOrders((data || []) as Order[]);
+      if (!isCurrent) return;
+      if (error) {
+        console.error("[Orders] Failed to load customer orders:", error);
+        setOrders([]);
+        setLoadError(
+          "We couldn't load your orders. Please refresh and try again.",
+        );
+      } else {
+        setOrders((data || []) as Order[]);
+        setLoadError(null);
+      }
       setLoading(false);
     };
 
@@ -62,6 +84,7 @@ const Orders = () => {
       .subscribe();
 
     return () => {
+      isCurrent = false;
       supabase.removeChannel(channel);
     };
   }, [user]);
@@ -93,6 +116,13 @@ const Orders = () => {
                   className="h-28 animate-pulse rounded-2xl bg-white"
                 />
               ))}
+            </div>
+          ) : loadError ? (
+            <div
+              role="alert"
+              className="rounded-2xl border border-red-200 bg-white p-8 text-center text-sm text-red-700"
+            >
+              {loadError}
             </div>
           ) : orders.length === 0 ? (
             <div className="rounded-[2.5rem] bg-white/70 backdrop-blur-md p-10 md:p-14 text-center border border-[#A68D65]/20 shadow-sm max-w-xl mx-auto relative overflow-hidden group">
@@ -181,14 +211,26 @@ const Orders = () => {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold capitalize text-green-800">
-                      {order.status || order.order_status || "pending"}
-                    </span>
-                    <span className="rounded-full bg-cream-light px-3 py-1 text-xs font-bold capitalize text-green-800">
-                      {order.payment_status || "pending"}
-                    </span>
-                    <span className="font-bold text-green-800">
-                      Rs {Number(order.total_amount || 0).toFixed(2)}
+                    <div className="flex flex-col items-start gap-1">
+                      <span className="text-[10px] font-bold text-neutral-500">
+                        Order Status
+                      </span>
+                      <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold capitalize text-green-800">
+                        {order.status || order.order_status || "pending"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-start gap-1">
+                      <span className="text-[10px] font-bold text-neutral-500">
+                        Payment Status
+                      </span>
+                      <span className="rounded-full bg-cream-light px-3 py-1 text-xs font-bold capitalize text-green-800">
+                        {order.payment_status || "pending"}
+                      </span>
+                    </div>
+                    <span className="text-right">
+                      <span className="font-bold text-green-800">
+                        {formatCurrency(order.total_amount)}
+                      </span>
                     </span>
                     <ArrowRight className="h-4 w-4 text-neutral-400" />
                   </div>

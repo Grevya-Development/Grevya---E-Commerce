@@ -17,6 +17,7 @@ import {
   XCircle,
 } from "lucide-react";
 import AdminLayout from "@/layouts/AdminLayout";
+import { formatCurrency } from "@/lib/currency";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -569,7 +570,7 @@ export default function AdminReturnRequests() {
                   </p>
                   {selected.order_total != null && (
                     <p className="mt-1 text-xs text-[#777D70]">
-                      Order total: ₹{Number(selected.order_total).toFixed(2)}
+                      Order total: {formatCurrency(selected.order_total)}
                     </p>
                   )}
                 </div>

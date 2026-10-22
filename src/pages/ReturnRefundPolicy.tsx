@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import PolicyLayout from "@/components/PolicyLayout";
+import { formatCurrency } from "@/lib/currency";
 import {
   AlertTriangle,
   CheckCircle,
@@ -587,11 +588,9 @@ const ReturnRefundPolicy = () => {
                                   <span className="mt-1 block text-xs text-[#69665C]">
                                     Qty {item.quantity}
                                     {order.total_amount != null &&
-                                      ` · Order total ₹${Number(
+                                      ` · Order total ${formatCurrency(Number(
                                         order.total_amount,
-                                      ).toLocaleString("en-IN", {
-                                        minimumFractionDigits: 2,
-                                      })}`}
+                                      ))}`}
                                   </span>
                                   <span className="mt-1 block break-all text-xs text-[#8A8678]">
                                     Order #{order.id.slice(0, 8)} · {orderDate}

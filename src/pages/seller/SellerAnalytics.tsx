@@ -31,6 +31,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import SellerLayout from "@/layouts/SellerLayout";
+import { formatCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabaseClient";
 
 type DateRange = 7 | 30 | 90;
@@ -111,13 +112,6 @@ const EXCLUDED_PAYMENT_STATUSES = new Set([
   "refunded",
 ]);
 const LOW_STOCK_FALLBACK = 10;
-
-const currency = (value: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(value);
 
 const numberValue = (value: unknown) => {
   const parsed = Number(value);
@@ -754,7 +748,7 @@ export default function SellerAnalytics() {
   const cards = [
     {
       label: "Total Revenue",
-      value: currency(summary.revenue),
+      value: formatCurrency(summary.revenue),
       note: `Paid seller item sales · last ${range} days`,
       icon: IndianRupee,
     },
@@ -934,14 +928,14 @@ export default function SellerAnalytics() {
                           tick={{ fontSize: 11 }}
                         />
                         <YAxis
-                          tickFormatter={(value: number) => currency(value)}
+                          tickFormatter={(value: number) => formatCurrency(value)}
                           width={76}
                           tick={{ fontSize: 10 }}
                         />
                         <Tooltip
                           labelFormatter={(value) => formatDay(String(value))}
                           formatter={(value: number) => [
-                            currency(value),
+                            formatCurrency(value),
                             "Revenue",
                           ]}
                         />
@@ -1132,7 +1126,7 @@ export default function SellerAnalytics() {
                                 {product.unitsSold}
                               </td>
                               <td className="px-3 py-3 font-semibold text-[#33381C]">
-                                {currency(product.revenue)}
+                                {formatCurrency(product.revenue)}
                               </td>
                               <td
                                 className={`px-3 py-3 ${

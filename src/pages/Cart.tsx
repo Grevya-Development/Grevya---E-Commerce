@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -17,8 +17,14 @@ import {
 import { useCartStore } from "@/store/useCartStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "@/components/ui/use-toast";
+import { formatCurrency } from "@/lib/currency";
+import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 
 const Cart = () => {
+  const [stockValidationState, setStockValidationState] = useState<
+    "checking" | "ready" | "error"
+  >("checking");
+  const [stockCheckAttempt, setStockCheckAttempt] = useState(0);
   const cartItems = useCartStore((state) => state.items);
   const removeItem = useCartStore((state) => state.removeItem);
   const adjustQuantity = useCartStore((state) => state.adjustQuantity);
@@ -26,7 +32,7 @@ const Cart = () => {
   const validateCartStock = useCartStore((state) => state.validateCartStock);
 
   const subtotal = getSubtotal();
-  const freeShippingThreshold = 500;
+  const freeShippingThreshold = FREE_SHIPPING_THRESHOLD;
   const shipping = subtotal >= freeShippingThreshold ? 0 : 50;
   const total = subtotal + shipping;
   const progressToFreeShipping = Math.min(
@@ -41,33 +47,55 @@ const Cart = () => {
     item: (typeof cartItems)[number],
     delta: number,
   ) => {
-    const result = await adjustQuantity(item.id, delta, item.variant_id);
-    if (!result.ok && delta > 0) {
+    try {
+      const result = await adjustQuantity(item.id, delta, item.variant_id);
+      if (!result.ok && delta > 0) {
+        toast({
+          title: "Stock limit reached",
+          description: result.availableStock
+            ? `Only ${result.availableStock} units are available.`
+            : "This product is out of stock.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: unknown) {
+      console.error("Unable to update cart quantity:", error);
       toast({
-        title: "Stock limit reached",
-        description: result.availableStock
-          ? `Only ${result.availableStock} units are available.`
-          : "This product is out of stock.",
+        title: "Unable to update quantity",
+        description: "Please try again after checking your connection.",
         variant: "destructive",
       });
     }
   };
 
-  const isAtStockLimit = (item: (typeof cartItems)[number]) => {
-    const itemStock = item.stock ?? 9999;
-    return item.quantity >= itemStock;
-  };
+  const isAtStockLimit = (item: (typeof cartItems)[number]) =>
+    item.quantity >= (item.stock ?? 0);
 
   useEffect(() => {
-    void validateCartStock().then((valid) => {
-      if (!valid)
-        toast({
-          title: "Cart updated",
-          description: "Some quantities were adjusted to match current stock.",
-          variant: "destructive",
-        });
-    });
-  }, [validateCartStock]);
+    let isCurrentRequest = true;
+    setStockValidationState("checking");
+
+    void validateCartStock()
+      .then((valid) => {
+        if (!isCurrentRequest) return;
+        if (!valid)
+          toast({
+            title: "Cart updated",
+            description: "Some quantities were adjusted to match current stock.",
+            variant: "destructive",
+          });
+        setStockValidationState("ready");
+      })
+      .catch((error: unknown) => {
+        console.error("Unable to validate cart stock:", error);
+        if (!isCurrentRequest) return;
+        setStockValidationState("error");
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [stockCheckAttempt, validateCartStock]);
 
   return (
     <div className="flex flex-col min-h-screen bg-cream/10">
@@ -87,7 +115,27 @@ const Cart = () => {
             Shopping Bag
           </h1>
 
-          {cartItems.length > 0 ? (
+          {stockValidationState === "checking" ? (
+            <div className="rounded-2xl border border-neutral-100 bg-white p-10 text-center text-neutral-500" role="status">
+              Checking current stock...
+            </div>
+          ) : stockValidationState === "error" ? (
+            <div className="rounded-2xl border border-red-100 bg-white p-10 text-center">
+              <p className="font-semibold text-neutral-900">
+                We couldn&apos;t verify your cart stock.
+              </p>
+              <p className="mt-2 text-sm text-neutral-500">
+                Please try again before changing your order.
+              </p>
+              <Button
+                type="button"
+                onClick={() => setStockCheckAttempt((attempt) => attempt + 1)}
+                className="mt-5"
+              >
+                Retry stock check
+              </Button>
+            </div>
+          ) : cartItems.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
               {/* Items List */}
               <div className="lg:col-span-2 space-y-4">
@@ -124,7 +172,7 @@ const Cart = () => {
                                     </Link>
                                   </h3>
                                   <p className="ml-4 text-green-800 tracking-tight">
-                                    ₹{(item.price * item.quantity).toFixed(2)}
+                                    {formatCurrency(item.price * item.quantity)}
                                   </p>
                                 </div>
                                 <p className="mt-1 text-xs text-neutral-400 font-semibold uppercase tracking-wider capitalize">
@@ -135,10 +183,13 @@ const Cart = () => {
                               <div className="flex flex-1 items-end justify-between text-sm mt-4">
                                 <div className="flex items-center border border-neutral-200 rounded-xl bg-neutral-50 p-1">
                                   <button
+                                    type="button"
                                     onClick={() =>
                                       void changeQuantity(item, -1)
                                     }
-                                    className="p-1.5 hover:bg-white rounded-lg text-neutral-500 hover:text-neutral-900 transition-colors"
+                                    disabled={item.quantity <= 1}
+                                    className="p-1.5 hover:bg-white rounded-lg text-neutral-500 hover:text-neutral-900 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label="Decrease quantity"
                                   >
                                     <Minus size={14} />
                                   </button>
@@ -146,6 +197,7 @@ const Cart = () => {
                                     {item.quantity}
                                   </span>
                                   <button
+                                    type="button"
                                     onClick={() => void changeQuantity(item, 1)}
                                     disabled={isAtStockLimit(item)}
                                     className="p-1.5 hover:bg-white rounded-lg text-neutral-500 hover:text-neutral-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -194,7 +246,7 @@ const Cart = () => {
                       <p className="text-xs text-neutral-500 font-medium">
                         Add{" "}
                         <strong className="text-green-800">
-                          ₹{remainingForFreeShipping.toFixed(2)}
+                          {formatCurrency(remainingForFreeShipping)}
                         </strong>{" "}
                         more for Free Shipping
                       </p>
@@ -218,13 +270,13 @@ const Cart = () => {
                     <div className="flex justify-between text-sm text-neutral-500 font-medium">
                       <span>Subtotal</span>
                       <span className="font-bold text-neutral-800">
-                        ₹{subtotal.toFixed(2)}
+                        {formatCurrency(subtotal)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm text-neutral-500 font-medium">
                       <span>Shipping</span>
                       <span className="font-bold text-neutral-800">
-                        {shipping === 0 ? "Free" : `₹${shipping.toFixed(2)}`}
+                        {shipping === 0 ? "Free" : formatCurrency(shipping)}
                       </span>
                     </div>
                   </div>
@@ -234,7 +286,7 @@ const Cart = () => {
                       Total Price
                     </span>
                     <span className="text-2xl font-extrabold text-green-800 tracking-tight">
-                      ₹{total.toFixed(2)}
+                      {formatCurrency(total)}
                     </span>
                   </div>
 

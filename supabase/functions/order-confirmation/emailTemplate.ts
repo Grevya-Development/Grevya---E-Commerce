@@ -1,3 +1,5 @@
+import { formatCurrency } from "../../../src/lib/currency.ts";
+
 type EmailOrderItem = {
   product_name?: string | null;
   quantity?: number | null;
@@ -35,12 +37,7 @@ const escapeHtml = (value: unknown) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
-const formatPrice = (value: unknown) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(Number(value) || 0);
+const formatPrice = (value: unknown) => formatCurrency(Number(value) || 0);
 
 const formatDate = (value: unknown) => {
   if (typeof value !== "string" || !value) return "Not available";

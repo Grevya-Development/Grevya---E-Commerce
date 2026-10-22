@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+import { getAuthorizedUserRoles } from "@/lib/authorizedRoles";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -19,7 +20,48 @@ const ProtectedRoute = ({
   const [sellerApplicationState, setSellerApplicationState] = useState<
     "checking" | "approved" | "pending" | "rejected" | "unavailable"
   >("checking");
+  const [roleCheckStatus, setRoleCheckStatus] = useState<
+    "checking" | "ready" | "error"
+  >("checking");
+  const [roleCheckKey, setRoleCheckKey] = useState<string | null>(null);
+  const [authorizedRoles, setAuthorizedRoles] = useState<string[]>([]);
+  const [roleCheckAttempt, setRoleCheckAttempt] = useState(0);
   const isSellerRoute = allowedRoles?.includes("seller") ?? false;
+  const currentRoleCheckKey =
+    user?.id && profile
+      ? `${user.id}:${profile.role || ""}:${profile.role_id || ""}`
+      : null;
+
+  useEffect(() => {
+    if (loading || profileLoading || !user?.id || !profile) return;
+
+    let cancelled = false;
+    setRoleCheckStatus("checking");
+    setRoleCheckKey(currentRoleCheckKey);
+    void getAuthorizedUserRoles(user.id, profile)
+      .then((roles) => {
+        if (cancelled) return;
+        setAuthorizedRoles(roles);
+        setRoleCheckStatus("ready");
+      })
+      .catch((error: unknown) => {
+        console.error("Could not verify authorized account roles:", error);
+        if (cancelled) return;
+        setAuthorizedRoles([]);
+        setRoleCheckStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    currentRoleCheckKey,
+    loading,
+    profile,
+    profileLoading,
+    roleCheckAttempt,
+    user?.id,
+  ]);
 
   useEffect(() => {
     if (loading || profileLoading || !user?.id || !profile) {
@@ -86,7 +128,7 @@ const ProtectedRoute = ({
     return () => {
       cancelled = true;
     };
-  }, [loading, profile?.role, profileLoading, user?.id]);
+  }, [loading, profile, profileLoading, user?.id]);
 
   useEffect(() => {
     console.log("Seller application state:", sellerApplicationState);
@@ -113,20 +155,59 @@ const ProtectedRoute = ({
     return <Navigate to={redirectTo} replace state={{ from: location }} />;
   }
 
+  if (roleCheckStatus === "checking" || roleCheckKey !== currentRoleCheckKey) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-cream/30 text-green-800">
+        Verifying your account access...
+      </div>
+    );
+  }
+
+  if (roleCheckStatus === "error") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-cream/30 p-6">
+        <div className="max-w-md rounded-2xl border border-neutral-100 bg-white p-8 text-center shadow-sm">
+          <h1 className="text-lg font-semibold text-neutral-900">
+            Account access could not be verified
+          </h1>
+          <p className="mt-2 text-sm text-neutral-600">
+            We couldn&apos;t confirm your authorized portal. Please retry or
+            return to sign in.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setRoleCheckStatus("checking");
+              setRoleCheckAttempt((attempt) => attempt + 1);
+            }}
+            className="mt-5 rounded-xl bg-[#33381C] px-5 py-2.5 text-sm font-semibold text-white"
+          >
+            Retry verification
+          </button>
+          <Link
+            to={loginPath || "/login"}
+            state={{ from: location }}
+            className="mt-4 block text-sm font-semibold text-[#33381C] underline"
+          >
+            Return to sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (allowedRoles && allowedRoles.length > 0) {
-    const userRole = sellerApplicationState === "approved" && isSellerRoute
-      ? "seller"
-      : profile?.role || "customer";
     if (isSellerRoute && sellerApplicationState === "checking") {
       return <div className="min-h-screen flex items-center justify-center bg-cream/30 text-green-800">Checking seller application...</div>;
     }
-    if (!allowedRoles.includes(userRole)) {
+    if (!allowedRoles.some((role) => authorizedRoles.includes(role))) {
       const redirectTo = loginPath || "/login";
       return <Navigate to={redirectTo} replace state={{ from: location }} />;
     }
   }
 
-  const isPendingSeller = profile?.role === "seller" && profile?.status === "pending";
+  const isPendingSeller =
+    authorizedRoles.includes("seller") && profile.status === "pending";
   if (isPendingSeller && sellerApplicationState !== "approved" && sellerApplicationState !== "unavailable") {
     const destination = sellerApplicationState === "pending"
       ? "/seller/onboarding"

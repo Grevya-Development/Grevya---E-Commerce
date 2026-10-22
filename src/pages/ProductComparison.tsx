@@ -17,6 +17,7 @@ import { useComparisonStore } from "@/store/useComparisonStore";
 import { getProductStockDetails, type ProductStockDetails } from "@/lib/stock";
 import { getReviewStatsByProductId, type ReviewRatingRow } from "@/lib/reviewStats";
 import { supabase } from "@/lib/supabaseClient";
+import { formatCurrency } from "@/lib/currency";
 
 interface CatalogProduct {
   id: number;
@@ -45,13 +46,6 @@ interface ComparisonEntry {
   averageRating: number;
   reviewCount: number;
 }
-
-const money = (amount: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(amount);
 
 const numberOrNull = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
@@ -369,7 +363,7 @@ const ProductComparison = () => {
         const price = comparableUnitPrices[index];
         return price === null
           ? "Not available"
-          : `${money(price)} / 100 g`;
+          : `${formatCurrency(price)} / 100 g`;
       },
     },
     {
