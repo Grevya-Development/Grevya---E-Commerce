@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
+import { formatCurrency } from "@/lib/currency";
+import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 
 interface OrderOption {
   id: string;
@@ -190,7 +192,7 @@ const Contact = () => {
     },
     {
       question: 'What is your shipping and return policy?',
-      answer: 'We offer free shipping on orders above ₹500. For damaged items or quality concerns, we offer a 100% replacement guarantee. Just take a photo and upload a support message here.',
+      answer: `We offer free shipping on orders of ${formatCurrency(FREE_SHIPPING_THRESHOLD)} or more. For damaged items or quality concerns, we offer a 100% replacement guarantee. Just take a photo and upload a support message here.`,
     },
     {
       question: 'Are your items microwave and freezer safe?',
@@ -362,7 +364,7 @@ const Contact = () => {
                               <option value="">Select Related Order</option>
                               {orders.map((ord) => (
                                 <option key={ord.id} value={ord.id}>
-                                  Order #{String(ord.id).slice(0, 8)} - ₹{Number(ord.total_amount).toFixed(2)}
+                                  Order #{String(ord.id).slice(0, 8)} - {formatCurrency(ord.total_amount)}
                                 </option>
                               ))}
                             </select>

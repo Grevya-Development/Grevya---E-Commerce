@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import SellerLayout from "@/layouts/SellerLayout";
+import { formatCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import { sendOrderShippedEmail } from "@/lib/orderService";
@@ -185,10 +186,6 @@ const getNextStatus = (status?: string | null) => {
 
   return nextStatusMap[normalized] || null;
 };
-
-
-const formatCurrency = (value?: number | null) =>
-  `₹${Number(value || 0).toFixed(2)}`;
 
 
 const getOrderStatusBadgeClass = (value?: string | null) => {

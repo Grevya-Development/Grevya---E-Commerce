@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+import { formatCurrency } from "@/lib/currency";
 
 const statuses = [
   "pending",
@@ -47,34 +48,63 @@ const OrderDetail = () => {
   }, [order]);
 
   useEffect(() => {
-    if (!user || !id) return;
+    if (!user || !id) {
+      setOrder(null);
+      setLoading(false);
+      return;
+    }
+
+    setOrder(null);
+    setLoading(true);
+    let isCurrent = true;
 
     const fetchOrder = async () => {
       try {
-        const [{ data, error }, { data: historyData }] = await Promise.all([
-          supabase
-            .from("orders")
-            .select("*, order_items(*)")
-            .eq("id", id)
-            .eq("user_id", user.id)
-            .maybeSingle(),
-          supabase
-            .from("order_status_history")
-            .select("*")
-            .eq("order_id", id)
-            .order("created_at", { ascending: true }),
-        ]);
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*, order_items(*)")
+          .eq("id", id)
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-        if (!error && data) {
-          setOrder({
-            ...data,
-            history: deduplicateHistory(historyData || []),
-          });
+        if (!isCurrent) return;
+        if (error) throw error;
+        if (!data) {
+          setOrder(null);
+          return;
         }
+
+        let historyData: Array<{
+          status: string;
+          created_at: string;
+          notes?: string | null;
+        }> = [];
+        const {
+          data: statusHistory,
+          error: statusHistoryError,
+        } = await supabase
+          .from("order_status_history")
+          .select("*")
+          .eq("order_id", id)
+          .order("created_at", { ascending: true });
+        if (statusHistoryError) {
+          console.warn(
+            "Failed to load order status history:",
+            statusHistoryError,
+          );
+        } else {
+          historyData = statusHistory || [];
+        }
+
+        if (!isCurrent) return;
+        setOrder({
+          ...data,
+          history: deduplicateHistory(historyData),
+        });
       } catch (err) {
-        console.warn("Failed to load order history log:", err);
+        console.error("Failed to load customer order:", err);
       } finally {
-        setLoading(false);
+        if (isCurrent) setLoading(false);
       }
     };
 
@@ -95,6 +125,7 @@ const OrderDetail = () => {
       .subscribe();
 
     return () => {
+      isCurrent = false;
       supabase.removeChannel(channel);
     };
   }, [id, user]);
@@ -134,7 +165,7 @@ const OrderDetail = () => {
                   </div>
                   <div className="text-left md:text-right">
                     <p className="text-2xl font-extrabold text-green-800">
-                      Rs {Number(order.total_amount || 0).toFixed(2)}
+                      {formatCurrency(order.total_amount)}
                     </p>
                     <p className="text-sm capitalize text-neutral-500">
                       Payment: {order.payment_status || "pending"}
@@ -268,7 +299,7 @@ const OrderDetail = () => {
                         </div>
                       </div>
                       <p className="font-bold text-green-800 whitespace-nowrap">
-                        Rs {Number(item.price || 0).toFixed(2)}
+                        {formatCurrency(item.price)}
                       </p>
                     </div>
                   ))}

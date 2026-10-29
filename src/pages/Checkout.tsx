@@ -17,12 +17,15 @@ import { useCartStore } from "@/store/useCartStore";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatCurrency } from "@/lib/currency";
+import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 
 interface PaymentMethod {
   id: string;
   name: string;
   description: string;
   icon: React.ReactNode;
+  enabled: boolean;
 }
 
 interface Address {
@@ -109,95 +112,47 @@ const normalizeAddressForDB = (info: any, userId: string) => {
   };
 };
 
-// ============================================================================
-// SCHEMA-RESILIENT RETRY WRAPPERS (FALLBACK PRUNING MECHANISM WITH WARNINGS)
-// ============================================================================
-const safeInsertOrder = async (orderPayload: any) => {
-  let attemptData = { ...orderPayload };
+const safeInsertOrderItems = async (
+  items: Array<Record<string, unknown>>,
+) => {
+  let attemptItems = items.map((item) => ({ ...item }));
+
   while (true) {
-    const { data, error } = await supabase
-      .from("orders")
-      .insert(attemptData)
-      .select()
-      .single();
+    const { error } = await supabase.from("order_items").insert(attemptItems);
+    if (!error) return { error: null };
 
-    if (!error) {
-      return { data, error: null };
-    }
-
-    const errorMsg = error.message || "";
-    const matchSchemaCache = errorMsg.match(
+    const schemaCacheMatch = error.message.match(
       /Could not find the '([^']+)' column/,
     );
-    const matchNotExist = errorMsg.match(
+    const missingColumnMatch = error.message.match(
       /column "([^"]+)" of relation "[^"]+" does not exist/,
     );
     const missingColumn =
-      (matchSchemaCache && matchSchemaCache[1]) ||
-      (matchNotExist && matchNotExist[1]);
+      schemaCacheMatch?.[1] || missingColumnMatch?.[1];
+    if (!missingColumn) return { error };
 
-    if (missingColumn && missingColumn in attemptData) {
-      console.warn(
-        `[Grevya Dev Resilience] Column '${missingColumn}' not found in orders database. Retrying order save without it.`,
-      );
-      delete attemptData[missingColumn];
-      if (Object.keys(attemptData).length === 0) {
-        return { data: null, error };
-      }
-      continue;
+    let removedColumn = false;
+    attemptItems = attemptItems.map((item) => {
+      if (!(missingColumn in item)) return item;
+      removedColumn = true;
+      const remaining = { ...item };
+      delete remaining[missingColumn];
+      return remaining;
+    });
+    if (
+      !removedColumn ||
+      attemptItems.some((item) => Object.keys(item).length === 0)
+    ) {
+      return { error };
     }
 
-    return { data: null, error };
+    console.warn(
+      `[Checkout] Retrying order item insert without unsupported column "${missingColumn}".`,
+    );
   }
 };
 
-const safeInsertOrderItems = async (itemsPayload: any[]) => {
-  let attemptData = itemsPayload.map((item) => ({ ...item }));
-  while (true) {
-    const { error } = await supabase.from("order_items").insert(attemptData);
-    if (!error) {
-      return { error: null };
-    }
-
-    const errorMsg = error.message || "";
-    const matchSchemaCache = errorMsg.match(
-      /Could not find the '([^']+)' column/,
-    );
-    const matchNotExist = errorMsg.match(
-      /column "([^"]+)" of relation "[^"]+" does not exist/,
-    );
-    const missingColumn =
-      (matchSchemaCache && matchSchemaCache[1]) ||
-      (matchNotExist && matchNotExist[1]);
-
-    if (missingColumn) {
-      let keyExisted = false;
-      attemptData = attemptData.map((item) => {
-        if (missingColumn in item) {
-          keyExisted = true;
-          const { [missingColumn]: _, ...rest } = item;
-          return rest;
-        }
-        return item;
-      });
-      if (keyExisted) {
-        console.warn(
-          `[Grevya Dev Resilience] Column '${missingColumn}' not found in order_items database. Retrying insert.`,
-        );
-        if (
-          attemptData.length === 0 ||
-          Object.keys(attemptData[0]).length === 0
-        ) {
-          return { error };
-        }
-        continue;
-      }
-    }
-
-    return { error };
-  }
-};
-
+// ============================================================================
 const safeInsertNotification = async (notifPayload: any) => {
   let attemptData = { ...notifPayload };
   while (true) {
@@ -414,6 +369,13 @@ const Checkout = () => {
   } | null>(null);
 
   const paginate = (newStep: number) => {
+    if (newStep >= 2) {
+      setSelectedPayment("cod");
+    }
+    if (newStep === 3 && selectedPayment !== "cod") {
+      setSelectedPayment("cod");
+      return;
+    }
     setDirection(newStep > step ? 1 : -1);
     setStep(newStep);
   };
@@ -433,15 +395,34 @@ const Checkout = () => {
     isDefault: false,
     saveToAccount: false,
   });
+  const [addressEditDraft, setAddressEditDraft] = useState<
+    typeof deliveryInfo | null
+  >(null);
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [addressEditPreviousId, setAddressEditPreviousId] = useState("new");
 
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>("new");
+  const deliveryFormInfo = addressEditDraft ?? deliveryInfo;
+
+  const updateDeliveryForm = (updates: Partial<typeof deliveryInfo>) => {
+    if (isEditingAddress) {
+      setAddressEditDraft((current) => ({
+        ...(current ?? deliveryInfo),
+        ...updates,
+      }));
+      return;
+    }
+
+    setDeliveryInfo((current) => ({ ...current, ...updates }));
+  };
 
   const cartItems = useCartStore((state) => state.items);
   const getSubtotal = useCartStore((state) => state.getSubtotal);
+  const validateCartStock = useCartStore((state) => state.validateCartStock);
   const clearCart = useCartStore((state) => state.clearCart);
   const subtotal = getSubtotal();
-  const freeShippingThreshold = 500;
+  const freeShippingThreshold = FREE_SHIPPING_THRESHOLD;
   const shipping = subtotal >= freeShippingThreshold ? 0 : 50;
   const total = subtotal + shipping;
 
@@ -523,654 +504,213 @@ const Checkout = () => {
     }));
   }, [profile, user]);
 
-  /*
-   * Keep all payment choices visible in the checkout UI.
-   *
-   * IMPORTANT:
-   * Razorpay is NOT integrated yet. COD is the only payment method
-   * that can actually place an order at this stage.
-   *
-   * When Razorpay is integrated, the "razorpay" and "card" branches
-   * in handlePayment() should start the verified Razorpay checkout.
-   */
   const paymentMethods: PaymentMethod[] = [
     {
       id: "razorpay",
       name: "Razorpay Secure Checkout",
       description: "Pay using UPI, cards, wallets, or net banking",
       icon: <IndianRupee className="h-8 w-8" />,
+      enabled: false,
     },
     {
       id: "card",
       name: "Card via Razorpay",
       description: "Razorpay will securely collect your card details",
       icon: <CreditCard className="h-8 w-8" />,
+      enabled: false,
     },
     {
       id: "cod",
       name: "Cash on Delivery",
       description: "Pay with cash when your order arrives",
       icon: <IndianRupee className="h-8 w-8" />,
+      enabled: true,
     },
   ];
+  const displayedPaymentMethod =
+    paymentMethods.find(
+      (method) => method.id === selectedPayment && method.enabled,
+    ) || paymentMethods[2];
 
-  const createOrder = async (paymentStatus: string) => {
-    if (!user) {
-      throw new Error("Please sign in before checkout.");
+  const continueToReview = () => {
+    if (selectedPayment !== "cod") {
+      setSelectedPayment("cod");
+      return;
     }
+    paginate(3);
+  };
 
-    if (cartItems.length === 0) {
-      throw new Error("Your cart is empty.");
+  useEffect(() => {
+    if (selectedPayment !== "cod") {
+      setSelectedPayment("cod");
     }
+  }, [selectedPayment]);
 
-    /*
-     * ============================================================
-     * 1. Resolve SKUs / variants
-     * ============================================================
-     *
-     * Older persisted carts may contain only product IDs. The
-     * production schema keeps SKU on product_variants, so resolve
-     * the variant before creating order_items.
-     */
-    const unresolvedProductIds = [
-      ...new Set(
-        cartItems
-          .filter((item) => !item.sku)
-          .map((item) => Number(item.id)),
-      ),
-    ];
-
-    const variantsByProductId = new Map<
-      number,
-      { id: string; sku: string }[]
-    >();
-
-    if (unresolvedProductIds.length > 0) {
-      const { data: variants, error: variantsError } = await supabase
-        .from("product_variants")
-        .select("id, product_id, sku")
-        .in("product_id", unresolvedProductIds)
-        .order("product_id");
-
-      if (variantsError) throw variantsError;
-
-      (variants || []).forEach((variant: any) => {
-        const productId = Number(variant.product_id);
-
-        if (!variant.id || !variant.sku) return;
-
-        const productVariants =
-          variantsByProductId.get(productId) || [];
-
-        productVariants.push({
-          id: variant.id,
-          sku: variant.sku,
-        });
-
-        variantsByProductId.set(productId, productVariants);
-      });
+  const createOrder = async () => {
+    if (selectedPayment !== "cod") {
+      throw new Error("Cash on Delivery is the only available payment method.");
     }
+    if (!user) throw new Error("Please sign in before checkout.");
+    if (cartItems.length === 0) throw new Error("Your cart is empty.");
 
-    /*
-     * ============================================================
-     * 2. Resolve product ownership
-     * ============================================================
-     *
-     * Products may expose seller ownership directly (seller_id,
-     * vendor_id, merchant_id, owner_id, etc.) or through a store.
-     *
-     * We intentionally read the complete product row here instead
-     * of selecting a possibly-missing schema column. This keeps
-     * checkout compatible with the existing database variations.
-     */
-    const productIds = [
-      ...new Set(cartItems.map((item) => Number(item.id))),
-    ];
-
-    const { data: productRows, error: productsError } = await supabase
+    const productIds = [...new Set(cartItems.map((item) => String(item.id)))];
+    const { data: products, error: productsError } = await supabase
       .from("products")
-      .select("*")
+      .select("id, seller_id")
       .in("id", productIds);
+    if (productsError) throw productsError;
 
-    if (productsError) {
-      throw productsError;
-    }
-
-    const productById = new Map<number, any>();
-
-    (productRows || []).forEach((product: any) => {
-      productById.set(Number(product.id), product);
-    });
-
-    const directSellerKeys = [
-      "seller_id",
-      "sellerId",
-      "vendor_id",
-      "vendorId",
-      "merchant_id",
-      "merchantId",
-      "owner_id",
-      "ownerId",
-    ];
-
-    const storeKeys = [
-      "store_id",
-      "storeId",
-      "shop_id",
-      "shopId",
-    ];
-
-    const getFirstValue = (
-      row: any,
-      keys: string[],
-    ): string | null => {
-      if (!row) return null;
-
-      for (const key of keys) {
-        const value = row[key];
-
-        if (
-          value !== undefined &&
-          value !== null &&
-          String(value).trim() !== ""
-        ) {
-          return String(value);
-        }
-      }
-
-      return null;
-    };
-
-    const sellerIdByProductId = new Map<number, string>();
-    const storeIdByProductId = new Map<number, string>();
-
-    productIds.forEach((productId) => {
-      const product = productById.get(productId);
-
-      if (!product) {
-        throw new Error(
-          `Product ${productId} could not be found. Please refresh your cart and try again.`,
-        );
-      }
-
-      const directSellerId = getFirstValue(
-        product,
-        directSellerKeys,
-      );
-
-      const storeId = getFirstValue(product, storeKeys);
-
-      if (directSellerId) {
-        sellerIdByProductId.set(productId, directSellerId);
-      }
-
-      if (storeId) {
-        storeIdByProductId.set(productId, storeId);
-      }
-    });
-
-    /*
-     * If a product does not have a direct seller ID but has a store,
-     * resolve the seller from the store row.
-     */
-    const unresolvedStoreIds = [
-      ...new Set(
-        productIds
-          .filter((productId) => !sellerIdByProductId.has(productId))
-          .map((productId) => storeIdByProductId.get(productId))
-          .filter(Boolean),
-      ),
-    ] as string[];
-
-    if (unresolvedStoreIds.length > 0) {
-      const { data: storeRows, error: storesError } = await supabase
-        .from("stores")
-        .select("*")
-        .in("id", unresolvedStoreIds);
-
-      if (storesError) {
-        throw new Error(
-          `Unable to resolve seller ownership from stores: ${storesError.message}`,
-        );
-      }
-
-      const sellerIdByStoreId = new Map<string, string>();
-
-      (storeRows || []).forEach((store: any) => {
-        const sellerId = getFirstValue(
-          store,
-          directSellerKeys,
-        );
-
-        if (sellerId) {
-          sellerIdByStoreId.set(String(store.id), sellerId);
-        }
-      });
-
-      productIds.forEach((productId) => {
-        if (sellerIdByProductId.has(productId)) return;
-
-        const storeId = storeIdByProductId.get(productId);
-
-        if (!storeId) return;
-
-        const sellerId = sellerIdByStoreId.get(storeId);
-
-        if (sellerId) {
-          sellerIdByProductId.set(productId, sellerId);
-        }
-      });
-    }
-
-    /*
-     * Every checkout item must have an identifiable seller.
-     * Without this check, a marketplace order could be assigned
-     * to the wrong seller.
-     */
-    const unresolvedSellerItems = cartItems.filter(
-      (item) => !sellerIdByProductId.has(Number(item.id)),
+    const sellerByProductId = new Map(
+      (products || []).map((product) => [
+        String(product.id),
+        product.seller_id ? String(product.seller_id) : null,
+      ]),
     );
-
-    if (unresolvedSellerItems.length > 0) {
-      const names = unresolvedSellerItems
-        .map((item) => item.name)
-        .join(", ");
-
-      throw new Error(
-        `Seller ownership could not be determined for: ${names}. ` +
-          `Please make sure each product has a seller_id or store_id linked to a seller.`,
-      );
-    }
-
-    /*
-     * ============================================================
-     * 3. Build authoritative checkout line items
-     * ============================================================
-     */
-    const orderLineItems = cartItems.map((item) => {
-      const matchingVariants =
-        variantsByProductId.get(Number(item.id)) || [];
-
-      const selectedVariant = item.variant_id
-        ? matchingVariants.find(
-            (variant) => variant.id === item.variant_id,
-          )
-        : matchingVariants.length === 1
-          ? matchingVariants[0]
-          : undefined;
-
-      const sku = item.sku || selectedVariant?.sku;
-
-      if (!sku) {
+    const itemsBySeller = new Map<string, typeof cartItems>();
+    cartItems.forEach((item) => {
+      const productId = String(item.id);
+      const sellerId = sellerByProductId.get(productId);
+      if (!sellerByProductId.has(productId)) {
         throw new Error(
-          `No unambiguous active SKU is available for "${item.name}". ` +
-            `Please refresh the product and add it to your cart again.`,
+          `Product "${item.name}" could not be found. Refresh your cart and try again.`,
         );
       }
-
-      const sellerId = sellerIdByProductId.get(Number(item.id));
-
       if (!sellerId) {
         throw new Error(
-          `Seller could not be determined for "${item.name}".`,
+          `Seller ownership could not be determined for "${item.name}".`,
         );
       }
-
-      return {
-        ...item,
-        sku,
-        variant_id:
-          item.variant_id || selectedVariant?.id,
-        seller_id: sellerId,
-      };
+      const sellerItems = itemsBySeller.get(sellerId) || [];
+      sellerItems.push(item);
+      itemsBySeller.set(sellerId, sellerItems);
     });
 
-    /*
-     * ============================================================
-     * 4. Group cart items by seller
-     * ============================================================
-     */
-    const itemsBySeller = new Map<
-      string,
-      typeof orderLineItems
-    >();
-
-    orderLineItems.forEach((item) => {
-      const sellerItems = itemsBySeller.get(item.seller_id);
-
-      if (sellerItems) {
-        sellerItems.push(item);
-      } else {
-        itemsBySeller.set(item.seller_id, [item]);
-      }
-    });
-
-    if (itemsBySeller.size === 0) {
-      throw new Error(
-        "No seller orders could be created from this cart.",
-      );
-    }
-
-    /*
-     * ============================================================
-     * 5. Prepare shipping information
-     * ============================================================
-     */
     const spaceIndex = deliveryInfo.fullName.indexOf(" ");
-
     const firstName =
       spaceIndex !== -1
         ? deliveryInfo.fullName.substring(0, spaceIndex)
         : deliveryInfo.fullName;
-
     const lastName =
       spaceIndex !== -1
         ? deliveryInfo.fullName.substring(spaceIndex + 1)
         : "";
-
-    const computedAddress =
+    const address =
       `${deliveryInfo.addressLine1}` +
-      `${
-        deliveryInfo.addressLine2
-          ? ", " + deliveryInfo.addressLine2
-          : ""
-      }` +
-      `${
-        deliveryInfo.landmark
-          ? ", Landmark: " + deliveryInfo.landmark
-          : ""
-      }`;
-
+      `${deliveryInfo.addressLine2 ? ", " + deliveryInfo.addressLine2 : ""}` +
+      `${deliveryInfo.landmark ? ", Landmark: " + deliveryInfo.landmark : ""}`;
     const shippingPayload = {
       ...deliveryInfo,
       firstName,
       lastName,
-      address: computedAddress,
+      address,
     };
 
-    /*
-     * Save the address if the customer requested it.
-     */
-    if (
-      selectedAddressId === "new" &&
-      deliveryInfo.saveToAccount
-    ) {
+    if (selectedAddressId === "new" && deliveryInfo.saveToAccount) {
       try {
-        const addressPayload = normalizeAddressForDB(
-          deliveryInfo,
-          user.id,
-        );
-
+        const addressPayload = normalizeAddressForDB(deliveryInfo, user.id);
         if (deliveryInfo.isDefault) {
-          await supabase
+          const { error: defaultAddressError } = await supabase
             .from("addresses")
             .update({ is_default: false })
             .eq("user_id", user.id);
+          if (defaultAddressError) throw defaultAddressError;
         }
-
-        const { error: addressError } =
-          await safeInsertAddress(addressPayload);
-
-        if (addressError) {
-          console.warn(
-            "Failed to save address to user account:",
-            addressError,
-          );
-        }
+        const { error: addressError } = await safeInsertAddress(addressPayload);
+        if (addressError) throw addressError;
       } catch (addressError) {
-        console.warn(
-          "Failed to save address to user account:",
-          addressError,
-        );
+        console.warn("Failed to save address to user account:", addressError);
       }
     }
 
-    /*
-     * ============================================================
-     * 6. Calculate checkout totals
-     * ============================================================
-     *
-     * Keep the existing Grevya shipping rule:
-     *   subtotal >= ₹500 -> free shipping
-     *   subtotal <  ₹500 -> ₹50 shipping
-     */
-    const checkoutSubtotal = orderLineItems.reduce(
-      (sum, item) =>
-        sum +
-        Number(item.price || 0) *
-          Number(item.quantity || 0),
-      0,
-    );
-
-    const checkoutShipping =
-      checkoutSubtotal >= freeShippingThreshold
-        ? 0
-        : 50;
-
-    /*
-     * ============================================================
-     * 7. Create one order per seller
-     * ============================================================
-     *
-     * Example:
-     *
-     * Cart:
-     *   Seller A -> ₹300
-     *   Seller A -> ₹100
-     *   Seller B -> ₹200
-     *
-     * Result:
-     *   Order GI-xxxx-1 -> Seller A
-     *   Order GI-xxxx-2 -> Seller B
-     *
-     * Shipping is allocated proportionally when applicable.
-     */
     const checkoutReference = `GI-${Date.now()}`;
-
-    const createdOrders: {
-      id: string;
-      number: string;
-      sellerId: string;
-    }[] = [];
-
-    const sellerEntries = Array.from(
-      itemsBySeller.entries(),
-    );
-
+    const sellerEntries = Array.from(itemsBySeller.entries());
+    const createdOrders: Array<{ id: string; number: string }> = [];
     let allocatedShipping = 0;
 
-    for (
-      let sellerIndex = 0;
-      sellerIndex < sellerEntries.length;
-      sellerIndex++
-    ) {
-      const [sellerId, sellerItems] =
-        sellerEntries[sellerIndex];
-
+    for (let sellerIndex = 0; sellerIndex < sellerEntries.length; sellerIndex++) {
+      const [, sellerItems] = sellerEntries[sellerIndex];
       const sellerSubtotal = sellerItems.reduce(
-        (sum, item) =>
-          sum +
-          Number(item.price || 0) *
-            Number(item.quantity || 0),
+        (sum, item) => sum + Number(item.price) * item.quantity,
         0,
       );
+      const sellerShipping =
+        shipping === 0
+          ? 0
+          : sellerIndex === sellerEntries.length - 1
+            ? Number((shipping - allocatedShipping).toFixed(2))
+            : Number(
+                (
+                  shipping *
+                  (subtotal > 0
+                    ? sellerSubtotal / subtotal
+                    : 1 / sellerEntries.length)
+                ).toFixed(2),
+              );
+      allocatedShipping += sellerShipping;
 
-      let sellerShipping = 0;
+      const orderNumber = `${checkoutReference}-${sellerIndex + 1}`;
+      const sellerTotal = Number((sellerSubtotal + sellerShipping).toFixed(2));
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .insert({
+          user_id: user.id,
+          order_number: orderNumber,
+          subtotal: sellerSubtotal,
+          shipping: sellerShipping,
+          total_amount: sellerTotal,
+          total: sellerTotal,
+          status: "pending",
+          order_status: "pending",
+          payment_status: "pending",
+          payment_method: "cod",
+          shipping_address: shippingPayload,
+          estimated_delivery: new Date(
+            Date.now() + 5 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+        })
+        .select("id")
+        .single();
+      if (orderError) throw orderError;
 
-      if (
-        checkoutShipping > 0 &&
-        checkoutSubtotal > 0
-      ) {
-        if (
-          sellerIndex ===
-          sellerEntries.length - 1
-        ) {
-          /*
-           * Put the rounding remainder on the final seller so
-           * all seller shipping values add up exactly to the
-           * original checkout shipping charge.
-           */
-          sellerShipping = Number(
-            (
-              checkoutShipping -
-              allocatedShipping
-            ).toFixed(2),
-          );
-        } else {
-          sellerShipping = Number(
-            (
-              checkoutShipping *
-              (sellerSubtotal /
-                checkoutSubtotal)
-            ).toFixed(2),
-          );
-
-          allocatedShipping += sellerShipping;
-        }
-      }
-
-      const sellerTotal = Number(
-        (
-          sellerSubtotal +
-          sellerShipping
-        ).toFixed(2),
-      );
-
-      const sellerOrderNumber =
-        `${checkoutReference}-${sellerIndex + 1}`;
-
-      const orderPayload = {
-        user_id: user.id,
-        order_number: sellerOrderNumber,
-
-        subtotal: sellerSubtotal,
-        shipping: sellerShipping,
-
-        total_amount: sellerTotal,
-        total: sellerTotal,
-
-        status:
-          paymentStatus === "paid"
-            ? "confirmed"
-            : "pending",
-
-        order_status:
-          paymentStatus === "paid"
-            ? "confirmed"
-            : "pending",
-
-        payment_status: paymentStatus,
-        payment_method: selectedPayment,
-        payment_reference: null,
-
-        shipping_address: shippingPayload,
-
-        estimated_delivery: new Date(
-          Date.now() +
-            5 * 24 * 60 * 60 * 1000,
-        ).toISOString(),
-      };
-
-      const {
-        data: orderData,
-        error: orderError,
-      } = await safeInsertOrder(
-        orderPayload,
-      );
-
-      if (orderError) {
-        throw orderError;
-      }
-
-      if (!orderData) {
-        throw new Error(
-          `Failed to create seller order ${
-            sellerIndex + 1
-          }.`,
-        );
-      }
-
-      const orderItems =
+      const { error: orderItemsError } = await safeInsertOrderItems(
         sellerItems.map((item) => ({
-          order_id: orderData.id,
-          product_id: item.id,
-          variant_id: item.variant_id,
+          order_id: order.id,
+          product_id: String(item.id),
+          variant_id: item.variant_id || null,
+          sku: item.sku || null,
+          seller_id: sellerByProductId.get(String(item.id)),
           product_name: item.name,
-          product_image:
-            item.image ||
-            (item as any).image_url,
-          sku: item.sku,
+          product_image: item.image,
           quantity: item.quantity,
           price: item.price,
+        })),
+      );
+      if (orderItemsError) throw orderItemsError;
 
-          /*
-           * If order_items has seller_id, it will be stored.
-           * If the existing schema does not have the column,
-           * safeInsertOrderItems removes it automatically.
-           */
-          seller_id: sellerId,
-        }));
-
-      const { error: itemsError } =
-        await safeInsertOrderItems(
-          orderItems,
-        );
-
-      if (itemsError) {
-        throw itemsError;
-      }
-
-      createdOrders.push({
-        id: orderData.id,
-        number: sellerOrderNumber,
-        sellerId,
-      });
+      createdOrders.push({ id: order.id, number: orderNumber });
     }
 
-    /*
-     * ============================================================
-     * 8. One customer notification for the checkout
-     * ============================================================
-     */
     const notificationMessage =
       createdOrders.length === 1
         ? `Order ${createdOrders[0].number} has been placed successfully!`
         : `${createdOrders.length} seller orders have been placed successfully!`;
-
-    const notifPayload = {
+    const { error: notificationError } = await safeInsertNotification({
       user_id: user.id,
       message: notificationMessage,
       type: "order",
       title: "Order Placed",
       is_read: false,
       read: false,
-    };
-
-    const { error: notifError } =
-      await safeInsertNotification(
-        notifPayload,
-      );
-
-    if (notifError) {
-      console.warn(
-        "Failed to insert notification:",
-        notifError,
-      );
+    });
+    if (notificationError) {
+      console.warn("Failed to insert notification:", notificationError);
     }
 
-    /*
-     * ============================================================
-     * 9. Clear cart only after every seller order and its items
-     *    have been inserted successfully.
-     * ============================================================
-     */
     clearCart();
-
     setPlacedOrder({
       id: createdOrders[0].id,
       number: checkoutReference,
-      sellerOrderCount:
-        createdOrders.length,
+      sellerOrderCount: createdOrders.length,
     });
   };
 
@@ -1179,7 +719,7 @@ const Checkout = () => {
   ) => {
     event.preventDefault();
 
-    if (processing) return;
+    if (processing || step !== 3) return;
 
     if (cartItems.length === 0) {
       toast({
@@ -1191,28 +731,26 @@ const Checkout = () => {
       return;
     }
 
-    /*
-     * Razorpay/card UI is restored, but the actual Razorpay gateway
-     * has not been integrated yet.
-     *
-     * Do NOT create a paid/confirmed order from the browser.
-     * Until backend Razorpay order creation + signature verification
-     * exists, only COD is allowed to create an order.
-     */
     if (selectedPayment !== "cod") {
-      toast({
-        title: "Razorpay not integrated yet",
-        description:
-          "Razorpay Secure Checkout and Card via Razorpay are visible, but online payment is not configured yet. Please select Cash on Delivery.",
-        variant: "destructive",
-      });
+      setSelectedPayment("cod");
       return;
     }
 
     setProcessing(true);
 
     try {
-      await createOrder("pending");
+      const cartStockValid = await validateCartStock();
+      if (!cartStockValid) {
+        toast({
+          title: "Cart stock changed",
+          description:
+            "Your cart was updated to match current stock. Please review it and try checkout again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await createOrder();
 
       toast({
         title: "Order placed",
@@ -1239,22 +777,22 @@ const Checkout = () => {
 
   const validateStep1 = () => {
     const phonePattern = /^[6-9]\d{9}$/;
-    const cleanPhone = deliveryInfo.phone.replace(/\D/g, "");
+    const cleanPhone = deliveryFormInfo.phone.replace(/\D/g, "");
     const pincodePattern = /^\d{6}$/;
-    const cleanPincode = deliveryInfo.pincode.replace(/\D/g, "");
+    const cleanPincode = deliveryFormInfo.pincode.replace(/\D/g, "");
 
     if (selectedAddressId !== "new") {
       return true;
     }
 
     if (
-      !deliveryInfo.fullName.trim() ||
-      !deliveryInfo.email.trim() ||
-      !deliveryInfo.phone.trim() ||
-      !deliveryInfo.addressLine1.trim() ||
-      !deliveryInfo.city.trim() ||
-      !deliveryInfo.pincode.trim() ||
-      !deliveryInfo.state.trim()
+      !deliveryFormInfo.fullName.trim() ||
+      !deliveryFormInfo.email.trim() ||
+      !deliveryFormInfo.phone.trim() ||
+      !deliveryFormInfo.addressLine1.trim() ||
+      !deliveryFormInfo.city.trim() ||
+      !deliveryFormInfo.pincode.trim() ||
+      !deliveryFormInfo.state.trim()
     ) {
       toast({
         title: "Incomplete Details",
@@ -1284,6 +822,28 @@ const Checkout = () => {
     }
 
     return true;
+  };
+
+  const continueFromDelivery = () => {
+    if (!validateStep1()) return;
+
+    if (isEditingAddress && addressEditDraft) {
+      setDeliveryInfo(addressEditDraft);
+      setAddressEditDraft(null);
+      setIsEditingAddress(false);
+      setSelectedAddressId("new");
+      paginate(3);
+      return;
+    }
+
+    paginate(2);
+  };
+
+  const cancelAddressEdit = () => {
+    setAddressEditDraft(null);
+    setIsEditingAddress(false);
+    setSelectedAddressId(addressEditPreviousId);
+    paginate(3);
   };
 
   if (authLoading) {
@@ -1349,7 +909,9 @@ const Checkout = () => {
                     if (s.num < step) paginate(s.num);
                     else if (s.num === 2 && step === 1) {
                       if (validateStep1()) paginate(2);
-                    } else if (s.num === 3 && step === 2) paginate(3);
+                    } else if (s.num === 3 && step === 2) {
+                      void continueToReview();
+                    }
                   }}
                   className="flex items-center gap-2 text-left focus:outline-none"
                 >
@@ -1416,6 +978,8 @@ const Checkout = () => {
                                 whileHover={{ scale: 1.01 }}
                                 whileTap={{ scale: 0.99 }}
                                 onClick={() => {
+                                  setAddressEditDraft(null);
+                                  setIsEditingAddress(false);
                                   setSelectedAddressId(addr.id);
                                   applySavedAddress(addr);
                                 }}
@@ -1461,6 +1025,8 @@ const Checkout = () => {
                               whileHover={{ scale: 1.01 }}
                               whileTap={{ scale: 0.99 }}
                               onClick={() => {
+                                setAddressEditDraft(null);
+                                setIsEditingAddress(false);
                                 setSelectedAddressId("new");
                                 setDeliveryInfo({
                                   fullName:
@@ -1502,18 +1068,17 @@ const Checkout = () => {
                       {selectedAddressId === "new" && (
                         <div className="space-y-4 pt-4 border-t border-neutral-100/70">
                           <h3 className="text-base font-semibold text-neutral-800">
-                            Add Shipping Destination
+                            {isEditingAddress
+                              ? "Edit Delivery Address"
+                              : "Add Shipping Destination"}
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FloatingInput
                               id="fullName"
                               label="Full Name *"
-                              value={deliveryInfo.fullName}
+                              value={deliveryFormInfo.fullName}
                               onChange={(e) =>
-                                setDeliveryInfo({
-                                  ...deliveryInfo,
-                                  fullName: e.target.value,
-                                })
+                                updateDeliveryForm({ fullName: e.target.value })
                               }
                               required
                             />
@@ -1521,12 +1086,9 @@ const Checkout = () => {
                               id="phone"
                               label="Phone Number *"
                               type="tel"
-                              value={deliveryInfo.phone}
+                              value={deliveryFormInfo.phone}
                               onChange={(e) =>
-                                setDeliveryInfo({
-                                  ...deliveryInfo,
-                                  phone: e.target.value,
-                                })
+                                updateDeliveryForm({ phone: e.target.value })
                               }
                               required
                             />
@@ -1535,12 +1097,9 @@ const Checkout = () => {
                                 id="email"
                                 label="Email Address *"
                                 type="email"
-                                value={deliveryInfo.email}
+                                value={deliveryFormInfo.email}
                                 onChange={(e) =>
-                                  setDeliveryInfo({
-                                    ...deliveryInfo,
-                                    email: e.target.value,
-                                  })
+                                  updateDeliveryForm({ email: e.target.value })
                                 }
                                 required
                               />
@@ -1549,10 +1108,9 @@ const Checkout = () => {
                               <FloatingInput
                                 id="addressLine1"
                                 label="Address Line 1 (Flat, House, Building, Apt) *"
-                                value={deliveryInfo.addressLine1}
+                                value={deliveryFormInfo.addressLine1}
                                 onChange={(e) =>
-                                  setDeliveryInfo({
-                                    ...deliveryInfo,
+                                  updateDeliveryForm({
                                     addressLine1: e.target.value,
                                   })
                                 }
@@ -1563,10 +1121,9 @@ const Checkout = () => {
                               <FloatingInput
                                 id="addressLine2"
                                 label="Address Line 2 (Area, Street, Village) (Optional)"
-                                value={deliveryInfo.addressLine2}
+                                value={deliveryFormInfo.addressLine2}
                                 onChange={(e) =>
-                                  setDeliveryInfo({
-                                    ...deliveryInfo,
+                                  updateDeliveryForm({
                                     addressLine2: e.target.value,
                                   })
                                 }
@@ -1575,59 +1132,44 @@ const Checkout = () => {
                             <FloatingInput
                               id="landmark"
                               label="Landmark (Optional)"
-                              value={deliveryInfo.landmark}
+                              value={deliveryFormInfo.landmark}
                               onChange={(e) =>
-                                setDeliveryInfo({
-                                  ...deliveryInfo,
-                                  landmark: e.target.value,
-                                })
+                                updateDeliveryForm({ landmark: e.target.value })
                               }
                             />
                             <FloatingInput
                               id="city"
                               label="City *"
-                              value={deliveryInfo.city}
+                              value={deliveryFormInfo.city}
                               onChange={(e) =>
-                                setDeliveryInfo({
-                                  ...deliveryInfo,
-                                  city: e.target.value,
-                                })
+                                updateDeliveryForm({ city: e.target.value })
                               }
                               required
                             />
                             <FloatingInput
                               id="pincode"
                               label="PIN Code *"
-                              value={deliveryInfo.pincode}
+                              value={deliveryFormInfo.pincode}
                               onChange={(e) =>
-                                setDeliveryInfo({
-                                  ...deliveryInfo,
-                                  pincode: e.target.value,
-                                })
+                                updateDeliveryForm({ pincode: e.target.value })
                               }
                               required
                             />
                             <FloatingInput
                               id="state"
                               label="State *"
-                              value={deliveryInfo.state}
+                              value={deliveryFormInfo.state}
                               onChange={(e) =>
-                                setDeliveryInfo({
-                                  ...deliveryInfo,
-                                  state: e.target.value,
-                                })
+                                updateDeliveryForm({ state: e.target.value })
                               }
                               required
                             />
                             <FloatingInput
                               id="country"
                               label="Country *"
-                              value={deliveryInfo.country}
+                              value={deliveryFormInfo.country}
                               onChange={(e) =>
-                                setDeliveryInfo({
-                                  ...deliveryInfo,
-                                  country: e.target.value,
-                                })
+                                updateDeliveryForm({ country: e.target.value })
                               }
                               required
                             />
@@ -1641,13 +1183,10 @@ const Checkout = () => {
                                     key={type}
                                     type="button"
                                     onClick={() =>
-                                      setDeliveryInfo({
-                                        ...deliveryInfo,
-                                        addressType: type,
-                                      })
+                                      updateDeliveryForm({ addressType: type })
                                     }
                                     className={`flex-1 py-2 px-3 text-sm font-semibold rounded-xl border transition-all ${
-                                      deliveryInfo.addressType === type
+                                      deliveryFormInfo.addressType === type
                                         ? "border-[#33381C] bg-[#F7EEE4]/30 text-[#33381C] shadow-sm"
                                         : "border-gray-200 bg-white hover:bg-neutral-50 text-neutral-600"
                                     }`}
@@ -1664,10 +1203,9 @@ const Checkout = () => {
                               <label className="flex items-center gap-2 cursor-pointer">
                                 <input
                                   type="checkbox"
-                                  checked={deliveryInfo.saveToAccount}
+                                  checked={deliveryFormInfo.saveToAccount}
                                   onChange={(e) =>
-                                    setDeliveryInfo({
-                                      ...deliveryInfo,
+                                    updateDeliveryForm({
                                       saveToAccount: e.target.checked,
                                     })
                                   }
@@ -1678,14 +1216,13 @@ const Checkout = () => {
                                 </span>
                               </label>
 
-                              {deliveryInfo.saveToAccount && (
+                              {deliveryFormInfo.saveToAccount && (
                                 <label className="flex items-center gap-2 cursor-pointer ml-6">
                                   <input
                                     type="checkbox"
-                                    checked={deliveryInfo.isDefault}
+                                    checked={deliveryFormInfo.isDefault}
                                     onChange={(e) =>
-                                      setDeliveryInfo({
-                                        ...deliveryInfo,
+                                      updateDeliveryForm({
                                         isDefault: e.target.checked,
                                       })
                                     }
@@ -1701,15 +1238,32 @@ const Checkout = () => {
                         </div>
                       )}
 
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          if (validateStep1()) paginate(2);
-                        }}
-                        className="w-full h-12 rounded-xl text-base font-bold bg-[#33381C] hover:bg-[#262A14] text-[#F7EEE4] mt-6 shadow-md transition-all duration-300"
+                      <div
+                        className={`mt-6 flex gap-3 ${
+                          isEditingAddress ? "items-center" : ""
+                        }`}
                       >
-                        Continue to Payment
-                      </Button>
+                        {isEditingAddress && (
+                          <button
+                            type="button"
+                            onClick={cancelAddressEdit}
+                            className="px-2 text-sm font-bold text-neutral-500 hover:text-neutral-700"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        <Button
+                          type="button"
+                          onClick={continueFromDelivery}
+                          className={`h-12 rounded-xl text-base font-bold bg-[#33381C] hover:bg-[#262A14] text-[#F7EEE4] shadow-md transition-all duration-300 ${
+                            isEditingAddress ? "flex-1" : "w-full"
+                          }`}
+                        >
+                          {isEditingAddress
+                            ? "Save Address & Return to Review"
+                            : "Continue to Payment"}
+                        </Button>
+                      </div>
                     </motion.div>
                   )}
 
@@ -1728,35 +1282,73 @@ const Checkout = () => {
                       <h2 className="text-xl font-semibold text-brown-800 mb-4">
                         Payment Method
                       </h2>
+                      <p className="mb-4 text-sm text-neutral-500">
+                        Cash on Delivery is currently the available payment
+                        method.
+                      </p>
                       <div className="space-y-4">
                         {paymentMethods.map((method) => (
                           <motion.label
                             key={method.id}
                             layout
-                            whileHover={{ scale: 1.01 }}
-                            whileTap={{ scale: 0.99 }}
-                            className={`flex items-center p-4 border rounded-2xl cursor-pointer transition-all ${
+                            whileHover={
+                              method.enabled ? { scale: 1.01 } : undefined
+                            }
+                            whileTap={
+                              method.enabled ? { scale: 0.99 } : undefined
+                            }
+                            aria-disabled={!method.enabled}
+                            className={`flex items-center p-4 border rounded-2xl transition-all ${
+                              method.enabled
+                                ? "cursor-pointer"
+                                : "cursor-not-allowed opacity-60"
+                            } ${
                               selectedPayment === method.id
                                 ? "border-[#33381C] bg-[#F7EEE4]/30 shadow-sm"
-                                : "border-gray-200 hover:bg-gray-50"
+                                : method.enabled
+                                  ? "border-gray-200 hover:bg-gray-50"
+                                  : "border-gray-200 bg-gray-50"
                             }`}
                           >
                             <input
                               type="radio"
                               name="paymentMethod"
                               value={method.id}
-                              checked={selectedPayment === method.id}
-                              onChange={() => setSelectedPayment(method.id)}
+                              checked={
+                                method.enabled &&
+                                selectedPayment === method.id
+                              }
+                              disabled={!method.enabled}
+                              tabIndex={method.enabled ? 0 : -1}
+                              onChange={() => {
+                                if (method.enabled) {
+                                  setSelectedPayment(method.id);
+                                }
+                              }}
+                              aria-label={method.name}
                               className="sr-only"
                             />
                             <div className="flex-shrink-0 mr-4 text-[#33381C]">
                               {method.icon}
                             </div>
                             <div className="flex-grow">
-                              <div className="font-semibold text-neutral-800">
+                              <div
+                                className={`font-semibold ${
+                                  method.enabled
+                                    ? "text-neutral-800"
+                                    : "text-neutral-600"
+                                }`}
+                              >
                                 {method.name}
+                                {!method.enabled && (
+                                  <span className="ml-2 inline-flex rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-neutral-600">
+                                    Coming Soon
+                                  </span>
+                                )}
                               </div>
-                              <div className="text-sm text-neutral-500">
+                              <div
+                                className="text-sm text-neutral-500"
+                              >
                                 {method.description}
                               </div>
                             </div>
@@ -1787,7 +1379,7 @@ const Checkout = () => {
                         </button>
                         <Button
                           type="button"
-                          onClick={() => paginate(3)}
+                          onClick={() => void continueToReview()}
                           className="h-12 rounded-xl text-base font-bold bg-[#33381C] hover:bg-[#262A14] text-[#F7EEE4] px-6 shadow-md transition-all duration-300"
                         >
                           Continue to Review
@@ -1820,6 +1412,28 @@ const Checkout = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-neutral-100">
                         <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-100">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <h4 className="font-bold text-xs uppercase text-neutral-400 tracking-wider">
+                              Delivery Address
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAddressEditPreviousId(selectedAddressId);
+                                setAddressEditDraft({
+                                  ...deliveryInfo,
+                                  isDefault: false,
+                                  saveToAccount: false,
+                                });
+                                setIsEditingAddress(true);
+                                setSelectedAddressId("new");
+                                paginate(1);
+                              }}
+                              className="text-xs font-bold text-[#A68D65] hover:text-[#33381C]"
+                            >
+                              Edit Address
+                            </button>
+                          </div>
                           <p className="font-semibold text-neutral-800 text-sm">
                             {deliveryInfo.fullName}
                           </p>
@@ -1848,14 +1462,10 @@ const Checkout = () => {
                               Payment Option
                             </h4>
                             <p className="font-semibold text-neutral-800 text-sm">
-                              {paymentMethods.find(
-                                (method) => method.id === selectedPayment,
-                              )?.name || selectedPayment}
+                              {displayedPaymentMethod.name}
                             </p>
                             <p className="text-neutral-500 text-xs mt-1">
-                              {selectedPayment === "cod"
-                                ? "Cash will be collected upon delivery of the items."
-                                : "Online payment is not integrated yet. Select Cash on Delivery to place the order."}
+                              Cash will be collected upon delivery of the items.
                             </p>
                             <p className="text-neutral-500 text-xs mt-2">
                               Products from different sellers will be created as separate seller orders.
@@ -1904,7 +1514,7 @@ const Checkout = () => {
                       </p>
                     </div>
                     <p className="font-bold text-green-800">
-                      Rs {(item.price * item.quantity).toFixed(2)}
+                      {formatCurrency(item.price * item.quantity)}
                     </p>
                   </div>
                 ))}
@@ -1912,19 +1522,19 @@ const Checkout = () => {
               <div className="space-y-2 mb-6">
                 <div className="flex justify-between">
                   <span className="text-brown-600">Subtotal</span>
-                 <span>Rs {subtotal.toFixed(2)}</span>
+                  <span>{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-brown-600">Shipping</span>
                   <span>
-                 {shipping === 0 ? "Free" : `Rs ${shipping.toFixed(2)}`}
-                </span>
+                    {shipping === 0 ? "Free" : formatCurrency(shipping)}
+                  </span>
                 </div>
                 <div className="border-t border-gray-100 pt-3 mt-3">
                   <div className="flex justify-between font-semibold">
                     <span>Total</span>
                     <span className="text-green-700">
-                       Rs {total.toFixed(2)}
+                      {formatCurrency(total)}
                     </span>
                   </div>
                 </div>
@@ -1944,7 +1554,7 @@ const Checkout = () => {
                   })}{" "}
                   {shipping === 0
                 ? "(Free Shipping)"
-                  : `(Shipping Rs ${shipping.toFixed(2)})`}
+                  : `(Shipping ${formatCurrency(shipping)})`}
                 </span>
               </div>
 
@@ -1962,7 +1572,7 @@ const Checkout = () => {
               {step === 2 && (
                 <Button
                   type="button"
-                  onClick={() => paginate(3)}
+                  onClick={() => void continueToReview()}
                   className="w-full h-12 rounded-xl text-base font-bold bg-[#33381C] hover:bg-[#262A14] text-[#F7EEE4] shadow-md transition-all duration-300"
                 >
                   Continue to Review
@@ -1979,15 +1589,10 @@ const Checkout = () => {
                       <Loader2 className="h-5 w-5 animate-spin" />
                       Placing Order...
                     </>
-                  ) : selectedPayment === "cod" ? (
-                    <>
-                      <Lock className="h-4 w-4 mr-1.5" />
-                      Place COD Order
-                    </>
                   ) : (
                     <>
                       <Lock className="h-4 w-4 mr-1.5" />
-                      Continue to Payment
+                      Place COD Order
                     </>
                   )}
                 </Button>
@@ -2013,23 +1618,10 @@ const Checkout = () => {
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-1.5">
                   <span className="text-[9px] font-bold bg-[#33381C] text-[#F7EEE4] px-2.5 py-1 rounded uppercase">
-                    Razorpay
-                  </span>
-                  <span className="text-[9px] font-bold bg-[#33381C] text-[#F7EEE4] px-2.5 py-1 rounded uppercase">
-                    Cards
-                  </span>
-                  <span className="text-[9px] font-bold bg-[#33381C] text-[#F7EEE4] px-2.5 py-1 rounded uppercase">
-                    UPI
-                  </span>
-                  <span className="text-[9px] font-bold bg-[#33381C] text-[#F7EEE4] px-2.5 py-1 rounded uppercase">
                     COD
                   </span>
                 </div>
               </div>
-
-              <p className="mt-4 text-center text-[9px] text-neutral-400">
-                Razorpay online payment is shown as an option, but gateway integration is not active yet. COD is currently the only payment method that can place an order.
-              </p>
             </aside>
           </div>
         </form>

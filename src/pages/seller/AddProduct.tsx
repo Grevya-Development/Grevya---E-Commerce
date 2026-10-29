@@ -18,6 +18,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import SellerLayout from "@/layouts/SellerLayout";
+import { formatCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 
@@ -633,7 +634,7 @@ export default function AddProduct() {
                   <PreviewMetric
                     label="Price"
                     value={
-                      previewPrice > 0 ? `₹${previewPrice.toFixed(2)}` : "₹0.00"
+                      formatCurrency(previewPrice)
                     }
                   />
                   <PreviewMetric

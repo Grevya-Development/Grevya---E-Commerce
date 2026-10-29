@@ -38,10 +38,11 @@ export async function getProductStockDetails(productId: number): Promise<Product
   const inventoryByVariant = new Map<string, number>();
 
   if (variantIds.length > 0) {
-    const { data: inventory } = await supabase
+    const { data: inventory, error: inventoryError } = await supabase
       .from('inventory')
       .select('variant_id, quantity_on_hand, quantity_reserved')
       .in('variant_id', variantIds);
+    if (inventoryError) throw inventoryError;
 
     (inventory || []).forEach((row: any) => {
       const available = asStock(row.quantity_on_hand) - asStock(row.quantity_reserved);

@@ -13,10 +13,8 @@ import {
   Compass,
   Lock,
   ArrowRight,
-  UserCheck,
   Building,
   User,
-  AlertCircle,
   CheckCircle2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -25,6 +23,7 @@ import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { getAuthorizedUserRoles } from "@/lib/authorizedRoles";
 import {
   friendlyAuthError,
   normalizeEmail,
@@ -167,7 +166,6 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
     },
     [expectedRole],
   );
-
   const from =
     (location.state as { from?: { pathname?: string } } | null)?.from
       ?.pathname || defaultRedirect();
@@ -195,13 +193,47 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
     "checking" | "ready" | "invalid"
   >("checking");
 
-  // Role validation conflict state
-  const [validationError, setValidationError] = useState<{
-    expected: string;
-    actual: string;
-  } | null>(null);
-  const [userRoles, setUserRoles] = useState<string[]>([]);
-  const [multipleRolesChooser, setMultipleRolesChooser] = useState(false);
+  const [loginCleanupUserId, setLoginCleanupUserId] = useState<string | null>(
+    null,
+  );
+  const [loginCleanupError, setLoginCleanupError] = useState<string | null>(
+    null,
+  );
+  const validatedSessionRef = useRef<string | null>(null);
+  const validationAttemptRef = useRef(0);
+
+  const signOutVerifiedSession = async (expectedUserId: string) => {
+    const { data: currentSessionData, error: sessionError } =
+      await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+
+    const currentSession = currentSessionData.session;
+    if (!currentSession) return;
+    if (currentSession.user.id !== expectedUserId) {
+      throw new Error(
+        "The signed-in account changed. Please refresh and verify your account.",
+      );
+    }
+
+    const { error: signOutError } = await supabase.auth.signOut({
+      scope: "local",
+    });
+    if (signOutError) throw signOutError;
+
+    const { data: verifiedSessionData, error: verificationError } =
+      await supabase.auth.getSession();
+    if (verificationError) throw verificationError;
+    if (verifiedSessionData.session?.user.id === expectedUserId) {
+      throw new Error(
+        "Your session could not be cleared. Please retry before switching portals.",
+      );
+    }
+    if (verifiedSessionData.session) {
+      throw new Error(
+        "The signed-in account changed while the session was being cleared.",
+      );
+    }
+  };
 
   const isLogin = mode === "login";
   const isSignup = mode === "signup";
@@ -272,10 +304,21 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
 
   // If already logged in, validate roles directly
   const validateActiveUserSession = useCallback(
-    async (authenticatedUserId?: string) => {
+    async (
+      authenticatedUserId?: string,
+      signOutOnMismatch = false,
+    ) => {
       const userId = authenticatedUserId || user?.id;
       if (!userId) return false;
+      const validationAttempt = ++validationAttemptRef.current;
+      const target = selectedRole || expectedRole || "customer";
+      validatedSessionRef.current = `${userId}:${target}`;
       setLoading(true);
+      setLoginCleanupError(null);
+      setErrors((current) => {
+        const { auth: _authError, ...remainingErrors } = current;
+        return remainingErrors;
+      });
       try {
         const { data: profileRow, error: profileError } = await supabase
           .from("profiles")
@@ -285,31 +328,35 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
 
         if (profileError) throw profileError;
 
+        if (validationAttempt !== validationAttemptRef.current) return false;
+
         if (!profileRow) {
-          await supabase.auth.signOut();
+          await signOutVerifiedSession(userId);
           throw new Error(
             "Your account could not be verified. Please contact the administrator.",
           );
         }
 
         if (profileRow.is_active === false) {
-          await supabase.auth.signOut();
+          await signOutVerifiedSession(userId);
           throw new Error(
             "Your account has been blocked. Please contact the administrator.",
           );
         }
 
-        const actualRole = profileRow.role || "customer";
-
-        const availableRoles = [actualRole];
-        if (actualRole === "admin") {
-          availableRoles.push("seller", "customer");
-        } else if (actualRole === "seller") {
-          availableRoles.push("customer");
+        const availableRoles = await getAuthorizedUserRoles(
+          userId,
+          profileRow,
+        );
+        if (validationAttempt !== validationAttemptRef.current) return false;
+        const { data: currentSessionData, error: currentSessionError } =
+          await supabase.auth.getSession();
+        if (currentSessionError) throw currentSessionError;
+        if (currentSessionData.session?.user.id !== userId) {
+          throw new Error(
+            "The signed-in account changed before portal access could be verified.",
+          );
         }
-        setUserRoles(availableRoles);
-
-        const target = selectedRole || expectedRole || "customer";
 
         if (availableRoles.includes(target)) {
           if (target === "seller") {
@@ -321,6 +368,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                 .maybeSingle();
 
             if (sellerApplicationError) throw sellerApplicationError;
+            if (validationAttempt !== validationAttemptRef.current) return false;
 
             if (!sellerApplication || sellerApplication.status === "rejected") {
               navigate("/seller/application", { replace: true });
@@ -332,20 +380,77 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
           } else {
             navigate(defaultRedirect(target), { replace: true });
           }
-        } else if (availableRoles.length > 1) {
-          setMultipleRolesChooser(true);
         } else {
-          setValidationError({ expected: target, actual: actualRole });
+          if (signOutOnMismatch) {
+            try {
+              await signOutVerifiedSession(userId);
+            } catch (cleanupError) {
+              console.error(
+                "[AuthPage] Could not safely clear the wrong-portal session:",
+                cleanupError,
+              );
+              if (validationAttempt === validationAttemptRef.current) {
+                setLoginCleanupUserId(userId);
+                setLoginCleanupError(
+                  "We could not safely clear the sign-in session. Retry cleanup before signing in again.",
+                );
+              }
+              return false;
+            }
+          }
+          if (validationAttempt !== validationAttemptRef.current) return false;
+          setErrors((current) => ({
+            ...current,
+            auth: "Invalid email or password.",
+          }));
         }
         return true;
       } catch (err) {
         console.error("Session verification failed:", err);
-        throw err;
+        if (validationAttempt === validationAttemptRef.current) {
+          if (!signOutOnMismatch) {
+            if (mode === "login") {
+              setErrors((current) => ({
+                ...current,
+                auth:
+                  err instanceof Error
+                    ? err.message
+                    : "We could not verify your account role. Please try again.",
+              }));
+              return false;
+            }
+            throw err;
+          }
+
+          try {
+            await signOutVerifiedSession(userId);
+          } catch (cleanupError) {
+            console.error(
+              "[AuthPage] Could not safely clear the unverified session:",
+              cleanupError,
+            );
+            setLoginCleanupUserId(userId);
+            setLoginCleanupError(
+              "We could not safely clear the sign-in session. Retry cleanup before signing in again.",
+            );
+            return false;
+          }
+          setErrors((current) => ({
+            ...current,
+            auth:
+              err instanceof Error
+                ? err.message
+                : "We could not verify your account role. Please try again.",
+          }));
+        }
+        return false;
       } finally {
-        setLoading(false);
+        if (validationAttempt === validationAttemptRef.current) {
+          setLoading(false);
+        }
       }
     },
-    [defaultRedirect, expectedRole, navigate, selectedRole, user?.id],
+    [defaultRedirect, expectedRole, mode, navigate, selectedRole, user?.id],
   );
 
   useEffect(() => {
@@ -355,7 +460,9 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
       user &&
       !authLoading &&
       !profileLoading &&
-      !loading
+      !loading &&
+      validatedSessionRef.current !==
+        `${user.id}:${selectedRole || expectedRole || "customer"}`
     ) {
       void validateActiveUserSession().catch(() => undefined);
     }
@@ -366,6 +473,8 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
     justResetPassword,
     loading,
     profileLoading,
+    expectedRole,
+    selectedRole,
     user,
     validateActiveUserSession,
   ]);
@@ -447,8 +556,12 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (loading || inFlightRef.current) return;
+    if (loading || inFlightRef.current || loginCleanupUserId) return;
     if (!validateForm()) return;
+    setErrors((current) => {
+      const { auth: _authError, ...remainingErrors } = current;
+      return remainingErrors;
+    });
 
     const normalizedEmail = normalizeEmail(email);
     const normalizedPhone = normalizePhone(phone);
@@ -464,18 +577,27 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
           normalizedEmail,
           password,
         );
-
-        const { data: refreshedSessionData } = await supabase.auth.getSession();
-        const activeUserId =
-          refreshedSessionData.session?.user?.id ?? authenticatedUser?.id;
-
-        if (!activeUserId) {
+        const credentialUserId = authenticatedUser?.id;
+        if (!credentialUserId) {
           throw new Error(
-            "Your session could not be restored after signing in. Please try again.",
+            "Your signed-in account could not be identified. Please try again.",
           );
         }
 
-        await validateActiveUserSession(activeUserId);
+        const {
+          data: refreshedSessionData,
+          error: refreshedSessionError,
+        } = await supabase.auth.getSession();
+        if (refreshedSessionError) throw refreshedSessionError;
+        if (refreshedSessionData.session?.user.id !== credentialUserId) {
+          setLoginCleanupUserId(credentialUserId);
+          setLoginCleanupError(
+            "We could not safely verify or clear this sign-in. Retry cleanup before trying again.",
+          );
+          return;
+        }
+
+        await validateActiveUserSession(credentialUserId, true);
       }
 
       if (mode === "signup") {
@@ -508,18 +630,21 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
       }
 
       if (mode === "reset") {
+        const { data: resetSessionData, error: resetSessionError } =
+          await supabase.auth.getSession();
+        if (resetSessionError) throw resetSessionError;
+        const resetUserId = resetSessionData.session?.user.id;
+        if (!resetUserId) {
+          throw new Error(
+            "Your password reset session expired. Please request a new reset link.",
+          );
+        }
         await updateAuthPassword(password);
         toast({
           title: "Password Updated",
           description: "Your password has been changed. Please sign in.",
         });
-        const { error: signOutError } = await supabase.auth.signOut();
-        if (signOutError) {
-          console.error(
-            "[AuthPage] Password changed, but recovery session sign-out failed:",
-            signOutError,
-          );
-        }
+        await signOutVerifiedSession(resetUserId);
         navigate("/login", {
           replace: true,
           state: { passwordReset: true },
@@ -530,6 +655,13 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
       setConfirmPassword("");
       const message =
         error instanceof Error ? error.message : "Authentication failed";
+      if (mode === "login" && /invalid login credentials/i.test(message)) {
+        setErrors((current) => ({
+          ...current,
+          auth: "Invalid email or password.",
+        }));
+        return;
+      }
       toast({
         title: "Authentication Error",
         description:
@@ -548,18 +680,27 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
     }
   };
 
-  const handleResolveMismatch = (role: string) => {
-    setValidationError(null);
-    setMultipleRolesChooser(false);
-    navigate(defaultRedirect(role), { replace: true });
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setValidationError(null);
-    setMultipleRolesChooser(false);
-    setUserRoles([]);
-    setSelectedRole(undefined);
+  const retryLoginSessionCleanup = async () => {
+    if (!loginCleanupUserId || loading) return;
+    setLoading(true);
+    try {
+      await signOutVerifiedSession(loginCleanupUserId);
+      setLoginCleanupUserId(null);
+      setLoginCleanupError(null);
+      setErrors((current) => ({
+        ...current,
+        auth: "Invalid email or password.",
+      }));
+    } catch (error) {
+      console.error("[AuthPage] Could not retry session cleanup:", error);
+      setLoginCleanupError(
+        error instanceof Error
+          ? error.message
+          : "We could not safely clear the sign-in session. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -654,87 +795,8 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
               </div>
             )}
 
-            {/* Validation Error Screen (Mismatch Role) */}
-            {validationError && (
-              <div className="text-center py-6 animate-fade-in space-y-6">
-                <div className="mx-auto w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-600 mb-2 border border-red-150">
-                  <AlertCircle className="w-8 h-8" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-xl font-bold text-neutral-900 font-serif">
-                    Access Denied
-                  </h2>
-                  <p className="text-neutral-500 text-xs max-w-sm mx-auto leading-relaxed">
-                    This account is registered as a{" "}
-                    <span className="font-bold text-[#33381C] capitalize">
-                      {validationError.actual}
-                    </span>
-                    . You cannot access the{" "}
-                    <span className="capitalize">
-                      {validationError.expected}
-                    </span>{" "}
-                    portal with these credentials.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-3 max-w-xs mx-auto pt-4">
-                  <Button
-                    onClick={() =>
-                      handleResolveMismatch(validationError.actual)
-                    }
-                    className="h-11 rounded-xl bg-[#33381C] hover:bg-[#262A14] text-xs font-bold w-full"
-                  >
-                    Continue as {validationError.actual.toUpperCase()}
-                  </Button>
-                  <Button
-                    onClick={handleSignOut}
-                    variant="outline"
-                    className="h-11 rounded-xl border-[#A68D65]/25 text-neutral-600 hover:bg-neutral-50 text-xs font-bold w-full"
-                  >
-                    Sign Out / Switch Account
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Multiple Roles Experience Chooser Screen */}
-            {multipleRolesChooser && !validationError && (
-              <div className="text-center py-6 animate-fade-in space-y-6">
-                <div className="mx-auto w-16 h-16 bg-[#33381C]/5 rounded-full flex items-center justify-center text-[#33381C] mb-2">
-                  <UserCheck className="w-8 h-8" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-xl font-bold text-neutral-900 font-serif">
-                    Choose Experience
-                  </h2>
-                  <p className="text-neutral-500 text-xs max-w-sm mx-auto">
-                    Select which platform dashboard you would like to open.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-3 max-w-xs mx-auto pt-4">
-                  {userRoles.map((role) => (
-                    <Button
-                      key={role}
-                      onClick={() => handleResolveMismatch(role)}
-                      className="h-11 rounded-xl bg-[#33381C] hover:bg-[#262A14] text-xs font-bold w-full capitalize"
-                    >
-                      Enter {role} Dashboard
-                    </Button>
-                  ))}
-                  <Button
-                    onClick={handleSignOut}
-                    variant="outline"
-                    className="h-11 rounded-xl border-[#A68D65]/25 text-neutral-600 hover:bg-neutral-50 text-xs font-bold w-full"
-                  >
-                    Sign Out
-                  </Button>
-                </div>
-              </div>
-            )}
-
             {/* Role Selection Screen */}
-            {requiresRoleSelection &&
-              !validationError &&
-              !multipleRolesChooser && (
+            {requiresRoleSelection && (
               <div className="space-y-6 animate-fade-in">
                 <div>
                   <h2 className="text-2xl font-serif font-bold text-[#1d1e19]">
@@ -788,9 +850,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
             )}
 
             {/* Actual Auth forms */}
-            {(selectedRole || mode === "reset") &&
-              !validationError &&
-              !multipleRolesChooser && (
+            {(selectedRole || mode === "reset") && (
               <AnimatePresence mode="wait">
                 <motion.div
                   key={mode}
@@ -948,6 +1008,11 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                         onChange={(e) => {
                           setEmail(e.target.value);
                           setResetRequestSent(false);
+                          setErrors((current) => {
+                            const { auth: _authError, ...remainingErrors } =
+                              current;
+                            return remainingErrors;
+                          });
                         }}
                         error={errors.email}
                         required
@@ -973,7 +1038,14 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                           label="Password"
                           type={showPassword ? "text" : "password"}
                           value={password}
-                          onChange={(e) => setPassword(e.target.value)}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            setErrors((current) => {
+                              const { auth: _authError, ...remainingErrors } =
+                                current;
+                              return remainingErrors;
+                            });
+                          }}
                           error={errors.password}
                           minLength={isLogin ? 1 : 8}
                           autoComplete={
@@ -994,6 +1066,15 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                             <Eye className="h-4.5 w-4.5" />
                           )}
                         </button>
+                      </div>
+                    )}
+
+                    {isLogin && (loginCleanupError || errors.auth) && (
+                      <div
+                        className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+                        role="alert"
+                      >
+                        {loginCleanupError || errors.auth}
                       </div>
                     )}
 
@@ -1037,6 +1118,7 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                       type="submit"
                       disabled={
                         loading ||
+                        Boolean(loginCleanupUserId) ||
                         (isForgot && resetRequestSent) ||
                         (mode === "reset" && recoveryState !== "ready")
                       }
@@ -1045,7 +1127,11 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                       {loading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {mode === "forgot" ? "Sending..." : "Saving..."}
+                          {mode === "login"
+                            ? "Signing in..."
+                            : mode === "forgot"
+                              ? "Sending..."
+                              : "Saving..."}
                         </>
                       ) : isForgot && resetRequestSent ? (
                         "Reset Link Sent"
@@ -1053,6 +1139,17 @@ const AuthPage = ({ mode }: { mode: AuthMode }) => {
                         pageCopy.submit
                       )}
                     </Button>
+                    {isLogin && loginCleanupUserId && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={retryLoginSessionCleanup}
+                        disabled={loading}
+                        className="w-full"
+                      >
+                        Retry session cleanup
+                      </Button>
+                    )}
                   </form>
                   )}
 

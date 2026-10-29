@@ -6,6 +6,7 @@ import { useCartStore } from '@/store/useCartStore';
 import { getAvailableStock, getProductStockDetails } from '@/lib/stock';
 import { toast } from '@/components/ui/use-toast';
 import { ProductProps } from './ProductCard';
+import { formatCurrency } from '@/lib/currency';
 
 export default function QuickViewModal() {
   const [isOpen, setIsOpen] = useState(false);
@@ -215,7 +216,7 @@ export default function QuickViewModal() {
 
                 {/* Price */}
                 <p className="text-2xl font-bold text-[#33381C] mb-4">
-                  ₹{product.price.toFixed(2)}
+                  {formatCurrency(product.price)}
                 </p>
 
                 {/* Description loading/content */}
@@ -300,7 +301,7 @@ export default function QuickViewModal() {
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   {availableStock === 0
                     ? 'Out of Stock'
-                    : `Add to Cart • ₹${(product.price * quantity).toFixed(2)}`}
+                    : `Add to Cart • ${formatCurrency(product.price * quantity)}`}
                 </button>
               </div>
             </div>

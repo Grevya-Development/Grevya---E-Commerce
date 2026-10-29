@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import SellerLayout from "@/layouts/SellerLayout";
+import { formatCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -326,7 +327,7 @@ export default function PendingProducts() {
                       {product.stock}
                     </td>
                     <td className="px-6 py-4 text-right text-sm text-slate-700">
-                      ₹{product.price}
+                      {formatCurrency(product.price)}
                     </td>
                     <td className="px-6 py-4 text-right text-sm text-slate-700">
                       {formatDate(product.created_at)}

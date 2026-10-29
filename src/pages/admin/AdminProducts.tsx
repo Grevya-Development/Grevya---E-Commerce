@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ShieldCheck, Star, Trash2, RefreshCw, ImagePlus } from "lucide-react";
 import AdminLayout from "@/layouts/AdminLayout";
+import { formatCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import {
@@ -296,7 +297,7 @@ export default function AdminProducts() {
                           Price
                         </p>
                         <p className="mt-2 font-semibold text-slate-900">
-                          ₹{product.price}
+                          {formatCurrency(product.price)}
                         </p>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-3">
